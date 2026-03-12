@@ -29,10 +29,10 @@
 <div class="container-fluid overflow-hidden py-5 px-lg-0">
     <div class="container py-5 px-lg-0">
         <div class="row g-5 mx-lg-0">
-            <div class="col-lg-12 about-text wow fadeInUp" data-wow-delay="0.3s">
+            <!-- <div class="col-lg-12 about-text wow fadeInUp" data-wow-delay="0.3s">
                 <h1 class="mb-3 text-center">Bisnis siap jalan dengan 4 langkah saja!</h1>
                 <img class="img-fluid mb-5" src="<?= base_url() ?>assets/front/img/step-mitra.png" alt="">
-            </div>
+            </div> -->
             <div class="col-lg-12 about-text wow fadeInUp" data-wow-delay="0.3s">
                 <h1 class="mb-5 text-center">Keuntungan jadi Agen Smesco Express</h1>
                 <div class="row justify-content-center g-4 mb-5">
