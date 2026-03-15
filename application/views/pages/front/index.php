@@ -1,3 +1,4 @@
+<!-- index.php -->
 <!DOCTYPE html>
 <html lang="en">
 
@@ -254,15 +255,29 @@
 			<div class="navbar-nav ms-auto p-4 p-lg-0">
 				<a href="<?= base_url() ?>" class="nav-item nav-link <?= ($segment == 'home') ? 'active' : '' ?>">Beranda</a>
 				<a href="<?= base_url('home/about') ?>" class="nav-item nav-link <?= ($segment == 'about') ? 'active' : '' ?>">Tentang</a>
-				<a href="<?= base_url('home/service') ?>" class="nav-item nav-link <?= ($segment == 'service') ? 'active' : '' ?>">Layanan</a>
-				<a href="<?= base_url('home/track') ?>" class="nav-item nav-link <?= ($segment == 'track') ? 'active' : '' ?>">Tracking</a>
+
+				<!-- Dropdown: Layanan -->
+				<div class="nav-item dropdown">
+					<a href="#" class="nav-link dropdown-toggle <?= in_array($segment, ['service', 'pricelist']) ? 'active' : '' ?>" data-bs-toggle="dropdown">Layanan</a>
+					<div class="dropdown-menu rounded-0 m-0">
+						<a href="<?= base_url('home/service') ?>" class="dropdown-item <?= ($segment == 'service') ? 'active' : '' ?>">Layanan Kami</a>
+						<a href="<?= base_url('home/pricelist') ?>" class="dropdown-item <?= ($segment == 'pricelist') ? 'active' : '' ?>">Daftar Harga</a>
+					</div>
+				</div>
+
+				<!-- Dropdown: Info Pengiriman -->
+				<div class="nav-item dropdown">
+					<a href="#" class="nav-link dropdown-toggle <?= in_array($segment, ['track', 'cek_ongkir', 'outlet']) ? 'active' : '' ?>" data-bs-toggle="dropdown">Info Pengiriman</a>
+					<div class="dropdown-menu rounded-0 m-0">
+						<a href="<?= base_url('home/track') ?>" class="dropdown-item <?= ($segment == 'track') ? 'active' : '' ?>">Tracking</a>
+						<a href="<?= base_url('home/cek_ongkir') ?>" class="dropdown-item <?= ($segment == 'cek_ongkir') ? 'active' : '' ?>">Cek Ongkir</a>
+						<a href="<?= base_url('home/outlet') ?>" class="dropdown-item <?= ($segment == 'outlet') ? 'active' : '' ?>">Outlet Kami</a>
+					</div>
+				</div>
+
 				<a href="<?= base_url('home/agent') ?>" class="nav-item nav-link <?= ($segment == 'agent') ? 'active' : '' ?>">Kemitraan</a>
-				<a href="<?= base_url('home/cek_ongkir') ?>" class="nav-item nav-link <?= ($segment == 'cek_ongkir') ? 'active' : '' ?>">Cek Ongkir</a>
-				<a href="<?= base_url('home/pricelist') ?>" class="nav-item nav-link <?= ($segment == 'pricelist') ? 'active' : '' ?>">Daftar Harga</a>
-				<a href="<?= base_url('home/outlet') ?>" class="nav-item nav-link <?= ($segment == 'outlet') ? 'active' : '' ?>">Outlet Kami</a>
 				<a href="<?= base_url('auth') ?>" class="nav-item nav-link"><?= ($this->session->userdata('is_logged_in')) ? 'Dashboard' : 'Login' ?></a>
 			</div>
-			<!-- <h4 class="m-0 pe-lg-5 d-none d-lg-block"><i class="fa fa-headphones text-primary me-3"></i>+012 345 6789</h4> -->
 		</div>
 	</nav>
 	<!-- Navbar End -->

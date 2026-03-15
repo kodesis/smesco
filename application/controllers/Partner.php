@@ -304,7 +304,7 @@ class Partner extends CI_Controller
             $max_num = $this->M_Partner->selectMaxGerai();
 
             // $kode = "KRX" . $pendaftar['id_kelurahan'];
-            $kode = "KRX";
+            $kode = "SMC";
 
             if (!$max_num['max']) {
                 $bilangan = 1;
@@ -392,7 +392,7 @@ class Partner extends CI_Controller
     {
         $max_num = $this->M_Partner->selectMaxDepositCode();
 
-        $kode = "KRXDPS";
+        $kode = "SMCDPS";
 
         if (!$max_num['max']) {
             $bilangan = 1;

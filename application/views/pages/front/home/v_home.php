@@ -1,3 +1,4 @@
+<!-- v_home.php -->
 <!-- Carousel Mulai -->
 <div class="container-fluid p-0">
     <div class="owl-carousel header-carousel position-relative mb-5">
@@ -107,7 +108,7 @@
             <h6 class="text-secondary text-uppercase">Layanan Kami</h6>
             <h1 class="mb-5">Jelajahi Layanan Kami</h1>
         </div>
-        <div class="row g-4">
+        <div class="row justify-content-center g-4">
             <div class="col-md-6 col-lg-4 wow fadeInUp" data-wow-delay="0.3s">
                 <div class="service-item p-4">
                     <div class="overflow-hidden mb-4">

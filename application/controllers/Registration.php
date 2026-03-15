@@ -51,8 +51,8 @@ class Registration extends CI_Controller
                 'no_telepon' => $this->input->post('no_telepon')
             ];
 
-            echo '<pre>', print_r($this->input->post()), '</pre>';
-            exit;
+            // echo '<pre>', print_r($this->input->post()), '</pre>';
+            // exit;
         }
     }
 
@@ -220,10 +220,10 @@ class Registration extends CI_Controller
             'foto_npwp' => $gambar['npwp'],
         ];
 
-        echo '<pre>';
-        print_r($data);
-        echo '</pre>';
-        exit;
+        // echo '<pre>';
+        // print_r($data);
+        // echo '</pre>';
+        // exit;
 
         $this->db->trans_begin();
 

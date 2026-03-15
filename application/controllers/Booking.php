@@ -227,7 +227,7 @@ class Booking extends CI_Controller
 
         $max_num = $this->M_Booking->selectMaxResi();
 
-        $kode = "KRX" . date('ymd');
+        $kode = "SMC" . date('ymd');
 
         if (!$max_num['max']) {
             $bilangan = 1;
@@ -275,10 +275,10 @@ class Booking extends CI_Controller
             'jenis_pengiriman' => $dom_int,
         ];
 
-        echo '<pre>';
-        print_r($data);
-        echo '</pre>';
-        exit;
+        // echo '<pre>';
+        // print_r($data);
+        // echo '</pre>';
+        // exit;
 
         $id_resi = $this->M_Booking->insertResi($data);
 
