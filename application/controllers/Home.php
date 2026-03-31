@@ -15,10 +15,10 @@ class Home extends CI_Controller
 		$data = [
 			'title' => 'Home',
 			'segment' => 'home',
-			'pages' => 'pages/front/home/v_home'
+			'pages' => 'pages/front/home/v2/v_home'
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function about()
@@ -29,7 +29,7 @@ class Home extends CI_Controller
 			'pages' => 'pages/front/home/v_about'
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function service()
@@ -40,7 +40,7 @@ class Home extends CI_Controller
 			'pages' => 'pages/front/home/v_service'
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function track($resi = NULL)
@@ -52,10 +52,10 @@ class Home extends CI_Controller
 				// Validasi hanya saat form POST
 				$this->form_validation->set_rules('g-recaptcha-response', 'reCAPTCHA', 'required');
 
-				if ($this->form_validation->run() == FALSE) {
-					$this->session->set_flashdata('message', 'reCAPTCHA is required.');
-					redirect('home/track');
-				}
+				// if ($this->form_validation->run() == FALSE) {
+				// 	$this->session->set_flashdata('message', 'reCAPTCHA is required.');
+				// 	redirect('home/track');
+				// }
 
 				$recaptchaResponse = $this->input->post('g-recaptcha-response');
 				$secretKey = '6LcrQFQqAAAAAKO2oNf5Gx-8MOR1vExhoD0oiDVY'; // Hosting
@@ -80,10 +80,10 @@ class Home extends CI_Controller
 				$result = file_get_contents($url, false, $context);
 				$resultData = json_decode($result);
 
-				if (!$resultData->success) {
-					$this->session->set_flashdata('message', 'Unable to verify reCAPTCHA. Please try again later.');
-					redirect('home/track');
-				}
+				// if (!$resultData->success) {
+				// 	$this->session->set_flashdata('message', 'Unable to verify reCAPTCHA. Please try again later.');
+				// 	redirect('home/track');
+				// }
 			}
 
 			$cek_resi = $this->M_Booking->cekResi($nomor_resi);
@@ -97,19 +97,19 @@ class Home extends CI_Controller
 			$data = [
 				'title' => 'Track',
 				'segment' => 'track',
-				'pages' => 'pages/front/home/v_track',
+				'pages' => 'pages/front/home/v2/v_track',
 				'resi' => ($resi) ? $resi : '',
 			];
 		} else {
 			$data = [
 				'title' => 'Track',
 				'segment' => 'track',
-				'pages' => 'pages/front/home/v_track',
+				'pages' => 'pages/front/home/v2/v_track',
 				'resi' => '',
 			];
 		}
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function agent()
@@ -120,7 +120,7 @@ class Home extends CI_Controller
 			'pages' => 'pages/front/home/v_agent'
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function cek_ongkir()
@@ -128,10 +128,10 @@ class Home extends CI_Controller
 		$data = [
 			'title' => 'Cek Ongkir',
 			'segment' => 'cek_ongkir',
-			'pages' => 'pages/front/home/v_cek_ongkir'
+			'pages' => 'pages/front/home/v2/v_cek_ongkir'
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function autocompleteOrigin()
@@ -266,7 +266,7 @@ class Home extends CI_Controller
 			'pages' => 'pages/front/home/v_pricelist'
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 
 	public function outlet()
@@ -278,6 +278,6 @@ class Home extends CI_Controller
 			'outlets' => $this->db->where(['is_active' => '1'])->order_by('nama_pendaftar', 'ASC')->get('partner')->result()
 		];
 
-		$this->load->view('pages/front/index', $data);
+		$this->load->view('pages/front/index_v2', $data);
 	}
 }

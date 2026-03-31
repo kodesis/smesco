@@ -235,7 +235,7 @@
             $('#setPickup .modal-title').text('Confirm arrival at warehouse ' + id);
 
             $.ajax({
-                url: "<?= site_url('booking/formConfirmWarehouse') ?>",
+                url: "<?= site_url('booking/formKonfirmBerangkat') ?>",
                 type: "POST",
                 data: {
                     id: id,

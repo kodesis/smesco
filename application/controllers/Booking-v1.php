@@ -494,7 +494,7 @@ class Booking extends CI_Controller
         $this->load->view('pages/index', $data);
     }
 
-    public function formConfirmWarehouse()
+    public function formKonfirmBerangkat()
     {
         $id = $this->input->post('id');
         $drivers = $this->M_Booking->list_driver();

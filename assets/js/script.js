@@ -221,19 +221,26 @@ $(document).ready(function () {
 		});
 
 		// Validasi khusus untuk Select2 customer_id
-		if (!$('#customer_id').val()) {
-			$('#customer_id').next('.select2-container').find('.select2-selection').addClass('is-invalid');
-			valid = false; // Tandai sebagai tidak valid
+		let customerValid = true;
+		if (!$("#customer_id").val()) {
+			$("#customer_id")
+				.next(".select2-container")
+				.find(".select2-selection")
+				.addClass("is-invalid");
+			customerValid = false;
 		} else {
-			$('#customer_id').next('.select2-container').find('.select2-selection').removeClass('is-invalid').addClass('is-valid');
-			valid = true;
+			$("#customer_id")
+				.next(".select2-container")
+				.find(".select2-selection")
+				.removeClass("is-invalid")
+				.addClass("is-valid");
 		}
 
 		// Jika ada input yang tidak valid, cegah submit dan tampilkan peringatan
-		if (!valid) {
+		if (!valid || !customerValid) {
 			Swal.fire({
-				icon: 'error',
-				text: 'Please fill out all required fields!'
+				icon: "error",
+				text: "Please fill out all required fields!",
 			});
 			return;
 		}
@@ -283,7 +290,16 @@ $(document).ready(function () {
 		}
 	}
 
-	$('#berat_timbang').on('input', handleChange);
+	// $('#berat_timbang').on('input', handleChange);
+	$("#berat_timbang").on("input", function () {
+		let berat = $(this).val();
+		if (berat === "") berat = 0;
+
+		// Update text di sidebar
+		$("#berat_timbang_summary").text(formatNumber(parseFloat(berat.replace(/\,/g, '')) || 0));
+		
+		handleChange();
+	});
 	$('#jenis_pengiriman').on('change', handleChange);
 
 
@@ -306,7 +322,7 @@ $(document).ready(function () {
 
 			// Cek jika kedua inputan origin dan destination sudah diisi
 			var origin = $("#origin").val();
-			var destination = $('#kota').find(":selected").data("nama");
+			var destination = $("#destination").val();
 			// var jenis_pengiriman = $("#jenis_pengiriman").val();
 
 			if (origin && destination) {
@@ -375,6 +391,21 @@ $(document).ready(function () {
 				$('#harga').val(per_kg);
 				$('#harga_jual').val(harga_jual);
 				$('#nominal').val(formatNumber(harga_up));
+					
+				$("#harga_label_summary").text(formatNumber(per_kg.toFixed(2)));
+				$("#nominal_summary").text(formatNumber(harga_up.toFixed(2)));
+				// nominal_summary
+
+				var jenis_label = {
+					D: "Domestik",
+					IR: "International Regular",
+					IE: "International Economic",
+					IP: "International Premium",
+				};
+
+				console.log(data.jenis);
+				$("#jenis_pengiriman").val(data.jenis);
+				$("#jenis_label").val(jenis_label[data.jenis] || "-");
 				// hitungNominal();
 			},
 			error: function () {
@@ -409,7 +440,7 @@ $(document).ready(function () {
 
 
 
-	$(document).on('change click keyup input paste', 'input[name="panjang[]"], input[name="lebar[]"], input[name="tinggi[]"], input[name="jumlah[]"]', function (event) {
+	$(document).on('change input', 'input[name="panjang[]"], input[name="lebar[]"], input[name="tinggi[]"], input[name="jumlah[]"]', function (event) {
 		$(this).val(function (index, value) {
 			return value.replace(/(?!\.)\D/g, "")
 				.replace(/(?<=\..*)\./g, "")
@@ -462,6 +493,8 @@ $(document).ready(function () {
 		});
 		$('#total_qty').val(formatNumber(total_koli.toFixed(0))); // Atur nilai input #nominal dengan total_pos_fix
 		$('#total_volume').val(formatNumber(total_volume.toFixed(2))); // Atur nilai input #total_chargeable dengan total_chwt
+		
+		$("#total_volume_summary").text(formatNumber(total_volume.toFixed(2)));
 
 		tentukanChargeable();
 		handleChange();
@@ -472,38 +505,37 @@ $(document).ready(function () {
 
 		var jenis_pengiriman = $("#jenis_pengiriman").val();
 
-		var berat_timbang = parseFloat($('#berat_timbang').val().replace(/\,/g, '')) || 0;
+		// 1. Ambil nilai dan BERSIHKAN dari koma/titik ribuan
+		var beratTimbangRaw = $("#berat_timbang").val().replace(/[,.]/g, "");
+		var berat_timbang = parseFloat(beratTimbangRaw) || 0;
 
-		var volume = parseFloat($('#total_volume').val().replace(/\,/g, '')) || 0;
+		var volumeRaw = $("#total_volume").val().replace(/[,.]/g, "");
+		var volume = parseFloat(volumeRaw) || 0;
 
-		console.log(volume);
-
+		// 2. Bandingkan
 		if (berat_timbang >= volume) {
 			chargeable = berat_timbang;
 		} else {
 			chargeable = volume;
 		}
 
-		if (jenis_pengiriman == 'D') {
-			chargeable = (chargeable < 10) ? 10 : chargeable;
-		} else {
-			chargeable = chargeable;
+		// 3. Logic Domestik minimal 10 kg
+		if (jenis_pengiriman === "D") {
+			chargeable = chargeable < 10 ? 10 : chargeable;
 		}
 
-		$('#chargeable').val(formatNumber(Math.ceil(chargeable)));
+		// Bulatkan ke atas (Ceil) untuk chargeable (misal 10.2 kg jadi 11 kg)
+		chargeable = Math.ceil(chargeable);
 
-		// hitungNominal();
+		// 4. Update ke tampilan & input hidden (tanpa koma untuk dikirim via AJAX)
+		$("#chargeable").val(chargeable); // Ini dikirim via AJAX, jadi JANGAN DIBIKIN KOMA
+		$("#chargeable_summary").text(formatNumber(chargeable)); // Ini buat visual aja
+
+		// hitungNominal(); <-- Kalau butuh, buka komennya
 	}
 
 	function formatNumber(number) {
-		// Pisahkan bagian integer dan desimal
-		let parts = number.toString().split(",");
-
-		// Format bagian integer dengan pemisah ribuan
-		parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-
-		// Gabungkan bagian integer dan desimal dengan koma sebagai pemisah desimal
-		return parts.join(",");
+		return new Intl.NumberFormat("en-US").format(number);
 	}
 
 	var rowCount = 1; // Inisialisasi row
@@ -563,11 +595,22 @@ $(document).ready(function () {
 
 
 	// Tambahkan event listener untuk tombol hapus row
-	$(document).on('click', '.hapusRow', function () {
-		$(this).closest('.baris').remove();
-		updateTotalRow(); // Perbarui total belanja setelah menghapus baris
+	$(document).on("click", ".hapusRow", function (e) {
+		// Tambahkan parameter 'e' di sini
+		e.preventDefault(); // <--- INI KUNCINYA, BRO! Mencegah form submit otomatis
 
-		updateRowNumbers();
+		if ($(".baris").length > 1) {
+			// Sisakan minimal satu baris
+			$(this).closest(".baris").remove();
+			updateTotalRow();
+			updateRowNumbers();
+		} else {
+			Swal.fire({
+				icon: "error",
+				title: "Gak bisa, bro!",
+				text: "Minimal harus ada satu baris detail barang.",
+			});
+		}
 	});
 
 	$("#nama_pengirim").autocomplete({
@@ -619,6 +662,18 @@ $(document).ready(function () {
 		reverse: true
 	});
 
+	// Tambahkan ini di document ready
+	$('#is_berharga').on('change', function() {
+		if($(this).is(':checked')) {
+			$('#input_nilai_barang').show(300); // Muncul pelan
+			$('#status_berharga').text('Ya (Berharga)');
+			$('#nilai_barang').focus();
+		} else {
+			$('#input_nilai_barang').hide(200); // Sembunyi
+			$('#status_berharga').text('Tidak');
+			$('#nilai_barang').val('0'); // Reset ke 0
+		}
+	});
 });
 
 function reloadTable() {

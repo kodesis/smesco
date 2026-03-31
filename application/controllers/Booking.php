@@ -28,17 +28,6 @@ class Booking extends CI_Controller
 
     public function index()
     {
-        if ($this->session->userdata('role_id') == '3') {
-            $saldo = $this->checkSaldo(($this->session->userdata('partner_id')));
-
-            if ($saldo < 500000) {
-                $this->session->set_flashdata('message_warning', '<div class="alert alert-warning alert-dismissible fade show" role="alert">
-                                Saldo Anda kurang dari 500.000. Segera lakukan top-up Saldo!.
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                                </div>');
-            }
-        }
-
         $per_page = ($this->input->post('show_per_page')) ? trim($this->input->post('show_per_page')) : (($this->session->userdata('show_per_page')) ? $this->session->userdata('show_per_page') : '10');
         if ($per_page === null) $per_page = $this->session->userdata('show_per_page');
         else $this->session->set_userdata('show_per_page', $per_page);
@@ -113,16 +102,6 @@ class Booking extends CI_Controller
 
     public function create_booking()
     {
-        if ($this->session->userdata('role_id') == '3') {
-            $saldo = $this->checkSaldo(($this->session->userdata('partner_id')));
-
-            if ($saldo < 500000) {
-                $this->session->set_flashdata('message_error', 'Saldo kurang dari Rp500.000. Booking tidak dapat diproses');
-                redirect('booking');
-            }
-        }
-
-        // $pages_booking = ($this->session->userdata('role_id') == '3') ? 'v_create_booking_v2' : 'v_create_booking';
         $pages_booking = 'v_create_booking_v2';
 
         $data = [
@@ -132,7 +111,6 @@ class Booking extends CI_Controller
             "bookings" => $this->M_Booking->list_booking(),
             "customers" => $this->M_Customer->list_customer(),
             "drivers" => $this->M_Booking->list_driver(),
-            "saldo_mitra" => $saldo
         ];
 
         $this->load->view('pages/index', $data);
@@ -171,11 +149,6 @@ class Booking extends CI_Controller
         } else {
             $this->load->view('pages/booking/v_booking_desktop', $data);
         }
-    }
-
-    private function checkSaldo($id)
-    {
-        return $this->M_Partner->getSaldoAkhirPartner($id)['saldo_akhir'];
     }
 
     public function store_booking()
@@ -238,7 +211,9 @@ class Booking extends CI_Controller
         $no_urut = sprintf("%04d", $bilangan);
         $no_resi = $kode . $no_urut;
 
-        // nominal
+		// nominal
+		$is_berharga = $this->input->post('is_berharga') ? '1' : '0';
+		$nilai_barang = $this->convertToNumber($this->input->post('nilai_barang'));
         $nominal = $this->convertToNumberWithComma($this->input->post('nominal')); // 1055530.00
         $harga_jual = $this->input->post('harga_jual');
         $chargeable = $this->convertToNumberWithComma($this->input->post('chargeable'));
@@ -256,7 +231,9 @@ class Booking extends CI_Controller
             'nama_penerima' => trim($this->input->post('nama_penerima')),
             'telepon_penerima' => trim($this->input->post('telepon_penerima')),
             'alamat_penerima' => trim($this->input->post('alamat_penerima')),
-            'commodity' => trim($this->input->post('jenis_barang')),
+			'is_berharga' => $is_berharga, // Masuk ke DB
+			'nilai_barang' => $nilai_barang, // Masuk ke DB
+			'commodity' => trim($this->input->post('jenis_barang')),
             'qty' => $this->convertToNumberWithComma($this->input->post('total_qty')),
             'berat_timbang' => $this->convertToNumberWithComma($this->input->post('berat_timbang')),
             'chargeable' => $chargeable,
@@ -334,15 +311,6 @@ class Booking extends CI_Controller
 
     public function editResi($no_resi)
     {
-        if ($this->session->userdata('role_id') == '3') {
-            $saldo = $this->checkSaldo(($this->session->userdata('partner_id')));
-
-            if ($saldo < 500000) {
-                $this->session->set_flashdata('message_error', 'Saldo kurang dari Rp500.000. Booking tidak dapat diproses');
-                redirect('booking');
-            }
-        }
-
         $pages_booking = 'v_edit_booking';
 
         $data = [
@@ -464,29 +432,13 @@ class Booking extends CI_Controller
 
             if (!empty($detail)) {
 
-                if ($this->M_Booking->insert_batch_detail_awb($detail)) {
-                    $this->M_Booking->updateBooking($id, $data_booking);
-
-                    $this->db->trans_commit();
-
-                    $detailBooking = $this->M_Booking->detailBooking($no_booking);
-                    $driver = $this->M_Auth->getUserById($detailBooking['id_driver'])['phone_number'];
-
-                    // notifikasi awb ke driver untuk pengantaran barang
-                    $driver = $this->M_Auth->getUserById($detailBooking['id_driver'])['phone_number'];
-                    $pesan_driver = $this->messageToDriver($detailBooking, $no_booking);
-                    $this->api_whatsapp->wa_notif($pesan_driver, $driver);
-
-                    $this->session->set_flashdata('message_name', 'Resi berhasil ditambahkan.');
-
-                    redirect('booking/list_detail');
-                } else {
-                    $this->db->trans_rollback();
-
-                    $this->session->set_flashdata('message_error', 'Gagal input. Silahkan ulangi lagi!');
-
-                    redirect('booking');
-                }
+				// SESUDAH
+				if ($this->M_Booking->insert_batch_detail_awb($detail)) {
+					$this->M_Booking->updateBooking($id, $data_booking);
+					$this->db->trans_commit();
+					$this->session->set_flashdata('message_name', 'Resi berhasil ditambahkan.');
+					redirect('booking/list_detail');
+				}
             }
         } else {
             $this->db->trans_rollback();
@@ -524,51 +476,10 @@ class Booking extends CI_Controller
 
         if ($this->M_Booking->updateResi($id, $data)) {
 
-            $data_deposit = [
-                'partner_id' => $detailResi['partner_id'],
-                'resi_id' => $detailResi['id'],
-                'usage_saldo' => ($status == '1') ? $detailResi['ppm'] : '0',
-            ];
-
-            $cek_deposit = $this->db->where('resi_id', $detailResi['id'])->get('deposit')->num_rows();
-
-            if ($cek_deposit) {
-                // Jika sudah ada, update data deposit
-                if (!$this->db->where('resi_id', $detailResi['id'])->update('deposit', $data_deposit)) {
-                    $this->db->trans_rollback();
-                    $response = array('success' => false, 'message' => 'Gagal memperbarui deposit.');
-                    $this->output->set_content_type('application/json')->set_output(json_encode($response));
-                    return;
-                }
-            } else {
-                // Jika belum ada, insert data deposit
-                if (!$this->db->insert('deposit', $data_deposit)) {
-                    $this->db->trans_rollback();
-                    $response = array('success' => false, 'message' => 'Gagal menambah deposit.');
-                    $this->output->set_content_type('application/json')->set_output(json_encode($response));
-                    return;
-                }
-            }
-
             $this->db->trans_commit();
 
-            if ($status == '1') {
-                $message = "Resi sudah dibayar";
-
-                // pesan untuk pengirim
-                $pesan_pengirim = $this->messageToCustomer($id, $detailResi['nama_pengirim']);
-
-                // pesan untuk penerima
-                $pesan_penerima = $this->messageToCustomer($id, $detailResi['nama_penerima']);
-
-                // notifikasi WA ke pengirim
-                $this->api_whatsapp->wa_notif($pesan_pengirim, $detailResi['telepon_pengirim']);
-
-                // notifikasi WA ke penerima
-                $this->api_whatsapp->wa_notif($pesan_penerima, $detailResi['telepon_penerima']);
-            } else {
-                $message = "Resi belum dibayar";
-            }
+			// SESUDAH
+			$message = ($status == '1') ? "Resi sudah dibayar" : "Resi belum dibayar";
         } else {
 
             $this->db->trans_rollback();
@@ -667,7 +578,7 @@ class Booking extends CI_Controller
         $this->load->view('pages/index', $data);
     }
 
-    public function formConfirmWarehouse()
+    public function formKonfirmBerangkat()
     {
         $id = $this->input->post('id');
         $drivers = $this->M_Booking->list_driver();
@@ -747,79 +658,34 @@ class Booking extends CI_Controller
         redirect('booking/list_detail');
     }
 
-    public function setPickup($id)
-    {
-        $detailAwb = $this->M_Booking->detailBooking($id);
+	public function setPickup($id)
+	{
+		$detailAwb  = $this->M_Booking->detailBooking($id);
+		$driver_id  = $this->input->post('driver_id');
+		$tanggal_pickup = $this->input->post('tanggal_pickup');
 
-        $driver_id = $this->input->post('driver_id');
-        $titik_jemput = $this->input->post('titik_jemput');
-        $gudang_tujuan = $this->input->post('gudang_tujuan');
-        $tanggal_pickup = $this->input->post('tanggal_pickup');
+		$data_resi = ['status_tracking' => '1'];
 
-        // Ambil nomor HP driver untuk notifikasi ke whatsapp
-        $driver = $this->M_Auth->getUserById($driver_id);
+		$data_booking = [
+			'id_driver'      => $driver_id,
+			'tanggal_pickup' => $tanggal_pickup,
+			'set_pickup'     => '1',
+		];
 
-        $data_resi = [
-            'status_tracking' => '1',
-        ];
+		$this->db->trans_begin();
 
-        $this->db->trans_begin();
+		$this->M_Booking->updateAwbDetailByBookingId($detailAwb['Id'], $data_resi);
 
-        $this->M_Booking->updateAwbDetailByBookingId($detailAwb['Id'], $data_resi);
+		if ($this->M_Booking->updateAwb($id, $data_booking)) {
+			$this->db->trans_commit();
+			$this->session->set_flashdata('message_name', "Penjemputan barang $id sudah diatur.");
+		} else {
+			$this->db->trans_rollback();
+			$this->session->set_flashdata('message_error', "Gagal atur penjemputan barang $id. Silahkan coba lagi!");
+		}
 
-        $data_booking = [
-            'id_driver' => $driver_id,
-            'tanggal_pickup' => $tanggal_pickup,
-            'set_pickup' => '1',
-        ];
-
-        $nama_driver = $driver['name'];
-        $no_smu = $detailAwb['awb'];
-        $nama_customer = $detailAwb['nama_customer'];
-        $qty = $detailAwb['total_qty'];
-        $beratBarang = $detailAwb['total_chargeable'];
-        $jenisBarang = $detailAwb['commodity'];
-
-        // Kunci rahasia untuk hash
-        $secret_key = "kriboexpress-kirimbro";
-
-        // Buat token hash menggunakan no_smu dan driver_id
-        $token = hash_hmac('sha256', $no_smu . $driver_id, $secret_key);
-
-        // URL dengan token
-        $linkKonfirmasi = base_url("confirm/pickup/$no_smu/$driver_id?token=$token");
-
-        if ($this->M_Booking->updateAwb($id, $data_booking)) {
-            $pesan = "*Halo, $nama_driver!*\n";
-            $pesan .= "Kami ingin mengingatkan bahwa anda mendapatkan tugas untuk pick-up barang customer. Berikut adalah detail barang yang harus Anda pickup:\n";
-            $pesan .= "*• Nomor SMU: $no_smu*\n";
-            $pesan .= "*• Nama Pengirim: $nama_customer*\n";
-            $pesan .= "*• Alamat Barang: $titik_jemput*\n";
-            $pesan .= "*• Gudang Tujuan: $gudang_tujuan*\n";
-            $pesan .= "*• Kuantitas Barang: $qty*\n";
-            $pesan .= "*• Jenis Barang: $jenisBarang*\n";
-            $pesan .= "*• Berat Barang: $beratBarang*\n";
-            $pesan .= "Setelah paket diambil, mohon klik tautan di bawah ini untuk mengonfirmasi bahwa barang sudah dipickup dan sedang dalam perjalanan ke gudang:\n";
-            $pesan .= "$linkKonfirmasi\n\n";
-            $pesan .= "Terima kasih atas kerja keras Anda dalam memastikan pengiriman berjalan lancar!\n";
-            $pesan .= "*Salam hangat,*\n";
-            $pesan .= "Tim Smesco Express\n";
-            $pesan .= "Kirim Bro"; //dibuat miring
-
-            $no_whatsapp = $driver['phone_number'];
-
-            $this->api_whatsapp->wa_notif($pesan, $no_whatsapp);
-            $this->db->trans_commit();
-
-            $this->session->set_flashdata('message_name', "Penjemputan barang $id sudah diatur.");
-        } else {
-            $this->db->trans_rollback();
-
-            $this->session->set_flashdata('message_error', "Gagal atur penjemputan barang $id. Silahkan coba lagi!");
-        }
-
-        redirect('booking');
-    }
+		redirect('booking');
+	}
 
     public function confirmPickup()
     {
@@ -886,71 +752,96 @@ class Booking extends CI_Controller
         return $this->output->set_content_type('application/json')->set_output(json_encode($response));
     }
 
+	public function confirmArrOriginWarehouse()
+	{
+		$id     = $this->input->post('id');
+		$status = $this->input->post('status');
 
+		$data = [
+			'status_tracking'            => '3',
+			'tanggal_tiba_gudang_asal'   => ($status == '1') ? date('Y-m-d H:i:s') : null,
+		];
 
-    public function confirmWarehouse()
-    {
-        $id = $this->input->post('id');
-        $status = $this->input->post('status');
+		$this->db->trans_begin();
 
-        $resi = $this->M_Booking->getResi($id);
+		if ($this->M_Booking->updateResi($id, $data)) {
+			$this->db->trans_commit();
+			$message = ($status == '1')
+				? "Barang sudah tiba di gudang asal"
+				: "Barang batal konfirmasi tiba di gudang asal";
+		} else {
+			$this->db->trans_rollback();
+			$message = "Gagal update status gudang asal.";
+		}
 
-        $agent = $this->M_Agent->showById($resi['agent_id']);
+		$response = ['success' => true, 'message' => $message];
+		$this->output->set_content_type('application/json')->set_output(json_encode($response));
+	}
 
-        $data = [
-            'confirm_arr_warehouse' => $status,
-            'status_tracking' => '3'
-        ];
+	public function confirmWarehouse()
+	{
+		$id     = $this->input->post('id');
+		$status = $this->input->post('status');
 
-        $this->db->trans_begin();
+		$resi  = $this->M_Booking->getResi($id);
+		$agent = $this->M_Agent->showById($resi['agent_id']);
 
-        if ($this->M_Booking->updateResi($id, $data)) {
-            $this->db->trans_commit();
-            if ($status == '1') {
-                $message = "Barang sudah dikonfirmasi tiba di gudang";
+		$data = [
+			'confirm_arr_warehouse'      => $status,
+			'status_tracking'            => '5',
+			'tanggal_tiba_gudang_tujuan' => ($status == '1') ? date('Y-m-d H:i:s') : null, // ← TAMBAHAN
+		];
 
-                // kirim notifikasi ke agent
-                $this->messageToAgent($agent, $resi);
-            } else {
-                $message = "Barang batal konfirmasi tiba di gudang";
-            }
-        }
+		$this->db->trans_begin();
 
-        // Kembalikan respon JSON
-        $response = array('success' => true, 'status', 'message' => $message);
-        $this->output->set_content_type('application/json')->set_output(json_encode($response));
-    }
+		if ($this->M_Booking->updateResi($id, $data)) {
+			$this->db->trans_commit();
 
-    public function confirmArrDestination()
-    {
-        $id = $this->input->post('id');
-        $status = $this->input->post('status');
+			if ($status == '1') {
+				$message = "Barang sudah dikonfirmasi tiba di gudang";
+				$this->messageToAgent($agent, $resi);
+			} else {
+				$message = "Barang batal konfirmasi tiba di gudang";
+			}
+		} else {
+			$this->db->trans_rollback();
+			$message = "Gagal update status gudang.";
+		}
 
-        $detailResi = $this->M_Booking->getResi($id);
+		$response = ['success' => true, 'message' => $message];
+		$this->output->set_content_type('application/json')->set_output(json_encode($response));
+	}
 
-        $data = [
-            'confirm_arrival' => $status,
-            'status_tracking' => '4'
-        ];
+	public function confirmArrDestination()
+	{
+		$id     = $this->input->post('id');
+		$status = $this->input->post('status');
 
-        // Lakukan pembaruan status pada database
-        $this->M_Booking->updateResi($id, $data);
+		$detailResi = $this->M_Booking->getResi($id);
 
-        if ($status == '1') {
-            $message = "Barang sudah dikonfirmasi tiba di alamat penerima";
+		$data = [
+			'confirm_arrival'     => $status,
+			'status_tracking'     => '6',
+			'tanggal_tiba_tujuan' => ($status == '1') ? date('Y-m-d H:i:s') : null, // ← TAMBAHAN
+		];
 
-            $pesan_pengirim = $this->messageArrivalToCustomer($detailResi);
-            $pesan_penerima = $this->messageArrivalToCustomer($detailResi);
+		$this->M_Booking->updateResi($id, $data);
 
-            $this->api_whatsapp->wa_notif($pesan_pengirim, $detailResi['telepon_pengirim']);
-            $this->api_whatsapp->wa_notif($pesan_penerima, $detailResi['telepon_penerima']);
-        } else {
-            $message = "Barang batal konfirmasi tiba di alamat penerima";
-        }
-        // Kembalikan respon JSON
-        $response = array('success' => true, 'status', 'message' => $message);
-        $this->output->set_content_type('application/json')->set_output(json_encode($response));
-    }
+		if ($status == '1') {
+			$message = "Barang sudah dikonfirmasi tiba di alamat penerima";
+
+			$pesan_pengirim = $this->messageArrivalToCustomer($detailResi);
+			$pesan_penerima = $this->messageArrivalToCustomer($detailResi);
+
+			$this->api_whatsapp->wa_notif($pesan_pengirim, $detailResi['telepon_pengirim']);
+			$this->api_whatsapp->wa_notif($pesan_penerima, $detailResi['telepon_penerima']);
+		} else {
+			$message = "Barang batal konfirmasi tiba di alamat penerima";
+		}
+
+		$response = ['success' => true, 'message' => $message];
+		$this->output->set_content_type('application/json')->set_output(json_encode($response));
+	}
 
     public function updateAwb($id)
     {
@@ -972,14 +863,9 @@ class Booking extends CI_Controller
     public function arriveWarehouse($id)
     {
         $detailBooking = $this->M_Booking->detailBooking($id);
-        // $resi = $this->M_Booking->detailItemBooking($detailBooking['Id']);
-        // echo '<pre>';
-        // print_r($resi);
-        // echo '</pre>';
-        // exit;
-
+		
         $data_resi = [
-            'status_tracking' => '3',
+            'status_tracking' => '4',
             'tanggal_berangkat' => $this->input->post('tanggal_berangkat'),
             'moda_pengiriman' => $this->input->post('moda_pengiriman'),
         ];
@@ -994,16 +880,6 @@ class Booking extends CI_Controller
 
         if ($this->M_Booking->updateBooking($detailBooking['Id'], $data_booking)) {
             $resi = $this->M_Booking->detailItemBooking($detailBooking['Id']);
-
-            // foreach ($resi as $r) :
-            // endforeach;
-
-            // Kirim notifikasi ke agent
-            // $this->api_whatsapp->wa_notif($pesan_agent, $customer);
-
-            // Kirim notifikasi ke customer
-            // $pesan_customer = $this->messageToCustomer($detailBooking, $resi);
-            // $this->api_whatsapp->wa_notif($pesan_customer, $customer);
 
             $this->db->trans_commit();
 
@@ -1041,84 +917,6 @@ class Booking extends CI_Controller
         return true;
     }
 
-    private function messageToCustomer($no_resi, $nama_tujuan)
-    {
-        $linkTracking = base_url("home/track");
-
-        $pesan_customer = "*Halo, {$nama_tujuan}!*\n";
-        $pesan_customer .= "Paket Anda sedang dalam perjalanan. Berikut nomor resi:\n";
-        $pesan_customer .= "*-- $no_resi*\n";
-        $pesan_customer .= "\nAnda dapat melacak status pengiriman di:\n $linkTracking \n\n*Salam hangat,*\nTim Smesco Express\n_Kirim Bro_"; //dibuat miring
-
-        return $pesan_customer;
-    }
-
-    private function messageToDriver($detailBooking, $no_booking)
-    {
-        $no_smu = $detailBooking['awb'];
-        $driver_id = $detailBooking['id_driver'];
-
-        $driver = $this->M_Auth->getUserById($driver_id);
-
-        // Kunci rahasia untuk hash
-        $secret_key = "kriboexpress-kirimbro";
-
-        // Buat token hash menggunakan no_smu dan driver_id
-        $token = hash_hmac('sha256', $no_booking . $driver_id, $secret_key);
-
-        // URL dengan token
-        $linkKonfirmasi = base_url("confirm/pickup/$no_booking/$driver_id?token=$token");
-
-        $pesan = "*Halo, {$driver['name']}!*\n";
-        $pesan .= "Kami ingin mengingatkan bahwa anda mendapatkan tugas untuk pick-up barang customer. Berikut adalah detail barang yang harus Anda pickup:\n";
-        $pesan .= "*• Nomor Booking: {$no_booking}*\n";
-        $pesan .= "*• Nama Pengirim: {$detailBooking['nama_customer']}*\n";
-        $pesan .= "*• Alamat Barang: {$detailBooking['alamat_pickup']}*\n";
-        $pesan .= "*• Gudang Tujuan: {$detailBooking['gudang_tujuan']}*\n";
-        $pesan .= "*• Kuantitas Barang: {$detailBooking['total_qty']}*\n";
-        $pesan .= "*• Jenis Barang: {$detailBooking['commodity']}*\n";
-        $pesan .= "*• Berat Barang: {$detailBooking['total_chargeable']}*\n";
-        $pesan .= "\nSetelah paket diambil, mohon klik tautan di bawah ini untuk mengonfirmasi bahwa barang sudah dipickup dan sedang dalam perjalanan ke gudang:\n";
-        $pesan .= "$linkKonfirmasi\n\n";
-        $pesan .= "Terima kasih atas kerja keras Anda dalam memastikan pengiriman berjalan lancar!\n";
-        $pesan .= "*Salam hangat,*\n";
-        $pesan .= "Tim Smesco Express\n";
-        $pesan .= "Kirim Bro"; //dibuat miring
-        return $pesan;
-    }
-
-
-    public function arriveDestination($id)
-    {
-
-        $detailResi = $this->M_Booking->getItemAwb($id);
-
-        $partner_id = $this->M_Booking->getBookingById($detailResi['booking_id'])['partner_id'];
-
-        $customer_phone = $this->M_Customer->showById($partner_id);
-        // print_r($customer_phone);
-        // exit;
-        $data = [
-            'status_tracking' => '4',
-        ];
-
-        $this->db->trans_begin();
-
-        if ($this->M_Booking->updateAwbDetail($id, $data)) {
-            $this->db->trans_commit();
-
-            $pesan_customer = $this->messageArrivalToCustomer($detailResi);
-
-            $this->api_whatsapp->wa_notif($pesan_customer, $customer_phone);
-
-            $this->session->set_flashdata('message_name', "Konfirmasi barang $id sudah tiba di tujuan berhasil.");
-        } else {
-            $this->session->set_flashdata('message_error', "Gagal konfimasi barang $id tiba di tujuan. Silahkan coba lagi!");
-        }
-
-        redirect('booking/list_detail');
-    }
-
     public function detailResi($no_resi)
     {
         // print_r($no_resi);
@@ -1134,6 +932,10 @@ class Booking extends CI_Controller
             "drivers" => $this->M_Booking->list_driver(),
         ];
 
+		// echo '<pre>';
+		// print_r($resi);
+		// echo '</pre>';
+		// exit;
         $this->load->view('pages/index', $data);
     }
 
@@ -1217,64 +1019,55 @@ class Booking extends CI_Controller
         }
     }
 
-    public function print_resi($no_resi)
-    {
-        $resi = $this->M_Booking->getResi($no_resi);
-        // $booking = $this->M_Booking->getBookingById($resi['booking_id']);
+	public function print_resi($no_resi)
+	{
+		$resi = $this->M_Booking->getResi($no_resi);
 
-        $linkTracking = base_url("home/track/$no_resi");
+		// Proteksi: Jika resi tidak ada, jangan paksa render
+		if (!$resi) {
+			show_404();
+			return;
+		}
 
-        // Load library CIQRCode
-        $this->load->library('ciqrcode');
+		$linkTracking = base_url("home/track/$no_resi");
 
-        // Generate QR code di direktori sementara
-        $tempDir = sys_get_temp_dir(); // Gunakan direktori sementara
-        $filePath = $tempDir . DIRECTORY_SEPARATOR . 'temp_qrcode.png'; // Path lengkap QR code
+		// ── 1. Generate QR Code (Tracking) ──
+		$this->load->library('ciqrcode');
+		$tempDir  = sys_get_temp_dir();
+		$fileName = 'qr_' . $no_resi . '.png';
+		$filePath = $tempDir . DIRECTORY_SEPARATOR . $fileName;
 
-        // Set parameter QR code
-        $params = [
-            'data' => $linkTracking,
-            'level' => 'H', // H = High
-            'size' => 10,
-            'savename' => $filePath, // Simpan di direktori sementara
-        ];
+		$this->ciqrcode->generate([
+			'data'     => $linkTracking,
+			'level'    => 'M',
+			'size'     => 5,
+			'savename' => $filePath,
+		]);
 
-        // Generate QR code
-        $this->ciqrcode->generate($params);
+		$qrData = '';
+		if (file_exists($filePath)) {
+			$qrData = 'data:image/png;base64,' . base64_encode(file_get_contents($filePath));
+			unlink($filePath);
+		}
 
-        // Cek apakah file QR code sementara ada sebelum mengambil isinya
-        if (file_exists($filePath)) {
-            // Baca konten file QR code sebagai base64
-            $imageData = base64_encode(file_get_contents($filePath));
+		// ── 2. Generate Barcode (1D) ──
+		$this->load->library('cibarcode');
+		$barcodeData = $this->cibarcode->generate($no_resi);
 
-            // Hapus file sementara setelah digunakan
-            unlink($filePath);
-        } else {
-            // Jika file tidak ditemukan, tulis log error
-            log_message('error', 'File temp_qrcode.png tidak ditemukan.');
-            $imageData = ''; // Pastikan tidak ada data kosong
-        }
+		// ── 3. Data Parsing ──
+		$data = [
+			'title_pdf'   => 'Resi-' . $no_resi,
+			'resi'        => $resi,
+			'pengirim'    => $resi['nama_pengirim'],
+			'penerima'    => $resi['nama_penerima'],
+			'qr_code'     => $qrData,
+			'barcode_smu' => $barcodeData,
+		];
 
-        // Data yang akan dikirim ke view
-        $data = [
-            'title_pdf' => 'Resi No. ' . $no_resi,
-            'resi' => $resi,
-            // 'booking' => $booking,
-            'pengirim' => $resi['nama_pengirim'],
-            'penerima' => $resi['nama_penerima'],
-            'qr_code' => 'data:image/png;base64,' . $imageData, // Gunakan base64 image
-        ];
-
-        // HTML Mode
-        // $this->load->view('pages/booking/v_print_resi', $data);
-
-        // PDF Mode
-        $file_pdf = 'Resi No. ' . $no_resi;
-        $paper = 'A6';
-        $orientation = "portrait";
-        $html = $this->load->view('pages/booking/v_print_resi', $data, true);
-        $this->pdfgenerator->generate($html, $file_pdf, $paper, $orientation);
-    }
+		// ── 4. Render PDF ──
+		$html = $this->load->view('pages/booking/v_print_resi', $data, true);
+		$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+	}
 
     public function print_invoice($no_booking)
     {
@@ -1447,8 +1240,6 @@ class Booking extends CI_Controller
                 'J' => "Chargeable",
                 'K' => "Nominal Resi",
                 'L' => "Fee",
-                // 'M' => "Topup",
-                // 'N' => "Sisa saldo"
             ];
 
             $sheet = $excel->setActiveSheetIndex(0);
@@ -1473,12 +1264,6 @@ class Booking extends CI_Controller
                 $excel->setActiveSheetIndex(0)->setCellValue('J' . $numrow, $t->chargeable);
                 $excel->setActiveSheetIndex(0)->setCellValue('K' . $numrow, $t->nominal);
                 $excel->setActiveSheetIndex(0)->setCellValue('L' . $numrow, $t->partner_fee);
-                // $excel->setActiveSheetIndex(0)->setCellValue('M' . $numrow, 0);
-                // $excel->setActiveSheetIndex(0)->setCellValue('N' . $numrow, $t->sisa_saldo);
-
-                // foreach (range('A', 'L') as $columnID) {
-                //     $excel->getActiveSheet()->getStyle($columnID . $numrow)->applyFromArray($style_row);
-                // }
 
                 $no++; // Tambah 1 setiap kali looping
                 $numrow++; // Tambah 1 setiap kali looping
@@ -1489,7 +1274,7 @@ class Booking extends CI_Controller
 
             // Redirect output to a client’s web browser (Excel5)
             header('Content-Type: application/vnd.ms-excel');
-            header('Content-Disposition: attachment;filename="Rekap deposit from ' . $from . ' to ' . $to . '.xls"');
+            header('Content-Disposition: attachment;filename="Rekap revenue from ' . $from . ' to ' . $to . '.xls"');
             header('Cache-Control: max-age=0');
             // If you're serving to IE 9, then the following may be needed
             header('Cache-Control: max-age=1');

@@ -1,256 +1,264 @@
+<!-- v_create_booking_v2.php -->
 <link rel="stylesheet" href="<?php echo base_url(); ?>assets/vendor/select2/css/select2.min.css">
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+<script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+
+<style>
+	/* Memaksa dropdown autocomplete selalu di urutan paling depan */
+	.ui-autocomplete {
+		z-index: 9999 !important;
+		/* Menang telak dari sticky-top */
+		max-height: 250px;
+		/* Biar kalau kotanya banyak, bisa di-scroll */
+		overflow-y: auto;
+		overflow-x: hidden;
+		background-color: #ffffff;
+		border: 1px solid #cbd5e1;
+		border-radius: 4px;
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+	}
+
+	/* Mempercantik hover saat milih kota */
+	.ui-menu-item-wrapper.ui-state-active {
+		background-color: #0054a6 !important;
+		/* Warna biru tabler */
+		color: #ffffff !important;
+		border: none !important;
+	}
+</style>
 
 <!-- Page header -->
 <div class="page-header d-print-none">
-    <div class="container-xl">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <h2 class="page-title">
-                    <?= $title ?>s
-                </h2>
-            </div>
-            <!-- Page title actions -->
-            <div class="col-auto ms-auto d-print-none">
-                <div class="btn-list">
-                    <a href="<?= base_url('booking') ?>" class="btn btn-warning d-none d-sm-inline-block" aria-label="Create new report">
-                        <!-- Download SVG icon from http://tabler-icons.io/i/plus -->
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-left">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M5 12l14 0" />
-                            <path d="M5 12l6 6" />
-                            <path d="M5 12l6 -6" />
-                        </svg>
-                        Back</a>
-                    <a href="<?= base_url('booking') ?>" class="btn btn-warning d-sm-none btn-icon" aria-label="Create new report">
-                        <!-- Download SVG icon from http://tabler-icons.io/i/plus -->
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-left">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M5 12l14 0" />
-                            <path d="M5 12l6 6" />
-                            <path d="M5 12l6 -6" />
-                        </svg>
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
+	<div class="container-xl">
+		<div class="row g-2 align-items-center">
+			<div class="col">
+				<h2 class="page-title">
+					<?= $title ?>s
+				</h2>
+			</div>
+			<!-- Page title actions -->
+			<div class="col-auto ms-auto d-print-none">
+				<div class="btn-list">
+					<a href="<?= base_url('booking') ?>" class="btn btn-warning d-none d-sm-inline-block" aria-label="Create new report">
+						<!-- Download SVG icon from http://tabler-icons.io/i/plus -->
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-left">
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M5 12l14 0" />
+							<path d="M5 12l6 6" />
+							<path d="M5 12l6 -6" />
+						</svg>
+						Back</a>
+					<a href="<?= base_url('booking') ?>" class="btn btn-warning d-sm-none btn-icon" aria-label="Create new report">
+						<!-- Download SVG icon from http://tabler-icons.io/i/plus -->
+						<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon icon-tabler icons-tabler-outline icon-tabler-arrow-left">
+							<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+							<path d="M5 12l14 0" />
+							<path d="M5 12l6 6" />
+							<path d="M5 12l6 -6" />
+						</svg>
+					</a>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 <!-- Page body -->
 <div class="page-body">
-    <div class="container-xl">
-        <div class="row row-deck row-cards">
-            <div class="col-12">
-                <form action="<?= base_url('booking/store_booking') ?>" method="post" class="card" id="formBooking">
-                    <div class="card-body">
-                        <?php
-                        $role_id = $this->session->userdata('role_id');
+	<div class="container-xl">
+		<form action="<?= base_url('booking/store_booking') ?>" method="post" id="formBooking">
+			<div class="row row-cards">
 
-                        if ($role_id == '3') {
-                            $user_id = $this->session->userdata('user_id');
-                            $id_customer = $this->session->userdata('customer_id'); ?>
-                            <div class="row">
-                                <div class="col-md-6 col-12">
-                                    <div class="mb-3">
-                                        <label for="jenis_pengiriman" class="form-label">Jenis pengiriman</label>
-                                        <select name="jenis_pengiriman" id="jenis_pengiriman" class="form-control">
-                                            <option value="D">Domestik</option>
-                                            <option value="I">International</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Jenis barang</label>
-                                        <input type="text" name="jenis_barang" id="jenis_barang" class="form-control" placeholder="Masukkan jenis barang" oninput="this.value = this.value.toUpperCase()">
-                                        <input type="hidden" name="saldo_mitra" id="saldo_mitra" class="form-control" value="<?= number_format($saldo_mitra) ?>">
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12 d-none">
-                                    <div class="mb-3">
-                                        <label class="form-label">Saldo</label>
-                                        <input type="text" name="saldo_mitra" id="saldo_mitra" class="form-control" value="<?= number_format($saldo_mitra) ?>">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Nama pengirim</label>
-                                        <input type="text" name="nama_pengirim" id="nama_pengirim" class="form-control" placeholder="Masukkan nama pengirim" oninput="this.value = this.value.toUpperCase()">
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">No Whatsapp pengirim</label>
-                                        <input type="text" name="telepon_pengirim" id="telepon_pengirim" class="form-control" placeholder="Masukkan no whatsapp pengirim">
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Alamat pengirim</label>
-                                        <textarea type="text" name="alamat_pengirim" id="alamat_pengirim" class="form-control" placeholder="Masukkan alamat pengirim" oninput="this.value = this.value.toUpperCase()"></textarea>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Nama penerima</label>
-                                        <input type="text" name="nama_penerima" id="nama_penerima" class="form-control" placeholder="Masukkan nama penerima" oninput="this.value = this.value.toUpperCase()">
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">No Whatsapp penerima</label>
-                                        <input type="text" name="telepon_penerima" id="telepon_penerima" class="form-control" placeholder="Masukkan no whatsapp penerima">
-                                    </div>
-                                </div>
-                                <div class="col-md-6 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Alamat penerima</label>
-                                        <textarea type="text" name="alamat_penerima" id="alamat_penerima" class="form-control" placeholder="Masukkan alamat penerima" oninput="this.value = this.value.toUpperCase()"></textarea>
-                                    </div>
-                                </div>
-                                <!-- <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label for="provinsi" class="form-label">Provinsi</label>
-                                        <select name="provinsi" id="provinsi" class="form-select" required>
-                                            <option value="">:: Pilih provinsi</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label for="kota" class="form-label">Kota/Kabupaten</label>
-                                        <select name="kota" id="kota" class="form-select" required>
-                                            <option value="">:: Pilih kota/kabupaten</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label for="kecamatan" class="form-label">Kecamatan</label>
-                                        <select name="kecamatan" id="kecamatan" class="form-select" required>
-                                            <option value="">:: Pilih kecamatan</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label for="kelurahan" class="form-label">Kelurahan</label>
-                                        <select name="kelurahan" id="kelurahan" class="form-select" required>
-                                            <option value="">:: Pilih kelurahan</option>
-                                        </select>
-                                    </div>
-                                </div> -->
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Berat timbang</label>
-                                        <input type="text" name="berat_timbang" id="berat_timbang" class="form-control" placeholder="Masukkan berat timbang">
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Total Koli</label>
-                                        <input type="text" name="total_qty" id="total_qty" class="form-control" placeholder="Masukkan jumlah barang" value="1" readonly>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Total Volume</label>
-                                        <input type="text" name="total_volume" id="total_volume" class="form-control" value="0" readonly>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Chargeable</label>
-                                        <input type="text" name="chargeable" id="chargeable" class="form-control" value="0" readonly>
-                                    </div>
-                                </div>
-                            </div>
-                            <hr>
-                            <div class="row">
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <input type="hidden" name="harga_jual" id="harga_jual" class="form-control" value="0" readonly>
-                                        <label for="origin" class="form-label">Origin</label>
-                                        <input type="text" name="origin" id="origin" class="form-control" placeholder="Masukkan origin" oninput="this.value = this.value.toUpperCase()">
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label for="destination" class="form-label">Destination</label>
-                                        <input type="text" name="destination" id="destination" class="form-control" placeholder="Masukkan destination" oninput="this.value = this.value.toUpperCase()">
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label for="harga" class="form-label">Harga satuan</label>
-                                        <input type="text" name="harga" id="harga" class="form-control" value="0" readonly>
-                                        <div class="invalid-feedback">Harga tidak tersedia</div>
-                                        <div class="valid-feedback">Harga tersedia</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-3 col-12">
-                                    <div class="mb-3">
-                                        <label class="form-label">Nominal</label>
-                                        <input type="text" name="nominal" id="nominal" class="form-control" value="0" readonly>
-                                    </div>
-                                </div>
-                            </div>
-                            <hr>
-                            <label for="" class="form-label">Input dimensi</label>
-                            <table class="table table-bordered">
-                                <thead>
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Panjang</th>
-                                        <th>Lebar</th>
-                                        <th>Tinggi</th>
-                                        <th>Koli</th>
-                                        <th>Volume</th>
-                                        <th>delete</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="table-body">
-                                    <tr class="baris ">
-                                        <td class="nomor-urut"></td>
-                                        <td>
-                                            <input type="text" name="panjang[]" id="panjang[]" class="form-control">
-                                        </td>
-                                        <td>
-                                            <input type="text" name="lebar[]" id="lebar[]" class="form-control">
-                                        </td>
-                                        <td>
-                                            <input type="text" name="tinggi[]" id="tinggi[]" class="form-control">
-                                        </td>
-                                        <td>
-                                            <input type="text" name="jumlah[]" id="jumlah[]" class="form-control" value="1">
-                                        </td>
-                                        <td>
-                                            <input type="text" name="volume[]" id="volume[]" class="form-control" value="0" readonly>
-                                        </td>
-                                        <td>
-                                            <button class="btn btn-danger btn-sm hapusRow">Hapus</button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="7" class="text-end">
-                                            <button type="button" class="btn btn-secondary btn-sm" id="addRow">Add new row</button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        <?php
-                        } ?>
-                    </div>
-                    <div class="card-footer text-end">
-                        <div class="d-flex">
-                            <button type="submit" class="btn btn-primary ms-auto">
-                                Simpan
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
+				<div class="col-lg-8">
+					<div class="card">
+						<div class="card-body">
+							<div class="row g-3 mb-4">
+								<div class="col-md-6 col-12">
+									<label class="form-label text-primary fw-bold">Jenis Barang (Commodity)</label>
+									<input type="text" name="jenis_barang" id="jenis_barang" class="form-control" placeholder="Contoh: PAKET BAJU" oninput="this.value = this.value.toUpperCase()">
+								</div>
+								<div class="col-md-3 col-6">
+									<label class="form-label">Barang Berharga?</label>
+									<label class="form-check form-switch mt-2">
+										<input class="form-check-input" type="checkbox" name="is_berharga" id="is_berharga" value="1">
+										<span class="form-check-label" id="status_berharga">Tidak</span>
+									</label>
+								</div>
+								<div class="col-md-3 col-6" id="input_nilai_barang" style="display: none;">
+									<label class="form-label text-danger">Nilai Barang (Rp)</label>
+									<input type="text" name="nilai_barang" id="nilai_barang" class="form-control angka" value="0">
+								</div>
+							</div>
+
+							<hr class="my-4">
+
+							<div class="row">
+								<div class="col-md-6 border-end">
+									<h4 class="mb-3 text-secondary">Data Pengirim</h4>
+									<div class="mb-3">
+										<label class="form-label">Nama Pengirim</label>
+										<input type="text" name="nama_pengirim" id="nama_pengirim" class="form-control" oninput="this.value = this.value.toUpperCase()">
+									</div>
+									<div class="mb-3">
+										<label class="form-label">No. WA Pengirim</label>
+										<input type="text" name="telepon_pengirim" id="telepon_pengirim" class="form-control">
+									</div>
+									<div class="mb-3">
+										<label class="form-label">Alamat Pengirim</label>
+										<textarea name="alamat_pengirim" id="alamat_pengirim" class="form-control" rows="3" oninput="this.value = this.value.toUpperCase()"></textarea>
+									</div>
+								</div>
+
+								<div class="col-md-6">
+									<h4 class="mb-3 text-secondary px-lg-3">Data Penerima</h4>
+									<div class="mb-3 px-lg-3">
+										<label class="form-label">Nama Penerima</label>
+										<input type="text" name="nama_penerima" id="nama_penerima" class="form-control" oninput="this.value = this.value.toUpperCase()">
+									</div>
+									<div class="mb-3 px-lg-3">
+										<label class="form-label">No. WA Penerima</label>
+										<input type="text" name="telepon_penerima" id="telepon_penerima" class="form-control">
+									</div>
+									<div class="mb-3 px-lg-3">
+										<label class="form-label">Alamat Penerima</label>
+										<textarea name="alamat_penerima" id="alamat_penerima" class="form-control" rows="3" oninput="this.value = this.value.toUpperCase()"></textarea>
+									</div>
+								</div>
+							</div>
+
+							<hr class="my-4">
+							<div class="row mb-3">
+								<div class="col-md-4">
+									<label class="form-label font-weight-bold text-primary">Berat Timbang Aktual (kg)</label>
+									<input type="text" name="berat_timbang" id="berat_timbang" class="form-control border-primary" placeholder="0">
+								</div>
+							</div>
+
+							<h4 class="mb-3">Input Dimensi Paket</h4>
+							<div class="table-responsive">
+								<table class="table table-bordered table-vcenter">
+									<thead>
+										<tr class="bg-light">
+											<th class="w-1 text-center">#</th>
+											<th>P (cm)</th>
+											<th>L (cm)</th>
+											<th>T (cm)</th>
+											<th>Koli</th>
+											<th>Volume (m³)</th>
+											<th class="w-1"></th>
+										</tr>
+									</thead>
+									<tbody id="table-body">
+										<tr class="baris">
+											<td class="nomor-urut text-muted text-center">1.</td>
+											<td><input type="text" name="panjang[]" class="form-control"></td>
+											<td><input type="text" name="lebar[]" class="form-control"></td>
+											<td><input type="text" name="tinggi[]" class="form-control"></td>
+											<td><input type="text" name="jumlah[]" class="form-control" value="1"></td>
+											<td><input type="text" name="volume[]" class="form-control bg-light" value="0" readonly></td>
+											<td>
+												<button type="button" class="btn btn-danger btn-icon hapusRow">
+													<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-trash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+														<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+														<path d="M4 7l16 0" />
+														<path d="M10 11l0 6" />
+														<path d="M14 11l0 6" />
+														<path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+														<path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+													</svg>
+												</button>
+											</td>
+										</tr>
+									</tbody>
+									<tfoot>
+										<tr>
+											<td colspan="7" class="text-end">
+												<button type="button" class="btn btn-outline-secondary btn-sm" id="addRow">
+													<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-plus" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+														<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+														<path d="M12 5l0 14" />
+														<path d="M5 12l14 0" />
+													</svg>
+													Tambah Baris
+												</button>
+											</td>
+										</tr>
+									</tfoot>
+								</table>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="col-lg-4">
+					<div class="sticky-top" style="top: 20px;">
+						<div class="card card-md border-primary shadow-sm">
+							<div class="card-status-top bg-primary"></div>
+							<div class="card-body">
+								<h3 class="card-title text-center mb-4">Order Summary</h3>
+
+								<div class="mb-3">
+									<label class="form-label fw-bold">Rute Pengiriman</label>
+
+									<input type="text" name="origin" id="origin" class="form-control mb-2" placeholder="Asal (Origin)" oninput="this.value = this.value.toUpperCase()" required>
+
+									<div class="text-center my-2 text-muted">
+										<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-arrow-down" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+											<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+											<path d="M12 5l0 14" />
+											<path d="M18 13l-6 6" />
+											<path d="M6 13l6 6" />
+										</svg>
+									</div>
+
+									<input type="text" name="destination" id="destination" class="form-control" placeholder="Tujuan (Destination)" oninput="this.value = this.value.toUpperCase()" required>
+
+									<div class="mt-2">
+										<input type="hidden" name="jenis_pengiriman" id="jenis_pengiriman" value="">
+										<input type="text" id="jenis_label" class="form-control bg-light text-center fw-bold text-blue" value="Pilih Tujuan" readonly>
+									</div>
+								</div>
+
+								<div class="p-3 bg-light rounded border mb-4">
+									<div class="d-flex justify-content-between mb-2">
+										<span class="text-secondary small">Berat Timbang:</span>
+										<span class="fw-bold"><span id="berat_timbang_summary">0</span> kg</span>
+									</div>
+									<div class="d-flex justify-content-between mb-2">
+										<span class="text-secondary small">Total Volume:</span>
+										<span class="fw-bold"><span id="total_volume_summary">0</span> m³</span>
+									</div>
+									<div class="d-flex justify-content-between border-top pt-2">
+										<span class="text-danger fw-bold">Chargeable:</span>
+										<span class="text-danger fw-bold"><span id="chargeable_summary">0</span> kg</span>
+										<input type="hidden" name="chargeable" id="chargeable" value="0">
+										<input type="hidden" name="total_qty" id="total_qty" value="1">
+										<input type="hidden" name="total_volume" id="total_volume" value="0">
+									</div>
+								</div>
+
+								<div class="mb-4">
+									<div class="d-flex justify-content-between align-items-center mb-1">
+										<label class="form-label mb-0 small">Harga per Kg</label>
+										<input type="hidden" name="harga" id="harga" value="0">
+										<input type="hidden" name="harga_jual" id="harga_jual" value="0">
+										<span class="fw-bold">Rp <span id="harga_label_summary">0</span></span>
+									</div>
+									<hr class="my-2">
+									<label class="form-label text-primary fw-bold mb-1">Total Bayar</label>
+									<h2 class="text-primary fw-bolder mb-0">Rp <span id="nominal_summary">0</span></h2>
+									<input type="hidden" name="nominal" id="nominal" value="0">
+								</div>
+
+								<button type="submit" class="btn btn-primary w-100 btn-lg shadow-sm" id="btnSimpan">
+									Simpan Booking
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+
+			</div>
+		</form>
+	</div>
 </div>

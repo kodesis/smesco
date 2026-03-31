@@ -22,7 +22,7 @@
                 ?>
                     <div class="row row-cards">
                         <div class="col-md-3 col-6">
-                            <div class="card card-sm">
+                            <!-- <div class="card card-sm">
                                 <div class="card-body">
                                     <div class="row align-items-center">
                                         <div class="col-auto">
@@ -48,7 +48,7 @@
                                         </div>
                                     </div>
                                 </div>
-                            </div>
+                            </div> -->
                             <div class="dropdown mt-2 w-100">
                                 <!-- <button type="button" class="btn btn-primary dropdown-toggle w-100" data-bs-toggle="dropdown">Buat Booking</button> -->
 
