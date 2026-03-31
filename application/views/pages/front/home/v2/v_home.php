@@ -1161,7 +1161,7 @@
 						</svg>
 						<h6>Domestik — Indonesia</h6>
 					</div>
-					<img src="<?= base_url() ?>assets/front/img/map-1.png" alt="Peta Domestik">
+					<img src="<?= base_url() ?>assets/front/img/map-smesco-1.png" alt="Peta Domestik">
 					<div class="jangkauan-footer">Menjangkau 98% area di Indonesia</div>
 				</div>
 			</div>
