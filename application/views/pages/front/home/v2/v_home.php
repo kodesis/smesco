@@ -791,7 +791,7 @@
 			<div class="hero-content">
 				<div class="container">
 					<div class="row">
-						<div class="col-lg-7 col-md-9">
+						<!-- <div class="col-lg-7 col-md-9">
 							<span class="hero-badge">Smesco Express</span>
 							<h1>Kirim Cepat,<br>Sampai <span>Tepat Waktu</span></h1>
 							<p class="lead">Solusi pengiriman domestik & internasional terpercaya. Dari Jakarta ke seluruh Indonesia dan mancanegara.</p>
@@ -799,7 +799,7 @@
 								<a href="<?= base_url('home/cek_ongkir') ?>" class="btn-hero-primary">Cek Ongkir</a>
 								<a href="<?= base_url('home/track') ?>" class="btn-hero-outline">Lacak Kiriman</a>
 							</div>
-						</div>
+						</div> -->
 					</div>
 				</div>
 			</div>
@@ -808,7 +808,7 @@
 			<div class="hero-content">
 				<div class="container">
 					<div class="row">
-						<div class="col-lg-7 col-md-9">
+						<!-- <div class="col-lg-7 col-md-9">
 							<span class="hero-badge">Pengiriman Udara</span>
 							<h1>Jangkauan <span>Global</span>,<br>Layanan Lokal</h1>
 							<p class="lead">Menjangkau 98% wilayah Indonesia dan 5 negara tujuan internasional dengan armada udara terpercaya.</p>
@@ -816,7 +816,7 @@
 								<a href="<?= base_url('home/service') ?>" class="btn-hero-primary">Lihat Layanan</a>
 								<a href="<?= base_url('home/about') ?>" class="btn-hero-outline">Tentang Kami</a>
 							</div>
-						</div>
+						</div> -->
 					</div>
 				</div>
 			</div>
@@ -825,7 +825,7 @@
 			<div class="hero-content">
 				<div class="container">
 					<div class="row">
-						<div class="col-lg-7 col-md-9">
+						<!-- <div class="col-lg-7 col-md-9">
 							<span class="hero-badge">Kemitraan</span>
 							<h1>Bergabung &<br><span>Berkembang</span> Bersama</h1>
 							<p class="lead">Jadilah mitra agen Smesco Express. Raih penghasilan lebih dengan jaringan ekspedisi yang terus berkembang.</p>
@@ -833,7 +833,7 @@
 								<a href="<?= base_url('home/agent') ?>" class="btn-hero-primary">Daftar Sekarang</a>
 								<a href="<?= base_url('home/about') ?>" class="btn-hero-outline">Pelajari Lebih</a>
 							</div>
-						</div>
+						</div> -->
 					</div>
 				</div>
 			</div>
