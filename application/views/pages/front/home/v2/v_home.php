@@ -1175,7 +1175,7 @@
 						</svg>
 						<h6>Internasional</h6>
 					</div>
-					<img src="<?= base_url() ?>assets/front/img/map-2.png" alt="Peta Internasional">
+					<img src="<?= base_url() ?>assets/front/img/map-smesco-2.png" alt="Peta Internasional">
 					<div class="jangkauan-footer">Singapura &bull; Thailand &bull; Malaysia &bull; Guangzhou &bull; Taipei</div>
 				</div>
 			</div>
