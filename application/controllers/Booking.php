@@ -833,8 +833,10 @@ class Booking extends CI_Controller
 			$pesan_pengirim = $this->messageArrivalToCustomer($detailResi);
 			$pesan_penerima = $this->messageArrivalToCustomer($detailResi);
 
-			$this->api_whatsapp->wa_notif($pesan_pengirim, $detailResi['telepon_pengirim']);
-			$this->api_whatsapp->wa_notif($pesan_penerima, $detailResi['telepon_penerima']);
+			// $this->api_whatsapp->wa_notif($pesan_pengirim, $detailResi['telepon_pengirim']);
+			// $this->api_whatsapp->wa_notif($pesan_penerima, $detailResi['telepon_penerima']);
+			$this->api_whatsapp->wa_notif_v2($detailResi['telepon_pengirim'], $pesan_pengirim);
+			$this->api_whatsapp->wa_notif_v2($detailResi['telepon_penerima'], $pesan_penerima);
 		} else {
 			$message = "Barang batal konfirmasi tiba di alamat penerima";
 		}
@@ -912,7 +914,8 @@ class Booking extends CI_Controller
         $pesan_agent .= "*Link konfirmasi: \n $linkKonfirmasi *\n\n";
         $pesan_agent .= "Setelah dikonfirmasi, status pengiriman akan diperbarui otomatis.\n*Salam hangat,*\nTim Smesco Express\nKirim Bro"; //dibuat miring
 
-        $this->api_whatsapp->wa_notif($pesan_agent, $agent['telepon_agent']);
+        // $this->api_whatsapp->wa_notif($pesan_agent, $agent['telepon_agent']);
+		$this->api_whatsapp->wa_notif_v2($detailResi['telepon_pengirim'], $pesan_pengirim);
 
         return true;
     }
