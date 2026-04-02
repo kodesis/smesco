@@ -1,12 +1,4 @@
 <?php
-if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
-	$_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
-}
-
-if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-	$_SERVER['REQUEST_SCHEME'] = $_SERVER['HTTP_X_FORWARDED_PROTO'];
-	$_SERVER['HTTPS'] = ($_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ? 'on' : 'off';
-}
 /**
  * CodeIgniter
  *
