@@ -1057,7 +1057,16 @@ class Booking extends CI_Controller
 		$this->load->library('cibarcode');
 		$barcodeData = $this->cibarcode->generate($no_resi);
 
-		// ── 3. Data Parsing ──
+		// ── 3. Convert Logo ke Base64 ──
+		$logoPath = FCPATH . 'assets/logo/icon-smesco.png'; // FCPATH ini penting biar ngebaca langsung ke root folder project lu
+		$logoBase64 = '';
+		if (file_exists($logoPath)) {
+			$logoType = pathinfo($logoPath, PATHINFO_EXTENSION);
+			$logoData = file_get_contents($logoPath);
+			$logoBase64 = 'data:image/' . $logoType . ';base64,' . base64_encode($logoData);
+		}
+
+		// ── 4. Data Parsing ──
 		$data = [
 			'title_pdf'   => 'Resi-' . $no_resi,
 			'resi'        => $resi,
@@ -1065,9 +1074,10 @@ class Booking extends CI_Controller
 			'penerima'    => $resi['nama_penerima'],
 			'qr_code'     => $qrData,
 			'barcode_smu' => $barcodeData,
+			'logo_base64' => $logoBase64 // Lempar variabel logonya ke view
 		];
 
-		// ── 4. Render PDF ──
+		// ── 5. Render PDF ──
 		$html = $this->load->view('pages/booking/v_print_resi', $data, true);
 		$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
 	}

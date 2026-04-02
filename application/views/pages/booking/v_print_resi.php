@@ -191,7 +191,8 @@
 	<div class="resi-container">
 		<div class="header">
 			<div class="header-logo">
-				<img src="<?= base_url('assets/logo/icon-smesco.png') ?>" style="width: 100px;">
+				<!-- <img src="<?= base_url('assets/logo/icon-smesco.png') ?>" style="width: 100px;"> -->
+				<img src="<?= $logo_base64 ?>" style="width: 100px;">
 				<!-- <div style="font-size: 9px; font-weight: bold; margin-top: 5px;">KRIBO EXPRESS x SMESCO</div> -->
 			</div>
 			<div class="header-qr">
