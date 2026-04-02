@@ -179,7 +179,7 @@
 									}
 									?>
 									<td class="">
-										<a href="<?= base_url('booking/print_resi/' . $b->no_resi) ?>" target="" class="btn btn-primary btn-sm ms-auto mb-1">Print</a>
+										<a href="<?= base_url('booking/print_resi/' . $b->no_resi) ?>" target="_blank" class="btn btn-primary btn-sm ms-auto mb-1">Print</a>
 										<?php
 										if ($this->session->userdata('role_id') == '2' or $this->session->userdata('username') == 'krx0005') {
 										?>

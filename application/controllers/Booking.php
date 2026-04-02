@@ -1068,8 +1068,9 @@ class Booking extends CI_Controller
 		];
 
 		// ── 4. Render PDF ──
-		$html = $this->load->view('pages/booking/v_print_resi', $data, true);
-		$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+		// $html = $this->load->view('pages/booking/v_print_resi', $data, true);
+		// $this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+		$this->load->view('pages/booking/v_print_resi', $data);
 	}
 
     public function print_invoice($no_booking)
