@@ -1,3 +1,4 @@
+<!-- v_print_resi.php -->
 <!DOCTYPE html>
 <html lang="id">
 
@@ -264,9 +265,6 @@
 		</div>
 	</div>
 
-	<script>
-		window.print();
-	</script>
 </body>
 
 </html>
