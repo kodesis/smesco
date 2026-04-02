@@ -179,7 +179,7 @@
 									}
 									?>
 									<td class="">
-										<a href="<?= base_url('booking/print_resi/' . $b->no_resi) ?>" target="_blank" class="btn btn-primary btn-sm ms-auto mb-1">Print</a>
+										<a href="<?= base_url('booking/print_resi/' . $b->no_resi) ?>" target="" class="btn btn-primary btn-sm ms-auto mb-1">Print</a>
 										<?php
 										if ($this->session->userdata('role_id') == '2' or $this->session->userdata('username') == 'krx0005') {
 										?>
@@ -189,7 +189,7 @@
 											<?php
 											if ($b->url_tracking) {
 											?>
-												<a href="<?= $b->url_tracking ?>" class="btn btn-info btn-sm ms-auto mb-1" target="_blank">Track Barang</a>
+												<a href="<?= $b->url_tracking ?>" class="btn btn-info btn-sm ms-auto mb-1" target="">Track Barang</a>
 											<?php
 											}
 										} else {
