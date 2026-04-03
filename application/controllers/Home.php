@@ -125,6 +125,7 @@ class Home extends CI_Controller
 
 	public function cek_ongkir()
 	{
+		show_404();
 		$data = [
 			'title' => 'Cek Ongkir',
 			'segment' => 'cek_ongkir',

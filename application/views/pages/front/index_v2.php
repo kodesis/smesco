@@ -379,8 +379,8 @@
 					<div class="dropdown-menu rounded-0 m-0">
 						<a href="<?= base_url('home/track') ?>"
 							class="dropdown-item <?= ($segment == 'track') ? 'active' : '' ?>">Tracking</a>
-						<a href="<?= base_url('home/cek_ongkir') ?>"
-							class="dropdown-item <?= ($segment == 'cek_ongkir') ? 'active' : '' ?>">Cek Ongkir</a>
+						<!-- <a href="<?= base_url('home/cek_ongkir') ?>"
+							class="dropdown-item <?= ($segment == 'cek_ongkir') ? 'active' : '' ?>">Cek Ongkir</a> -->
 						<a href="<?= base_url('home/outlet') ?>"
 							class="dropdown-item <?= ($segment == 'outlet') ? 'active' : '' ?>">Outlet Kami</a>
 					</div>

@@ -874,7 +874,7 @@
 <!-- ══════════════════════════════════════════════ -->
 <!-- CEK ONGKIR INLINE                              -->
 <!-- ══════════════════════════════════════════════ -->
-<section class="cek-ongkir-section">
+<!-- <section class="cek-ongkir-section">
 	<div class="container">
 		<div class="cek-ongkir-card">
 			<div class="row align-items-start">
@@ -906,7 +906,6 @@
 						</div>
 					</div>
 
-					<!-- Hasil -->
 					<div id="hasil-ongkir">
 						<div class="hasil-label">Estimasi Biaya</div>
 						<div class="hasil-rute" id="hasil-rute"></div>
@@ -932,7 +931,7 @@
 			</div>
 		</div>
 	</div>
-</section>
+</section> -->
 
 <!-- ══════════════════════════════════════════════ -->
 <!-- TENTANG KAMI                                   -->
