@@ -150,6 +150,7 @@
                                             </div>
                                             <!-- <hr> -->
                                             <label for="" class="form-label">Input dimensi</label>
+											<div class="table-responsive">
                                             <table class="table table-bordered">
                                                 <thead>
                                                     <tr>
@@ -191,6 +192,7 @@
                                                     </tr>
                                                 </tbody>
                                             </table>
+											</div>
                                         </div>
                                     </div>
                                 </div>
