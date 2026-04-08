@@ -3,7 +3,7 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class Master extends Authenticated_Controller
 {
-	protected $allowed_roles = ['admin-kribo', 'finance-kribo'];
+	protected $allowed_roles = ['admin-kribo', 'finance-kribo', 'superadmin'];
 
 	public function __construct()
 	{
@@ -61,8 +61,9 @@ class Master extends Authenticated_Controller
 			$this->form_validation->set_rules('origin', 'Kota Asal', 'required|trim');
 			$this->form_validation->set_rules('destination', 'Kota Tujuan', 'required|trim');
 			$this->form_validation->set_rules('service_type_id', 'Tipe Layanan', 'required|numeric');
-			$this->form_validation->set_rules('price_per_kg', 'Harga per kg', 'required|numeric');
 			$this->form_validation->set_rules('min_weight_kg', 'Minimum Berat', 'required|numeric');
+			$this->form_validation->set_rules('price_kribo', 'Harga Kribo (Modal)', 'required|numeric');
+			$this->form_validation->set_rules('price_smesco', 'Harga Smesco (Jual)', 'required|numeric');
 
 			// 4. Jalankan Validasi
 			if ($this->form_validation->run() !== FALSE) {
@@ -89,7 +90,8 @@ class Master extends Authenticated_Controller
 						'origin'          => $origin,
 						'destination'     => $destination,
 						'service_type_id' => $service_type_id,
-						'price_per_kg'    => $this->input->post('price_per_kg', TRUE),
+						'price_kribo'     => $this->input->post('price_kribo', TRUE),
+						'price_smesco'    => $this->input->post('price_smesco', TRUE),
 						'min_weight_kg'   => $this->input->post('min_weight_kg', TRUE),
 						'is_active'       => $this->input->post('is_active') ? 1 : 0,
 						// created_at & updated_at otomatis diisi oleh MySQL karena setelan DB lu
@@ -164,7 +166,8 @@ class Master extends Authenticated_Controller
 			$this->form_validation->set_rules('origin', 'Kota Asal', 'required|trim');
 			$this->form_validation->set_rules('destination', 'Kota Tujuan', 'required|trim');
 			$this->form_validation->set_rules('service_type_id', 'Tipe Layanan', 'required|numeric');
-			$this->form_validation->set_rules('price_per_kg', 'Harga per kg', 'required|numeric');
+			$this->form_validation->set_rules('price_kribo', 'Harga Kribo (Modal)', 'required|numeric');
+			$this->form_validation->set_rules('price_smesco', 'Harga Smesco (Jual)', 'required|numeric');
 			$this->form_validation->set_rules('min_weight_kg', 'Minimum Berat', 'required|numeric');
 
 			if ($this->form_validation->run() !== FALSE) {
@@ -187,7 +190,8 @@ class Master extends Authenticated_Controller
 						'origin'          => $origin,
 						'destination'     => $destination,
 						'service_type_id' => $service_type_id,
-						'price_per_kg'    => $this->input->post('price_per_kg', TRUE),
+						'price_kribo'     => $this->input->post('price_kribo', TRUE),
+						'price_smesco'    => $this->input->post('price_smesco', TRUE),
 						'min_weight_kg'   => $this->input->post('min_weight_kg', TRUE),
 						'is_active'       => $this->input->post('is_active') ? 1 : 0,
 					];

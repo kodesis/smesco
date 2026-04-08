@@ -38,9 +38,9 @@
 	<script src="<?= base_url() ?>assets/dashboard/js/demo-theme.min.js?1684106062"></script>
 	<div class="page page-center">
 		<div class="container-tight py-4">
-			<div class="empty">
+			<div class="empty justify-content-center align-items-center mt-5">
 				<div class="text-center mb-4">
-					<a href="." class="navbar-brand navbar-brand-autodark"><img src="<?= base_url() ?>assets/logo/logo-smesco.png" width="200" alt=""></a>
+					<a href="." class="navbar-brand navbar-brand-autodark"><img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" width="200" alt=""></a>
 				</div>
 				<div class="empty-header">404</div>
 				<p class="empty-title">Oops… You just found an error page</p>

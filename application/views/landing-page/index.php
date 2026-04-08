@@ -1100,6 +1100,155 @@
 				padding: 24px 20px;
 			}
 		}
+
+		/* ── HAMBURGER ──────────────────────────────────── */
+		.nav-hamburger {
+			display: none;
+			flex-direction: column;
+			justify-content: center;
+			gap: 5px;
+			width: 40px;
+			height: 40px;
+			background: var(--off);
+			border: 1px solid var(--border);
+			border-radius: 9px;
+			cursor: pointer;
+			padding: 8px;
+			margin-left: auto;
+			transition: background 0.15s;
+		}
+
+		.nav-hamburger span {
+			display: block;
+			width: 100%;
+			height: 2px;
+			background: var(--navy);
+			border-radius: 2px;
+			transition: transform 0.3s, opacity 0.3s;
+		}
+
+		.nav-hamburger.open span:nth-child(1) {
+			transform: translateY(7px) rotate(45deg);
+		}
+
+		.nav-hamburger.open span:nth-child(2) {
+			opacity: 0;
+		}
+
+		.nav-hamburger.open span:nth-child(3) {
+			transform: translateY(-7px) rotate(-45deg);
+		}
+
+		/* ── MOBILE OVERLAY ─────────────────────────────── */
+		.mobile-overlay {
+			display: none;
+			position: fixed;
+			inset: 0;
+			background: rgba(15, 39, 64, 0.5);
+			z-index: 1000;
+			backdrop-filter: blur(3px);
+		}
+
+		.mobile-overlay.show {
+			display: block;
+		}
+
+		/* ── MOBILE DRAWER ──────────────────────────────── */
+		.mobile-drawer {
+			position: fixed;
+			top: 0;
+			right: 0;
+			width: 300px;
+			height: 100%;
+			background: var(--white);
+			z-index: 1001;
+			transform: translateX(100%);
+			transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+			display: flex;
+			flex-direction: column;
+			box-shadow: -8px 0 40px rgba(15, 39, 64, 0.15);
+		}
+
+		.mobile-drawer.open {
+			transform: translateX(0);
+		}
+
+		.drawer-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 20px 20px;
+			border-bottom: 1px solid var(--border);
+		}
+
+		.drawer-close {
+			width: 36px;
+			height: 36px;
+			background: var(--off);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 15px;
+			color: var(--navy);
+			cursor: pointer;
+			transition: background 0.15s;
+		}
+
+		.drawer-close:hover {
+			background: var(--border);
+		}
+
+		.drawer-menu {
+			list-style: none;
+			padding: 16px 12px;
+			flex: 1;
+			overflow-y: auto;
+		}
+
+		.drawer-menu li a {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 13px 16px;
+			font-size: 0.92rem;
+			font-weight: 600;
+			color: var(--grey);
+			text-decoration: none;
+			border-radius: 10px;
+			transition: background 0.15s, color 0.15s;
+		}
+
+		.drawer-menu li a:hover {
+			background: var(--off);
+			color: var(--navy);
+		}
+
+		.drawer-menu li a i {
+			font-size: 16px;
+			color: var(--navy);
+			width: 20px;
+			text-align: center;
+		}
+
+		.drawer-footer {
+			padding: 20px;
+			border-top: 1px solid var(--border);
+		}
+
+		/* ── RESPONSIVE UPDATE ──────────────────────────── */
+		@media (max-width: 767px) {
+
+			.nav-menu,
+			.nav-end {
+				display: none;
+			}
+
+			.nav-hamburger {
+				display: flex;
+			}
+		}
 	</style>
 </head>
 
@@ -1112,7 +1261,7 @@
 		<div class="container">
 			<div class="nav-inner">
 				<a href="<?= base_url('home') ?>" class="nav-brand">
-					<img src="<?= base_url() ?>assets/logo/logo-smesco-hera.png" width="150" height="" alt="SMESCO Express" class="navbar-brand-image">
+					<img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" width="150" height="" alt="SMESCO Express" class="navbar-brand-image">
 				</a>
 
 				<ul class="nav-menu">
@@ -1124,20 +1273,49 @@
 
 				<div class="nav-end">
 					<?php if ($this->session->userdata('is_logged_in')) : ?>
-						<a href="<?= base_url('dashboard') ?>" class="btn-dark">
-							Dashboard
-						</a>
+						<a href="<?= base_url('dashboard') ?>" class="btn-dark">Dashboard</a>
 					<?php else : ?>
-
-						<a href="<?= base_url('auth') ?>" class="btn-dark">
-							Login
-						</a>
-					<?php
-					endif; ?>
+						<a href="<?= base_url('auth') ?>" class="btn-dark">Login</a>
+					<?php endif; ?>
 				</div>
+
+				<!-- Hamburger Button (mobile only) -->
+				<button class="nav-hamburger" id="navToggle" aria-label="Toggle menu">
+					<span></span>
+					<span></span>
+					<span></span>
+				</button>
 			</div>
 		</div>
 	</nav>
+
+	<!-- Mobile Drawer -->
+	<div class="mobile-overlay" id="mobileOverlay"></div>
+	<div class="mobile-drawer" id="mobileDrawer">
+		<div class="drawer-header">
+			<img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" width="130" alt="SMESCO Express">
+			<button class="drawer-close" id="drawerClose" aria-label="Close menu">
+				<i class="bi bi-x-lg"></i>
+			</button>
+		</div>
+		<ul class="drawer-menu">
+			<li><a href="<?= base_url('home') ?>"><i class="bi bi-house"></i> Home</a></li>
+			<li><a href="<?= base_url('home/tracking') ?>"><i class="bi bi-search"></i> Lacak Resi</a></li>
+			<li><a href="#layanan"><i class="bi bi-box-seam"></i> Layanan</a></li>
+			<li><a href="#jangkauan"><i class="bi bi-geo-alt"></i> Jangkauan</a></li>
+		</ul>
+		<div class="drawer-footer">
+			<?php if ($this->session->userdata('is_logged_in')) : ?>
+				<a href="<?= base_url('dashboard') ?>" class="btn-primary-cta" style="width:100%;justify-content:center;">
+					<i class="bi bi-speedometer2"></i> Dashboard
+				</a>
+			<?php else : ?>
+				<a href="<?= base_url('auth') ?>" class="btn-primary-cta" style="width:100%;justify-content:center;">
+					<i class="bi bi-box-arrow-in-right"></i> Login
+				</a>
+			<?php endif; ?>
+		</div>
+	</div>
 
 	<?php $this->load->view($pages) ?>
 
@@ -1149,7 +1327,7 @@
 			<div class="row g-5">
 				<div class="col-lg-4">
 					<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-						<img src="<?= base_url() ?>assets/logo/logo-smesco-hera.png" width="300" alt="Smesco Express">
+						<img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" width="300" alt="Smesco Express">
 					</div>
 					<!-- UPDATED: friendlier tagline -->
 					<p class="footer-tagline">
@@ -1196,7 +1374,35 @@
 		<i class="bi bi-whatsapp"></i>
 	</a>
 
+	<script>
+		const navToggle = document.getElementById('navToggle');
+		const mobileDrawer = document.getElementById('mobileDrawer');
+		const mobileOverlay = document.getElementById('mobileOverlay');
+		const drawerClose = document.getElementById('drawerClose');
 
+		function openDrawer() {
+			mobileDrawer.classList.add('open');
+			mobileOverlay.classList.add('show');
+			navToggle.classList.add('open');
+			document.body.style.overflow = 'hidden';
+		}
+
+		function closeDrawer() {
+			mobileDrawer.classList.remove('open');
+			mobileOverlay.classList.remove('show');
+			navToggle.classList.remove('open');
+			document.body.style.overflow = '';
+		}
+
+		navToggle.addEventListener('click', openDrawer);
+		drawerClose.addEventListener('click', closeDrawer);
+		mobileOverlay.addEventListener('click', closeDrawer);
+
+		// Tutup drawer saat klik link anchor
+		document.querySelectorAll('.drawer-menu a').forEach(link => {
+			link.addEventListener('click', closeDrawer);
+		});
+	</script>
 </body>
 
 </html>

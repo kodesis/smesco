@@ -33,7 +33,7 @@
 				</button>
 				<h1 class="navbar-brand navbar-brand-autodark d-none-navbar-horizontal pe-0 pe-md-3">
 					<a href="<?= base_url() ?>" target="_blank">
-						<img src="<?= base_url() ?>assets/logo/logo-smesco-hera.png" width="" alt="SMESCO Express" class="navbar-brand-image">
+						<img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" width="" alt="SMESCO Express" class="navbar-brand-image">
 					</a>
 				</h1>
 				<div class="navbar-nav flex-row order-md-last">

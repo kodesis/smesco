@@ -99,26 +99,33 @@
 					</div>
 
 					<div class="row">
-						<div class="col-md-6 col-12">
+						<div class="col-md-4 col-12">
 							<div class="mb-3">
-								<label for="price_per_kg" class="form-label required">Harga per kg</label>
+								<label class="form-label required">Harga Kribo (Modal)</label>
 								<div class="input-group input-group-flat">
 									<span class="input-group-text">Rp</span>
-
-									<input type="text" id="price_per_kg_display"
-										class="form-control <?= form_error('price_per_kg') ? 'is-invalid' : '' ?>"
-										value="<?= set_value('price_per_kg') ?>"
-										placeholder="0">
-
-									<input type="hidden" name="price_per_kg" id="price_per_kg" value="<?= set_value('price_per_kg') ?>">
-
+									<input type="text" id="price_kribo_display" class="form-control <?= form_error('price_kribo_display') ? 'is-invalid' : '' ?>" value="<?= set_value('price_kribo_display', '0') ?>" placeholder="0">
+									<input type="hidden" name="price_kribo" id="price_kribo">
 								</div>
-								<?php if (form_error('price_per_kg')): ?>
-									<div class="text-danger small mt-1"><?= form_error('price_per_kg') ?></div>
+								<?php if (form_error('price_kribo_display')): ?>
+									<div class="text-danger small mt-1"><?= form_error('price_kribo_display') ?></div>
 								<?php endif; ?>
 							</div>
 						</div>
-						<div class="col-md-6 col-12">
+						<div class="col-md-4 col-12">
+							<div class="mb-3">
+								<label class="form-label required">Harga Smesco (Jual)</label>
+								<div class="input-group input-group-flat">
+									<span class="input-group-text">Rp</span>
+									<input type="text" id="price_smesco_display" class="form-control <?= form_error('price_smesco_display') ? 'is-invalid' : '' ?>" value="<?= set_value('price_smesco_display') ?>" placeholder="0">
+									<input type="hidden" name="price_smesco" id="price_smesco">
+								</div>
+								<?php if (form_error('price_smesco_display')): ?>
+									<div class="text-danger small mt-1"><?= form_error('price_smesco_display') ?></div>
+								<?php endif; ?>
+							</div>
+						</div>
+						<div class="col-md-4 col-12">
 							<div class="mb-3">
 								<label for="min_weight_kg" class="form-label required">Minimum Berat</label>
 								<div class="input-group input-group-flat">
@@ -185,29 +192,33 @@
 
 <script>
 	document.addEventListener("DOMContentLoaded", function() {
-		const displayInput = document.getElementById('price_per_kg_display');
-		const hiddenInput = document.getElementById('price_per_kg');
 
-		// Fungsi untuk nambahin titik (Format Rupiah)
 		function formatRupiah(value) {
-			// Hapus semua karakter selain angka
 			let number_string = value.replace(/[^0-9]/g, '');
-			// Tambahkan titik setiap 3 digit
 			return number_string.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 		}
 
-		// 1. Format otomatis saat halaman pertama kali diload (jika ada value dari set_value)
-		if (displayInput.value) {
-			displayInput.value = formatRupiah(displayInput.value);
+		function initCurrencyInput(displayId, hiddenId) {
+			const display = document.getElementById(displayId);
+			const hidden = document.getElementById(hiddenId);
+
+			if (!display || !hidden) return;
+
+			// Fix Bug 2 — set hidden value saat pertama load
+			if (display.value) {
+				display.value = formatRupiah(display.value);
+				hidden.value = display.value.replace(/\./g, '');
+			}
+
+			// Format saat user mengetik
+			display.addEventListener('input', function() {
+				this.value = formatRupiah(this.value);
+				hidden.value = this.value.replace(/\./g, '');
+			});
 		}
 
-		// 2. Format otomatis saat user mengetik
-		displayInput.addEventListener('input', function(e) {
-			// Format tampilan inputnya
-			this.value = formatRupiah(this.value);
-
-			// Simpan angka murni (tanpa titik) ke hidden input untuk dikirim ke database
-			hiddenInput.value = this.value.replace(/\./g, '');
-		});
+		// Fix Bug 1 — handle kedua input
+		initCurrencyInput('price_kribo_display', 'price_kribo');
+		initCurrencyInput('price_smesco_display', 'price_smesco');
 	});
 </script>
