@@ -1,204 +1,258 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class Dashboard extends CI_Controller
+class Dashboard extends Authenticated_Controller
 {
+
 	public function __construct()
 	{
 		parent::__construct();
-		$this->load->library(['session', 'PHPExcel']);
-		$this->load->helper(['string', 'date']);
-		$this->load->model(['M_Auth', 'M_Booking', 'M_Partner']);
-
-		if (!$this->session->userdata('is_logged_in')) {
-
-			$this->session->set_userdata('last_page', current_url());
-
-			$this->session->set_flashdata('message_name', '<div class="alert alert-danger alert-dismissible fade show" role="alert">
-			You have to login first.
-			<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-			</div>');
-
-			redirect('auth');
-		}
+		$this->load->model('M_User');
+		$this->load->model('M_Agent');
+		$this->load->model('M_VisitorLog');
 	}
 
 	public function index()
 	{
-		$role_id = $this->session->userdata('role_id');
-		$partner_id = $this->session->userdata('partner_id');
+		$sess      = $this->session->userdata('user');
+		$role_slug = $sess['role_slug'];
 
-		$saldo = $this->M_Partner->getSaldoAkhirPartner($partner_id)['saldo_akhir'];
-
-		$data = [
-			'title' => 'Dashboard',
-			'segment' => 'dashboard',
-			'pages' => 'pages/dashboard/v_dashboard',
-			'booking' => $this->M_Booking->dashboard(),
-			'drivers' => $this->M_Booking->list_driver(),
-			'saldo' => ($role_id == '3') ? $saldo : 0,
-		];
-
-		$this->load->view('pages/index', $data);
-	}
-
-	public function reset($jenis)
-	{
-		$data = [
-			"detail-awb" => ['search_resi', 'booking/list_detail'],
-			"customer" => ['search_customer', 'customer'],
-			"user" => ['search_user', 'setting/user'],
-			"menu" => ['search_menu', 'setting/menu'],
-			"agent" => ['search_agent', 'agent'],
-			"partner" => ['search_partner', 'partner'],
-			"pendaftaran" => ['search_pendaftaran', 'partner'],
-			"booking" => ['search_booking', 'booking'],
-			"pricelist" => ['search_pricelist', 'pricelist'],
-		];
-
-		if (isset($data[$jenis])) {
-			$this->session->unset_userdata($data[$jenis][0]);
-			redirect($data[$jenis][1]);
+		// Tentukan view & data berdasarkan role
+		switch ($role_slug) {
+			case 'superadmin':
+				$this->_superadmin($sess);
+				break;
+			case 'admin-kribo':
+				$this->_admin_kribo($sess);
+				break;
+			case 'finance-kribo':
+				$this->_finance_kribo($sess);
+				break;
+			case 'admin-mitra':
+			case 'staff-mitra':
+			case 'finance-mitra':
+				$this->_mitra($sess);
+				break;
+			case 'tracker-mitra':
+				$this->_tracker($sess);
+				break;
+			case 'checker': // Tambahkan Role Checker
+				$this->_checker($sess);
+				break;
+			case 'driver': // Tambahkan Role Driver
+				$this->_driver($sess);
+				break;
+			default:
+				show_error('Role tidak dikenali.', 403);
 		}
 	}
 
-	public function showDepositSummary($partner_id)
+	// ----------------------------------------------------------------
+
+	private function _superadmin($sess)
 	{
-		$deposits = $this->M_Partner->getDepositSummary($partner_id); // Ambil data dari model
+		$this->load->model(['M_Api', 'M_Shipment']);
+
+		// Statistik Users & Agents
+		$total_users        = $this->db->where('deleted_at IS NULL')->count_all_results('users');
+		$total_agents       = $this->M_Agent->count_active();
+		$total_global_users = $this->db
+			->select('users.id')
+			->join('roles', 'roles.id = users.role_id')
+			->where('users.deleted_at IS NULL')
+			->where('roles.scope', 'global')
+			->count_all_results('users');
+		$total_agent_users  = $total_users - $total_global_users;
+
+		// Statistik API
+		$total_api_clients = $this->db->count_all('api_clients');
+		$api_hits_today    = $this->db->where('DATE(created_at)', date('Y-m-d'))->count_all_results('api_logs');
+		$api_trend         = $this->db->select("DATE(created_at) as date, COUNT(id) as total")
+			->from('api_logs')
+			->where('created_at >=', date('Y-m-d', strtotime('-7 days')))
+			->group_by('DATE(created_at)')
+			->order_by('date', 'ASC')
+			->get()->result();
+
+		// ✅ Statistik Shipment (baru)
+		$shipment_stats = $this->M_Shipment->get_superadmin_stats();
+
+		// Recent data
+		$recent_agents = $this->db
+			->select('a.*, r.nama_kota')
+			->from('agents a')
+			->join('mt_kota r', 'r.id = a.regency_id', 'left')
+			->where('a.deleted_at IS NULL')
+			->order_by('a.created_at', 'DESC')
+			->limit(5)
+			->get()->result();
+
+		$recent_users = $this->M_User->get_paged_with_role(5, 0); // ✅ konsisten jadi 5
+
+		$recent_logs = $this->db
+			->select('l.*, u.name AS user_name')
+			->from('user_activity_logs l')
+			->join('users u', 'u.id = l.user_id', 'left')
+			->order_by('l.created_at', 'DESC')
+			->limit(10)
+			->get()->result();
+
+		// ✅ Visitor stats
+		$visitor_stats       = $this->M_VisitorLog->get_dashboard_stats();
+		$visitor_trend       = $this->M_VisitorLog->get_trend_7days();
+		$suspicious_ips      = $this->M_VisitorLog->get_suspicious_ips();
+		$recent_suspicious   = $this->M_VisitorLog->get_recent_suspicious();
 
 		$data = [
-			'title' => 'Deposit',
-			'deposits' => $deposits,
-			'keyword' => '',
-			'pages' => 'pages/partner/v_rekap_deposit',
-			'segment' => 'dashboard'
+			'title'              => 'Dashboard Superadmin',
+			'total_users'        => $total_users,
+			'total_agents'       => $total_agents,
+			'total_api_clients'  => $total_api_clients,
+			'api_hits_today'     => $api_hits_today,
+			'api_trend_json'     => json_encode($api_trend),
+			'total_global_users' => $total_global_users,
+			'total_agent_users'  => $total_agent_users,
+			'shipment_stats'     => $shipment_stats, // ✅
+			'recent_agents'      => $recent_agents,
+			'recent_users'       => $recent_users,
+			'recent_logs'        => $recent_logs,
+			'visitor_stats'     => $visitor_stats,
+			'visitor_trend_json' => json_encode($visitor_trend),
+			'suspicious_ips'    => $suspicious_ips,
+			'recent_suspicious' => $recent_suspicious,
 		];
 
-		$this->load->view('pages/index', $data);
+		$this->render('app/pages/dashboard/v_superadmin', $data);
 	}
 
-	public function downloadDepositExcel()
+	private function _admin_kribo($sess)
 	{
-		$from = $this->input->post('date_from');
-		$to = $this->input->post('date_to');
-		$partner_id = $this->session->userdata('partner_id');
+		$this->load->model('M_Shipment');
 
-		$deposits = $this->M_Partner->getDepositSummary($partner_id, $from, $to);
+		$total_agents   = $this->db->where('deleted_at IS NULL')->count_all_results('agents');
+		$total_users    = $this->db->where('deleted_at IS NULL')->count_all_results('users');
+		$agents_active  = $this->M_Agent->count_active();
+		$users_inactive = $this->db->where('deleted_at IS NULL')->where('is_active', 0)->count_all_results('users');
 
-		if ($deposits) {
-			require_once(APPPATH . 'libraries/PHPExcel/IOFactory.php');
+		// ✅ Tambahan
+		$shipment_stats   = $this->M_Shipment->get_kribo_stats();
+		$recent_shipments = $this->M_Shipment->get_recent_shipments(8);
+		$agents_list      = $this->M_Agent->get_all_with_stats();
+		$recent_users     = $this->M_User->get_paged_with_role(5, 0);
 
-			$excel = new PHPExcel();
-			// Settingan awal fil excel
-			$excel->getProperties()->setCreator('Smesco Express')
-				->setLastModifiedBy('Smesco Express')
-				->setTitle("Deposit history")
-				->setSubject("Deposit")
-				->setDescription("Deposit history from " . $from . ' to ' . $to)
-				->setKeywords("Deposit history");
+		$data = [
+			'title'            => 'Dashboard Admin Kribo',
+			'total_agents'     => $total_agents,
+			'total_users'      => $total_users,
+			'agents_active'    => $agents_active,
+			'users_inactive'   => $users_inactive,
+			'shipment_stats'   => $shipment_stats,
+			'recent_shipments' => $recent_shipments,
+			'agents_list'      => $agents_list,
+			'recent_users'     => $recent_users,
+		];
 
-			// Buat sebuah variabel untuk menampung pengaturan style dari header tabel
-			$style_col = [
-				'font' => ['bold' => true],
-				'alignment' => ['horizontal' => PHPExcel_Style_Alignment::HORIZONTAL_CENTER, 'vertical' => PHPExcel_Style_Alignment::VERTICAL_CENTER],
-				'borders' => ['top' => ['style'  => PHPExcel_Style_Border::BORDER_THIN], 'right' => ['style'  => PHPExcel_Style_Border::BORDER_THIN], 'bottom' => ['style'  => PHPExcel_Style_Border::BORDER_THIN], 'left' => ['style'  => PHPExcel_Style_Border::BORDER_THIN]]
-			];
+		$this->render('app/pages/dashboard/v_admin_kribo', $data);
+	}
 
-			$style_row = [
-				'alignment' => ['vertical' => PHPExcel_Style_Alignment::VERTICAL_CENTER],
-				'borders' => ['top' => ['style'  => PHPExcel_Style_Border::BORDER_THIN], 'right' => ['style'  => PHPExcel_Style_Border::BORDER_THIN], 'bottom' => ['style'  => PHPExcel_Style_Border::BORDER_THIN], 'left' => ['style'  => PHPExcel_Style_Border::BORDER_THIN]]
-			];
+	private function _finance_kribo($sess)
+	{
+		$total_agents = $this->db->where('deleted_at IS NULL')->count_all_results('agents');
+		$total_users  = $this->db
+			->select('users.id')
+			->join('roles', 'roles.id = users.role_id')
+			->where('users.deleted_at IS NULL')
+			->where('roles.scope', 'agent')
+			->count_all_results('users');
 
-			// bagian header
-			$headers = [
-				'A' => "No.",
-				'B' => "No. Resi.",
-				'C' => "Tanggal",
-				'D' => "Asal",
-				'E' => "Tujuan",
-				'F' => "Komoditi",
-				'G' => "Koli",
-				'H' => "Berat timbang",
-				'I' => "Volume",
-				'J' => "Chargeable",
-				'K' => "Nominal Resi",
-				'L' => "Fee",
-				'M' => "Topup",
-				'N' => "Sisa saldo"
-			];
+		$agents_list = $this->M_Agent->get_all_with_stats();
 
-			$sheet = $excel->setActiveSheetIndex(0);
-			foreach ($headers as $columnID => $header) {
-				$sheet->setCellValue($columnID . '1', $header);
-				$sheet->getColumnDimension($columnID)->setAutoSize(true);
-			}
+		$data = compact('total_agents', 'total_users', 'agents_list');
 
-			$no = 1;
-			$numrow = 2;
+		$this->render('dashboard/v_finance_kribo', 'Dashboard Finance Kribo', $data);
+	}
 
-			foreach ($deposits as $t) {
-				if ($t->kode_topup) {
-					$excel->setActiveSheetIndex(0)->setCellValue('A' . $numrow, $no);
-					$excel->setActiveSheetIndex(0)->setCellValue('B' . $numrow, format_indo_non_hari($t->topup_date));
-					$excel->setActiveSheetIndex(0)->mergeCells('B' . $numrow . ':E' . $numrow);
-					$excel->setActiveSheetIndex(0)->setCellValue('F' . $numrow, 'Top Up Deposit');
-					$excel->setActiveSheetIndex(0)->mergeCells('F' . $numrow . ':J' . $numrow);
-					$excel->setActiveSheetIndex(0)->setCellValue('K' . $numrow, 0);
-					$excel->setActiveSheetIndex(0)->setCellValue('L' . $numrow, 0);
-					$excel->setActiveSheetIndex(0)->setCellValue('M' . $numrow, $t->nominal_topup);
-					$excel->setActiveSheetIndex(0)->setCellValue('N' . $numrow, $t->sisa_saldo);
+	private function _mitra($sess)
+	{
+		$this->load->model('M_Shipment');
 
-					$excel->getActiveSheet()->getStyle('B' . $numrow)->getAlignment()->setHorizontal('center');
-					$excel->getActiveSheet()->getStyle('F' . $numrow)->getAlignment()->setHorizontal('center');
-				} else {
-					$excel->setActiveSheetIndex(0)->setCellValue('A' . $numrow, $no);
-					$excel->setActiveSheetIndex(0)->setCellValue('B' . $numrow, $t->no_resi);
-					$excel->setActiveSheetIndex(0)->setCellValue('C' . $numrow, format_indo_non_hari($t->tanggal_resi));
-					$excel->setActiveSheetIndex(0)->setCellValue('D' . $numrow, $t->origin);
-					$excel->setActiveSheetIndex(0)->setCellValue('E' . $numrow, $t->destination);
-					$excel->setActiveSheetIndex(0)->setCellValue('F' . $numrow, $t->commodity);
-					$excel->setActiveSheetIndex(0)->setCellValue('G' . $numrow, $t->qty);
-					$excel->setActiveSheetIndex(0)->setCellValue('H' . $numrow, $t->berat_timbang);
-					$excel->setActiveSheetIndex(0)->setCellValue('I' . $numrow, $t->volume);
-					$excel->setActiveSheetIndex(0)->setCellValue('J' . $numrow, $t->chargeable);
-					$excel->setActiveSheetIndex(0)->setCellValue('K' . $numrow, $t->nominal_resi);
-					$excel->setActiveSheetIndex(0)->setCellValue('L' . $numrow, $t->usage_saldo);
-					$excel->setActiveSheetIndex(0)->setCellValue('M' . $numrow, 0);
-					$excel->setActiveSheetIndex(0)->setCellValue('N' . $numrow, $t->sisa_saldo);
-				}
+		$agent_id   = $sess['agent_id'];
+		$agent_info = $this->M_Agent->get_detail($agent_id);
 
-				// foreach (range('A', 'N') as $columnID) {
-				// 	$excel->getActiveSheet()->getStyle($columnID . $numrow)->applyFromArray($style_row);
-				// }
+		// ✅ Ambil nama kota hub kargo agen
+		$city = $this->db
+			->select('c.name')
+			->from('agents a')
+			->join('cities c', 'c.id = a.city_id', 'left')
+			->where('a.id', $agent_id)
+			->get()->row();
 
-				$no++; // Tambah 1 setiap kali looping
-				$numrow++; // Tambah 1 setiap kali looping
-			}
+		$city_name = $city->name ?? NULL;
 
-			$excel->getActiveSheet()->getStyle('A1:N1')->applyFromArray($style_col);
+		$total_users = $this->db
+			->where('agent_id', $agent_id)
+			->where('deleted_at IS NULL')
+			->count_all_results('users');
 
+		$users_active = $this->db
+			->where('agent_id', $agent_id)
+			->where('deleted_at IS NULL')
+			->where('is_active', 1)
+			->count_all_results('users');
 
-			// Redirect output to a client’s web browser (Excel5)
-			header('Content-Type: application/vnd.ms-excel');
-			header('Content-Disposition: attachment;filename="Rekap deposit from ' . $from . ' to ' . $to . '.xls"');
-			header('Cache-Control: max-age=0');
-			// If you're serving to IE 9, then the following may be needed
-			header('Cache-Control: max-age=1');
+		$agent_users    = $this->M_User->get_all_with_role($agent_id);
+		$shipment_stats = $this->M_Shipment->get_agent_stats($agent_id, $city_name); // ✅ pass city_name
+		$current_user   = $this->current_user;
 
-			// If you're serving to IE over SSL, then the following may be needed
-			header('Last-Modified: ' . gmdate('D, d M Y H:i:s') . ' GMT'); // always modified
-			header('Cache-Control: cache, must-revalidate'); // HTTP/1.1
-			header('Pragma: public'); // HTTP/1.0
+		$data = [
+			'title'          => 'Dashboard — ' . ($agent_info->name ?? 'Mitra'),
+			'agent_info'     => $agent_info,
+			'total_users'    => $total_users,
+			'users_active'   => $users_active,
+			'agent_users'    => $agent_users,
+			'shipment_stats' => $shipment_stats,
+			'current_user'   => $current_user,
+			'city_name'      => $city_name, // ✅ untuk kondisi tampil/hide tombol inbound
+		];
 
-			$objWriter = PHPExcel_IOFactory::createWriter($excel, 'Excel5');
-			$objWriter->save('php://output');
+		$this->render('app/pages/dashboard/v_mitra', $data);
+	}
 
-			redirect($_HTTP('SERVER_REFERER'));
-		} else {
+	private function _tracker($sess)
+	{
+		$agent_id   = $sess['agent_id'];
+		$agent_info = $this->M_Agent->get_by_id($agent_id);
 
-			$this->session->set_flashdata('message_error', 'There is no data between ' . $from . ' and ' . $to);
-		}
+		$data = compact('agent_info');
 
-		redirect('dashboard');
+		$this->render('dashboard/v_tracker', 'Dashboard Tracker', $data);
+	}
+
+	// --- Dashboard khusus Driver (Mobile-First) ---
+	private function _driver($sess)
+	{
+		$title = 'Dashboard Driver';
+		// Statistik jemputan hari ini
+		$stats = $this->db->select("
+			COUNT(*) as total_tugas,
+			SUM(CASE WHEN status = 'READY_TO_PICKUP' THEN 1 ELSE 0 END) as belum_pickup,
+			SUM(CASE WHEN status = 'PICKED_UP' THEN 1 ELSE 0 END) as sudah_pickup
+		")->get('shipments')->row();
+
+		$this->render('app/pages/dashboard/v_driver', compact('title', 'stats'));
+	}
+
+	// --- Dashboard khusus Checker (Warehouse-First) ---
+	private function _checker($sess)
+	{
+		$title = 'Dashboard Checker';
+		// Statistik barang yang akan datang (dari driver) vs yang sudah diterima gudang
+		$stats = $this->db->select("
+			COUNT(*) as total_expected,
+			SUM(CASE WHEN status = 'PICKED_UP' THEN 1 ELSE 0 END) as in_transit,
+			SUM(CASE WHEN status = 'RECEIVED_AT_SMESCO_WAREHOUSE' THEN 1 ELSE 0 END) as accepted
+		")->get('shipments')->row();
+
+		$this->render('app/pages/dashboard/v_checker', compact('title', 'stats'));
 	}
 }

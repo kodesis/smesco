@@ -705,6 +705,20 @@ if (!function_exists('format_indo_non_hari')) {
 		return $result;
 	}
 }
+if (!function_exists('format_indo_bulan_tahun')) {
+	function format_indo_bulan_tahun($ym)
+	{
+		$bulanIndo = [
+			'01' => 'Januari', '02' => 'Februari', '03' => 'Maret',
+			'04' => 'April', '05' => 'Mei', '06' => 'Juni',
+			'07' => 'Juli', '08' => 'Agustus', '09' => 'September',
+			'10' => 'Oktober', '11' => 'November', '12' => 'Desember'
+		];
+
+		$parts = explode('-', $ym);
+		return $bulanIndo[$parts[1]] . ' ' . $parts[0];
+	}
+}
 
 if (!function_exists('format_english')) {
 	function format_english($date)

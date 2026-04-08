@@ -1,0 +1,438 @@
+<?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
+
+<div class="page-header d-print-none mb-4">
+	<div class="container-xl">
+		<div class="row g-2 align-items-center">
+			<div class="col">
+				<h2 class="page-title text-uppercase ls-1">Daftar Transaksi Shipment</h2>
+				<div class="text-muted mt-1">Monitoring & pengolahan data pengiriman kargo.</div>
+			</div>
+			<div class="col-auto ms-auto d-print-none">
+				<a href="<?= site_url('shipment/create') ?>" class="btn btn-primary shadow-sm">
+					<?= tabler_icon('plus', 'me-2') ?> Buat Booking Baru
+				</a>
+			</div>
+		</div>
+	</div>
+</div>
+
+<div class="page-body">
+	<div class="container-xl">
+
+		<!-- SUMMARY CARDS (data dari $stats) -->
+		<div class="row row-cards mb-4">
+			<div class="col-6 col-lg-3">
+				<div class="card card-sm border-0 border-start border-primary border-3">
+					<div class="card-body">
+						<div class="row align-items-center">
+							<div class="col-auto"><span class="bg-primary text-white avatar shadow-sm"><?= tabler_icon('package') ?></span></div>
+							<div class="col">
+								<div class="font-weight-medium">Total Booking</div>
+								<div class="text-muted small"><?= $stats->total_all ?? 0 ?> Transaksi</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg-3">
+				<div class="card card-sm border-0 border-start border-yellow border-3">
+					<div class="card-body">
+						<div class="row align-items-center">
+							<div class="col-auto"><span class="bg-yellow text-white avatar shadow-sm"><?= tabler_icon('clock-pause') ?></span></div>
+							<div class="col">
+								<div class="font-weight-medium">Pending Manifest</div>
+								<div class="text-muted small"><?= $stats->total_pending ?? 0 ?> Resi</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg-3">
+				<div class="card card-sm border-0 border-start border-blue border-3">
+					<div class="card-body">
+						<div class="row align-items-center">
+							<div class="col-auto"><span class="bg-blue text-white avatar shadow-sm"><?= tabler_icon('truck-delivery') ?></span></div>
+							<div class="col">
+								<div class="font-weight-medium">Dalam Transit</div>
+								<div class="text-muted small"><?= $stats->total_transit ?? 0 ?> Resi</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div class="col-6 col-lg-3">
+				<div class="card card-sm border-0 border-start border-green border-3">
+					<div class="card-body">
+						<div class="row align-items-center">
+							<div class="col-auto"><span class="bg-green text-white avatar shadow-sm"><?= tabler_icon('cash') ?></span></div>
+							<div class="col">
+								<div class="font-weight-medium">Total Omzet</div>
+								<div class="text-muted small">Rp <?= number_format($stats->total_omzet ?? 0, 0, ',', '.') ?></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- FILTER -->
+		<div class="card mb-4">
+			<div class="card-body py-2">
+				<form action="<?= site_url('shipment') ?>" method="GET">
+					<div class="row g-2 align-items-end">
+						<div class="col-12 col-md-3">
+							<label class="form-label small mb-1">Kata Kunci</label>
+							<input type="text" name="q" class="form-control form-control-sm" placeholder="Resi / nama..." value="<?= $filters['q'] ?>">
+						</div>
+						<div class="col-6 col-md-2">
+							<label class="form-label small mb-1">Status</label>
+							<select name="status" class="form-select form-select-sm">
+								<option value="">Semua</option>
+								<?php
+								$statuses = [
+									'BOOKED',
+									'READY_TO_PICKUP',
+									'PICKED_UP',
+									'RECEIVED_ORIGIN',
+									'MANIFESTED',
+									'DEPARTED',
+									'ARRIVED',
+									'RECEIVED_DESTINATION',
+									'DELIVERED',
+									'CANCELLED'
+								];
+								foreach ($statuses as $st):
+									$sel = ($filters['status'] == $st) ? 'selected' : '';
+								?>
+									<option value="<?= $st ?>" <?= $sel ?>><?= str_replace('_', ' ', $st) ?></option>
+								<?php endforeach; ?>
+							</select>
+						</div>
+						<div class="col-6 col-md-2">
+							<label class="form-label small mb-1">Tgl Dari</label>
+							<input type="date" name="start" class="form-control form-control-sm" value="<?= $filters['start'] ?>">
+						</div>
+						<div class="col-6 col-md-2">
+							<label class="form-label small mb-1">Tgl Sampai</label>
+							<input type="date" name="end" class="form-control form-control-sm" value="<?= $filters['end'] ?>">
+						</div>
+						<div class="col-6 col-md-3 d-flex gap-2">
+							<button type="submit" class="btn btn-sm btn-primary">Cari</button>
+							<a href="<?= site_url('shipment') ?>" class="btn btn-sm btn-link px-1">Reset</a>
+							<button type="button" id="btn-bulk-manifest" class="btn btn-sm btn-dark d-none ms-auto">
+								<?= tabler_icon('plane-departure', 'me-1') ?> Manifest (<span id="selected-count">0</span>)
+							</button>
+						</div>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- INFO ROW -->
+		<div class="d-flex justify-content-between align-items-center mb-2 px-1">
+			<small class="text-muted">
+				Menampilkan <strong><?= count($shipments) ?></strong> dari <strong><?= $total ?></strong> transaksi
+			</small>
+		</div>
+
+		<!-- ===== DESKTOP TABLE (hidden on mobile) ===== -->
+		<div class="card shadow-sm d-none d-md-block">
+			<div class="table-responsive">
+				<table class="table table-vcenter card-table table-hover">
+					<thead class="bg-light">
+						<tr>
+							<th style="width:20px"><input type="checkbox" id="check-all" class="form-check-input"></th>
+							<th class="w-1">No</th>
+							<th>No. Resi (AWB)</th>
+							<th>Rute & Layanan</th>
+							<th>Pengirim & Penerima</th>
+							<th>Biaya & Qty</th>
+							<th>Status</th>
+							<th class="w-1">Aksi</th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php if (!empty($shipments)): $no = 1;
+							foreach ($shipments as $s): ?>
+								<tr>
+									<td>
+										<?php if ($s->status == 'RECEIVED_ORIGIN' && $role_slug == 'admin-kribo'): ?>
+											<input type="checkbox" class="form-check-input shipment-check" value="<?= $s->id ?>">
+										<?php endif; ?>
+									</td>
+									<td class="text-muted small"><?= $no++ ?></td>
+									<td>
+										<div class="d-flex align-items-center gap-1">
+											<span class="fw-bold text-primary"><?= $s->no_resi ?></span>
+											<?php if ($s->is_valuable): ?>
+												<span class="text-danger" title="Barang Berharga"><?= tabler_icon('shield-check', 'icon-sm') ?></span>
+											<?php endif; ?>
+										</div>
+										<small class="text-muted"><?= $s->created_by_name ?> • <?= date('d/m/Y H:i', strtotime($s->created_at)) ?></small>
+									</td>
+									<td>
+										<div class="d-flex align-items-center small mb-1">
+											<span class="badge bg-blue-lt me-1"><?= $s->origin ?></span>
+											<?= tabler_icon('arrow-right', 'text-muted mx-1') ?>
+											<span class="badge bg-green-lt"><?= $s->destination ?></span>
+										</div>
+										<span class="badge bg-purple-lt small text-uppercase"><?= $s->service_code ?></span>
+									</td>
+									<td>
+										<div class="small mb-1"><span class="text-muted">Dari:</span> <strong><?= htmlspecialchars($s->sender_name) ?></strong></div>
+										<div class="small"><span class="text-muted">Ke:</span> <strong><?= htmlspecialchars($s->receiver_name) ?></strong></div>
+									</td>
+									<td>
+										<div class="fw-bold text-success small">Rp <?= number_format($s->total_amount, 0, ',', '.') ?></div>
+										<div class="small text-muted"><?= $s->koli ?> Koli | <?= floatval($s->chargeable_weight) ?> Kg</div>
+									</td>
+									<td>
+										<?php
+										$bg = 'bg-secondary';
+
+										if ($s->status == 'BOOKED')           $bg = 'bg-cyan';
+										if ($s->status == 'READY_TO_PICKUP')  $bg = 'bg-yellow text-dark';
+										if ($s->status == 'PICKED_UP')             $bg = 'bg-teal';
+										if ($s->status == 'RECEIVED_ORIGIN')  $bg = 'bg-indigo';
+										if ($s->status == 'MANIFESTED')       $bg = 'bg-blue';
+										if ($s->status == 'DEPARTED')              $bg = 'bg-orange';
+										if ($s->status == 'ARRIVED')               $bg = 'bg-purple';
+										if ($s->status == 'RECEIVED_DESTINATION')  $bg = 'bg-cyan';
+										if ($s->status == 'DELIVERED')        $bg = 'bg-success';
+										if ($s->status == 'CANCELLED')        $bg = 'bg-danger';
+										?>
+										<span class="badge <?= $bg ?> fw-bold"><?= str_replace('_', ' ', $s->status) ?></span>
+									</td>
+									<td>
+										<div class="btn-list flex-nowrap">
+											<?php if ($s->status == 'BOOKED'): ?>
+												<button type="button" class="btn btn-sm btn-success btn-confirm-paid"
+													data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>">
+													<?= tabler_icon('cash', 'me-1') ?> Lunas
+												</button>
+											<?php endif; ?>
+											<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-icon btn-outline-primary" title="Detail"><?= tabler_icon('eye') ?></a>
+											<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-icon btn-outline-secondary" title="Cetak Label"><?= tabler_icon('printer') ?></a>
+											<!-- <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-cancel-shipment"
+												data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>" title="Batalkan"><?= tabler_icon('trash') ?></button> -->
+											<?php if ($role_slug !== 'staff-mitra'): ?>
+												<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-cancel-shipment"
+													data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>" title="Batalkan">
+													<?= tabler_icon('trash') ?>
+												</button>
+											<?php endif; ?>
+										</div>
+									</td>
+								</tr>
+							<?php endforeach;
+						else: ?>
+							<tr>
+								<td colspan="8" class="text-center py-5">
+									<div class="empty">
+										<div class="empty-icon text-muted"><?= tabler_icon('mood-empty') ?></div>
+										<p class="empty-title">Data Kosong</p>
+										<p class="empty-subtitle text-muted">Tidak ada transaksi yang sesuai filter.</p>
+									</div>
+								</td>
+							</tr>
+						<?php endif; ?>
+					</tbody>
+				</table>
+			</div>
+			<?php $this->load->view('app/layouts/_pagination', compact('total', 'page', 'per_page', 'offset', 'total_pages', 'base_url')); ?>
+		</div>
+
+		<!-- ===== MOBILE CARD LIST (hidden on desktop) ===== -->
+		<div class="d-md-none">
+			<?php if (!empty($shipments)): foreach ($shipments as $s): ?>
+					<?php
+					$bg = 'bg-secondary';
+					if ($s->status == 'BOOKED')                $bg = 'bg-cyan';
+					if ($s->status == 'READY_TO_PICKUP')       $bg = 'bg-yellow text-dark';
+					if ($s->status == 'PICKED_UP')             $bg = 'bg-teal';
+					if ($s->status == 'RECEIVED_ORIGIN')       $bg = 'bg-indigo';
+					if ($s->status == 'MANIFESTED')            $bg = 'bg-blue';
+					if ($s->status == 'DEPARTED')              $bg = 'bg-orange';
+					if ($s->status == 'ARRIVED')               $bg = 'bg-purple';
+					if ($s->status == 'RECEIVED_DESTINATION')  $bg = 'bg-cyan';
+					if ($s->status == 'DELIVERED')             $bg = 'bg-success';
+					if ($s->status == 'CANCELLED')             $bg = 'bg-danger';
+					?>
+					<div class="card mb-2">
+						<div class="card-body p-3">
+							<!-- Header: Resi + Status -->
+							<div class="d-flex justify-content-between align-items-start mb-2">
+								<div>
+									<div class="fw-bold text-primary"><?= $s->no_resi ?><?php if ($s->is_valuable): ?> <span class="text-danger"><?= tabler_icon('shield-check', 'icon-sm') ?></span><?php endif; ?></div>
+									<small class="text-muted"><?= $s->created_by_name ?> • <?= date('d/m/Y H:i', strtotime($s->created_at)) ?></small>
+								</div>
+								<span class="badge <?= $bg ?> fw-bold"><?= str_replace('_', ' ', $s->status) ?></span>
+							</div>
+							<!-- Info Grid -->
+							<div class="row g-2 small mb-2">
+								<div class="col-6">
+									<div class="text-muted">Rute</div>
+									<div class="fw-semibold"><?= $s->origin ?> → <?= $s->destination ?> <span class="badge bg-purple-lt ms-1"><?= $s->service_code ?></span></div>
+								</div>
+								<div class="col-6">
+									<div class="text-muted">Biaya</div>
+									<div class="fw-bold text-success">Rp <?= number_format($s->total_amount, 0, ',', '.') ?></div>
+									<div class="text-muted"><?= $s->koli ?> Koli | <?= floatval($s->chargeable_weight) ?> Kg</div>
+								</div>
+								<div class="col-6">
+									<div class="text-muted">Pengirim</div>
+									<div class="fw-semibold text-truncate"><?= htmlspecialchars($s->sender_name) ?></div>
+								</div>
+								<div class="col-6">
+									<div class="text-muted">Penerima</div>
+									<div class="fw-semibold text-truncate"><?= htmlspecialchars($s->receiver_name) ?></div>
+								</div>
+							</div>
+							<!-- Actions -->
+							<div class="d-flex gap-2 flex-wrap">
+								<?php if ($s->status == 'BOOKED'): ?>
+									<button type="button" class="btn btn-sm btn-success btn-confirm-paid flex-grow-1"
+										data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>">
+										<?= tabler_icon('cash', 'me-1') ?> Konfirmasi Lunas
+									</button>
+								<?php endif; ?>
+								<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-outline-primary"><?= tabler_icon('eye', 'me-1') ?> Detail</a>
+								<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('printer') ?></a>
+								<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-void-shipment"
+									data-id="<?= $s->id ?>"
+									data-resi="<?= $s->no_resi ?>"
+									title="Void Transaksi">
+									<?= tabler_icon('ban') ?> </button>
+							</div>
+						</div>
+					</div>
+				<?php endforeach;
+			else: ?>
+				<div class="card">
+					<div class="card-body text-center py-5 text-muted">
+						<?= tabler_icon('mood-empty', 'display-6') ?><p class="mt-2 mb-0">Tidak ada data transaksi.</p>
+					</div>
+				</div>
+			<?php endif; ?>
+
+			<!-- Pagination mobile -->
+			<?php $this->load->view('app/layouts/_pagination', compact('total', 'page', 'per_page', 'offset', 'total_pages', 'base_url')); ?>
+		</div>
+
+	</div>
+</div>
+
+<!-- Modal Manifest (sama seperti sebelumnya) -->
+<div class="modal modal-blur fade" id="modal-manifest" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title">Lengkapi Data Penerbangan</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<form id="form-manifest-bulk">
+				<div class="modal-body">
+					<div class="mb-3">
+						<label class="form-label required">Nomor SMU (Master AWB)</label>
+						<input type="text" name="smu_number" class="form-control" placeholder="GA-882192" required oninput="this.value=this.value.toUpperCase()">
+					</div>
+					<div class="row">
+						<div class="col-md-6 mb-3">
+							<label class="form-label required">Nomor Flight</label>
+							<input type="text" name="flight_number" class="form-control" placeholder="GA-142" required oninput="this.value=this.value.toUpperCase()">
+						</div>
+						<div class="col-md-6 mb-3">
+							<label class="form-label required">Gudang Asal</label>
+							<input type="text" name="origin_warehouse" class="form-control" placeholder="Warehouse CGK" required>
+						</div>
+					</div>
+					<div class="mb-3">
+						<label class="form-label required">Tanggal & Jam Berangkat</label>
+						<input type="datetime-local" name="departure_date" class="form-control" required>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Batal</button>
+					<button type="submit" class="btn btn-primary">Simpan & Manifestkan</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
+<script>
+	document.addEventListener("DOMContentLoaded", function() {
+		// --- Checkbox bulk (desktop only) ---
+		const checkAll = document.getElementById('check-all');
+		const shipmentChecks = document.querySelectorAll('.shipment-check');
+		const btnBulk = document.getElementById('btn-bulk-manifest');
+		const selectedCount = document.getElementById('selected-count');
+
+		function updateBulkButton() {
+			const checked = document.querySelectorAll('.shipment-check:checked');
+			selectedCount.innerText = checked.length;
+			btnBulk.classList.toggle('d-none', checked.length === 0);
+		}
+
+		if (checkAll) {
+			checkAll.addEventListener('change', function() {
+				shipmentChecks.forEach(c => c.checked = this.checked);
+				updateBulkButton();
+			});
+		}
+		shipmentChecks.forEach(c => c.addEventListener('change', updateBulkButton));
+
+		btnBulk?.addEventListener('click', () => $('#modal-manifest').modal('show'));
+
+		// --- Submit Manifest ---
+		document.getElementById('form-manifest-bulk')?.addEventListener('submit', function(e) {
+			e.preventDefault();
+			const selectedIds = Array.from(document.querySelectorAll('.shipment-check:checked')).map(cb => cb.value);
+			const formData = new FormData(this);
+			formData.append('ids', JSON.stringify(selectedIds));
+
+			Swal.fire({
+				title: 'Proses Manifest?',
+				text: `${selectedIds.length} resi akan di-update ke MANIFESTED.`,
+				icon: 'warning',
+				showCancelButton: true,
+				confirmButtonText: 'Ya, Proses!'
+			}).then(result => {
+				if (result.isConfirmed) {
+					fetch("<?= site_url('shipment/ajax_bulk_manifest') ?>", {
+							method: 'POST',
+							body: formData
+						})
+						.then(r => r.json())
+						.then(data => {
+							if (data.status) Swal.fire('Berhasil!', data.message, 'success').then(() => location.reload());
+						});
+				}
+			});
+		});
+
+		// --- Konfirmasi Lunas (FIX: data-resi bukan data-awb) ---
+		$(document).on('click', '.btn-confirm-paid', function() {
+			const id = $(this).data('id');
+			const resi = $(this).data('resi'); // ✅ fix dari data-awb → data-resi
+
+			Swal.fire({
+				title: 'Konfirmasi Pembayaran',
+				text: `Sudah menerima pembayaran untuk resi ${resi}?`,
+				icon: 'info',
+				showCancelButton: true,
+				confirmButtonText: 'Ya, Sudah Lunas!',
+				cancelButtonText: 'Belum',
+				confirmButtonColor: '#2fb344'
+			}).then(result => {
+				if (result.isConfirmed) {
+					$.post("<?= site_url('shipment/ajax_confirm_paid') ?>", {
+						id
+					}, function(res) {
+						if (res.status) Swal.fire('Sip!', 'Status berubah jadi Siap Pickup.', 'success').then(() => location.reload());
+					}, 'json');
+				}
+			});
+		});
+	});
+</script>

@@ -303,63 +303,65 @@ $(document).ready(function () {
 	$('#jenis_pengiriman').on('change', handleChange);
 
 
-	$("#origin").autocomplete({
-		source: function (request, response) {
-			$.ajax({
-				url: base_url + 'booking/autocompleteOrigin',
-				dataType: "json",
-				data: {
-					term: request.term
-				},
-				success: function (data) {
-					response(data);
-				}
-			});
-		},
-		minLength: 2,
-		select: function (event, ui) {
-			$("#origin").val(ui.item.value);
+	// $("#origin").autocomplete({
+	// 	source: function (request, response) {
+	// 		$.ajax({
+	// 			url: base_url + 'shipment/autocompleteOrigin',
+	// 			dataType: "json",
+	// 			data: {
+	// 				term: request.term
+	// 			},
+	// 			success: function (data) {
+	// 				response(data);
+	// 			}
+	// 		});
+	// 	},
+	// 	minLength: 2,
+	// 	select: function (event, ui) {
+	// 		$("#origin").val(ui.item.value);
 
-			// Cek jika kedua inputan origin dan destination sudah diisi
-			var origin = $("#origin").val();
-			var destination = $("#destination").val();
-			// var jenis_pengiriman = $("#jenis_pengiriman").val();
+	// 		// Cek jika kedua inputan origin dan destination sudah diisi
+	// 		var origin = $("#origin").val();
+	// 		var destination = $("#destination").val();
+	// 		// var jenis_pengiriman = $("#jenis_pengiriman").val();
 
-			if (origin && destination) {
-				fetchPrice(origin, destination);
-			}
-		}
-	});
-	$("#destination").autocomplete({
-		source: function (request, response) {
+	// 		if (origin && destination) {
+	// 			fetchPrice(origin, destination);
+	// 		}
+	// 	}
+	// });
+	// $("#destination").autocomplete({
+	// 	source: function (request, response) {
 
-			var jenis_pengiriman = $("#jenis_pengiriman").val();
-			$.ajax({
-				url: base_url + 'booking/autocompleteDestination',
-				dataType: "json",
-				data: {
-					term: request.term,
-					jenis: jenis_pengiriman
-				},
-				success: function (data) {
-					response(data);
-				}
-			});
-		},
-		minLength: 2,
-		select: function (event, ui) {
-			$("#destination").val(ui.item.value);
+	// 		var jenis_pengiriman = $("#jenis_pengiriman").val();
+	// 		$.ajax({
+	// 			url: base_url + 'shipment/autocompleteDestination',
+	// 			dataType: "json",
+	// 			data: {
+	// 				term: request.term,
+	// 				jenis: jenis_pengiriman
+	// 			},
+	// 			success: function (data) {
+	// 				response(data);
+	// 			}
+	// 		});
+	// 	},
+	// 	minLength: 2,
+	// 	select: function (event, ui) {
+	// 		$("#destination").val(ui.item.value);
 
-			// Cek jika kedua inputan origin dan destination sudah diisi
-			var origin = $("#origin").val();
-			var destination = $("#destination").val();
-			// var jenis_pengiriman = $("#jenis_pengiriman").val();
+	// 		// Cek jika kedua inputan origin dan destination sudah diisi
+	// 		var origin = $("#origin").val();
+	// 		var destination = $("#destination").val();
+	// 		// var jenis_pengiriman = $("#jenis_pengiriman").val();
 
-			if (origin && destination) {
-				fetchPrice(origin, destination);
-			}
-		}
-	});
+	// 		if (origin && destination) {
+	// 			fetchPrice(origin, destination);
+	// 		}
+	// 	}
+	// });
+
+
 
 	// Fungsi untuk melakukan AJAX request dan mendapatkan harga
 	function fetchPrice(origin, destination) {
@@ -613,48 +615,6 @@ $(document).ready(function () {
 		}
 	});
 
-	$("#nama_pengirim").autocomplete({
-		source: function (request, response) {
-			$.ajax({
-				url: base_url + "booking/autocompleteCustomer",
-				dataType: "json",
-				data: {
-					term: request.term
-				},
-				success: function (data) {
-					response(data);
-				}
-			});
-		},
-		minLength: 2,
-		select: function (event, ui) {
-			$("#nama_pengirim").val(ui.item.nama_customer);
-			$("#telepon_pengirim").val(ui.item.telepon_customer);
-			$("#alamat_pengirim").val(ui.item.alamat_customer);
-		}
-	});
-
-	$("#nama_penerima").autocomplete({
-		source: function (request, response) {
-			$.ajax({
-				url: base_url + "booking/autocompleteCustomer",
-				dataType: "json",
-				data: {
-					term: request.term
-				},
-				success: function (data) {
-					response(data);
-				}
-			});
-		},
-		minLength: 2,
-		select: function (event, ui) {
-			$("#nama_penerima").val(ui.item.nama_customer);
-			$("#telepon_penerima").val(ui.item.telepon_customer);
-			$("#alamat_penerima").val(ui.item.alamat_customer);
-		}
-	});
-
 	$('.select2').select2();
 
 	// Menggunakan mask untuk input uang
@@ -801,6 +761,3 @@ function checkTime(i) {
 	return i;
 }
 
-const d = new Date();
-let year = d.getFullYear();
-document.getElementById("tahun").innerHTML = year;

@@ -1,5 +1,5 @@
 <?php
-defined('BASEPATH') or exit('No direct script access allowed');
+defined('BASEPATH') OR exit('No direct script access allowed');
 
 /*
 | -------------------------------------------------------------------
@@ -78,11 +78,11 @@ $db['default'] = array(
 	// 'hostname' => 'localhost',
 	// 'username' => 'root',
 	// 'password' => '',
-	// 'database' => 'kribo-express',
+	// 'database' => 'smesco',
 	'hostname' => 'kriboexpress.com',
 	'username' => 'kriboexp_kriboexp',
 	'password' => 'kribo123!@#',
-	'database' => 'kriboexp_kriboexp',
+	'database' => 'kriboexp_smesco',
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
 	'pconnect' => FALSE,

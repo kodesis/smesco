@@ -1,77 +1,66 @@
 <?php
-
 defined('BASEPATH') or exit('No direct script access allowed');
 
-class M_Pricelist extends CI_Model
+class M_Pricelist extends MY_Model
 {
-    public function __construct()
-    {
-        parent::__construct();
-        $this->load->database();
-    }
+	public function count_paged($search = NULL, $status_filter = NULL)
+	{
+		$this->db->from('pricelist');
 
-    public function list_pricelist()
-    {
-        return $this->db->order_by('origin', 'ASC')->get('mt_pricelist')->result();
-    }
+		if ($status_filter !== '' && $status_filter !== NULL) {
+			$this->db->where('is_active', $status_filter);
+		}
 
-    public function insert($data)
-    {
-        return $this->db->insert('mt_pricelist', $data);
-    }
+		if ($search) {
+			$this->db->group_start()
+				->like('origin', $search)
+				->or_like('destination', $search)
+				->or_like('price_per_kg', $search)
+				->group_end();
+		}
 
-    public function insertGetId($invoice_data)
-    {
-        $this->db->insert('mt_pricelist', $invoice_data);
+		return $this->db->count_all_results();
+	}
 
-        // Dapatkan ID invoice yang baru saja di-generate
-        return $this->db->insert_id();
-    }
+	public function get_paged_pricelist($limit, $offset, $search = NULL, $status_filter = NULL)
+	{
+		$this->db->from('pricelist');
+		$this->db->join('users', 'users.id = pricelist.created_by', 'left')
+			->select('pricelist.*, users.name AS created_by_name');
+			$this->db->join('service_types', 'service_types.id = pricelist.service_type_id', 'left')
+			->select('service_types.name AS service_name, service_types.code AS service_code');
 
-    public function update($data, $old_slug)
-    {
-        $this->db->where('slug', $old_slug);
-        return $this->db->update('mt_pricelist', $data);
-    }
+		if ($status_filter !== '' && $status_filter !== NULL) {
+			$this->db->where('is_active', $status_filter);
+		}
 
-    public function show($id)
-    {
-        return $this->db->where('slug', $id)->get('mt_pricelist')->row_array();
-    }
+		if ($search) {
+			$this->db->group_start()
+				->like('origin', $search)
+				->or_like('destination', $search)
+				->or_like('price_per_kg', $search)
+				->group_end();
+		}
 
-    public function showById($id)
-    {
-        return $this->db->where('id', $id)->get('mt_pricelist')->row_array();
-    }
+		$this->db->order_by('created_at', 'DESC')
+			->limit($limit, $offset);
 
-    public function is_available($id)
-    {
-        return $this->db->where('slug', $id)->get('mt_pricelist')->num_rows();
-    }
+		return $this->db->get()->result();
+	}
 
-    public function count($keyword)
-    {
-        if ($keyword) {
-            $this->db->group_start(); // Mulai grup kondisi
-            $this->db->like('origin', $keyword);
-            $this->db->or_like('destination', $keyword);
-            $this->db->or_like('city', $keyword);
-            $this->db->group_end(); // Akhiri grup kondisi
-        }
+	public function get_cities()
+	{
+		return $this->db->select('id, code, name, is_active')->from('cities')->where('is_active', 1)->order_by('name')->get()->result();
+	}
 
-        return $this->db->from('mt_pricelist')->count_all_results();
-    }
+	public function get_services()
+	{
+		return $this->db->select('id, code, name, description, is_active')->from('service_types')->where('is_active', 1)->order_by('name')->get()->result();
+	}
 
-    public function listPricelistPaginate($limit, $from, $keyword)
-    {
-        if ($keyword) {
-            $this->db->group_start(); // Mulai grup kondisi
-            $this->db->like('origin', $keyword);
-            $this->db->or_like('destination', $keyword);
-            $this->db->or_like('city', $keyword);
-            $this->db->group_end(); // Akhiri grup kondisi
-        }
+	public function get_detail($id)
+	{
+		return $this->db->select('pricelist.*, users.name AS created_by_name, service_types.name AS service_name')->from('pricelist')->join('users', 'users.id = pricelist.created_by', 'left')->join('service_types', 'service_types.id = pricelist.service_type_id', 'left')->where('pricelist.id', $id)->get()->row();
+	}
 
-        return $this->db->from('mt_pricelist')->order_by('city', 'ASC')->order_by('min_chargeable', 'ASC')->limit($limit, $from)->get()->result();
-    }
 }

@@ -155,3 +155,24 @@ if (!function_exists('terbilang')) {
 		}
 	}
 }
+
+if (!function_exists('format_nomor_wa')) {
+	function format_nomor_wa($no_hp)
+	{
+		// Hilangkan semua karakter non-digit
+		$no_hp = preg_replace('/[^0-9]/', '', $no_hp);
+
+		// Jika diawali dengan 0, ganti menjadi 62
+		if (substr($no_hp, 0, 1) === '0') {
+			return '62' . substr($no_hp, 1);
+		}
+
+		// Jika sudah diawali 62, tetap
+		if (substr($no_hp, 0, 2) === '62') {
+			return $no_hp;
+		}
+
+		// Jika tidak valid, kembalikan string kosong
+		return '';
+	}
+}
