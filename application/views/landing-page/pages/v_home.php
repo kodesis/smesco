@@ -9,13 +9,13 @@
 	</div>
 
 	<div class="slide active" data-index="0">
-		<img src="assets/landing-page/img/hero/slide-1.png" alt="Slide 1" class="slide-img" />
+		<img src="assets/landing-page/img/hero/slide-1.jpeg" alt="Slide 1" class="slide-img" />
 	</div>
 	<div class="slide" data-index="1">
-		<img src="assets/landing-page/img/hero/slide-2.png" alt="Slide 2" class="slide-img" />
+		<img src="assets/landing-page/img/hero/slide-2.jpeg" alt="Slide 2" class="slide-img" />
 	</div>
 	<div class="slide" data-index="2">
-		<img src="assets/landing-page/img/hero/slide-3.png" alt="Slide 3" class="slide-img" />
+		<img src="assets/landing-page/img/hero/slide-3.jpeg" alt="Slide 3" class="slide-img" />
 	</div>
 
 	<button class="slider-arrow prev" id="sliderPrev" aria-label="Slide sebelumnya">
