@@ -26,8 +26,8 @@
 										<option value="">- Pilih Asal -</option>
 										<?php foreach ($cities as $c):
 											if ($c->name == 'JAKARTA') : ?>
-											<option value="<?= $c->name ?>"><?= $c->code ?> - <?= $c->name ?></option>
-											<?php 
+												<option value="<?= $c->name ?>"><?= $c->code ?> - <?= $c->name ?></option>
+											<?php
 											endif ?>
 										<?php endforeach; ?>
 									</select>
@@ -158,6 +158,31 @@
 								</div>
 							</div>
 						</div>
+
+						<div class="card mt-3 border-primary">
+							<div class="card-body">
+								<label class="form-check form-switch">
+									<input class="form-check-input" type="checkbox" name="use_pickup" id="use_pickup" value="1">
+									<span class="form-check-label fw-bold">Request Pickup (Penjemputan)</span>
+								</label>
+
+								<div id="pickup_detail" class="mt-3 d-none">
+									<label class="form-label required">Area Penjemputan</label>
+									<select name="pickup_rate_id" id="pickup_rate_id" class="form-select trigger-price">
+										<option value="">- Pilih Area -</option>
+										<?php
+										$rates = $this->db->get_where('master_pickup_rates', ['is_active' => 1])->result();
+										foreach ($rates as $r):
+										?>
+											<option value="<?= $r->id ?>" data-price="<?= $r->price_smesco ?>">
+												<?= $r->area_name ?> (Rp <?= number_format($r->price_smesco) ?>)
+											</option>
+										<?php endforeach; ?>
+									</select>
+									<small class="text-danger">* Minimal penjemputan adalah 50 Kg.</small>
+								</div>
+							</div>
+						</div>
 					</div>
 
 				</div>
@@ -226,7 +251,13 @@
 					<div class="card-body">
 						<div class="d-flex justify-content-between align-items-center mb-2">
 							<span class="text-muted">Harga / Kg</span>
-							<span class="font-weight-bold" id="lbl_price">Rp 0</span>
+							<div class="text-end">
+								<span id="badge-tiered" class="badge bg-purple-lt d-none mb-1">
+									<?= tabler_icon('layers-difference', 'icon-sm me-1') ?> Tiered Pricing Active
+								</span>
+								<br>
+								<span class="font-weight-bold h4 mb-0" id="lbl_price">Rp 0</span>
+							</div>
 						</div>
 						<hr class="my-2">
 						<div class="d-flex justify-content-between align-items-center">
@@ -254,18 +285,17 @@
 	document.addEventListener("DOMContentLoaded", function() {
 		const pembagi_volume = 5000;
 
-		// Inisiasi Select2
+		// --- Inisiasi Select2 ---
 		if (jQuery().select2) {
 			$('.select2').select2({
 				width: '100%'
 			});
-			// Karena select2 menimpa input asli, tangkap event change via jQuery
 			$('.select2').on('change', function() {
 				checkPrice();
 			});
 		}
 
-		// DOM Elements
+		// --- DOM Elements ---
 		const inputActual = document.getElementById('actual_weight');
 		const lblVolume = document.getElementById('lbl_volume');
 		const lblChargeable = document.getElementById('lbl_chargeable');
@@ -274,50 +304,29 @@
 		const btnSubmit = document.getElementById('btn-submit');
 		const alertPrice = document.getElementById('alert-price');
 		const totalKoliDisplay = document.getElementById('total_koli_display');
+		const usePickupCheck = document.getElementById('use_pickup');
+		const pickupSelect = document.getElementById('pickup_rate_id');
 
 		let currentPricePerKg = 0;
 		let minWeightKg = 1;
 
 		// ==========================================
-		// FUNGSI FORMAT ANGKA (Titik & Koma)
+		// FUNGSI HELPER (Format & Parse) - FIXED
 		// ==========================================
 		function parseIndoNumber(str) {
 			if (!str) return 0;
-			str = str.toString().replace(/\./g, '').replace(/,/g, '.');
-			return parseFloat(str) || 0;
+			// Hapus titik (ribuan), ganti koma jadi titik (desimal)
+			let cleaned = str.toString().replace(/\./g, '').replace(/,/g, '.');
+			return parseFloat(cleaned) || 0;
 		}
 
+		// BARU - GANTI DENGAN INI
 		function formatIndoNumber(num) {
 			let str = num.toString().replace('.', ',');
 			let parts = str.split(',');
-			parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, "."); // ← fix
+			parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 			return parts.join(',');
 		}
-
-		function applyIndoMask() {
-			document.querySelectorAll('.indo-format').forEach(el => {
-				el.removeEventListener('input', maskHandler); // Mencegah duplicate event
-				el.addEventListener('input', maskHandler);
-			});
-		}
-
-		function maskHandler(e) {
-			let val = this.value.replace(/[^0-9,]/g, '');
-			let parts = val.split(',');
-			if (parts.length > 2) {
-				val = parts[0] + ',' + parts.slice(1).join('');
-			}
-			if (val) {
-				let splitVal = val.split(',');
-				splitVal[0] = splitVal[0].replace(/\B(?=(\d{3})+(?!\d))/g, "."); // ← fix
-				this.value = splitVal.join(',');
-			} else {
-				this.value = '';
-			}
-		}
-
-		// Terapkan mask pertama kali
-		applyIndoMask();
 
 		function formatRp(angka) {
 			return new Intl.NumberFormat('id-ID', {
@@ -327,15 +336,35 @@
 			}).format(angka);
 		}
 
+		function applyIndoMask() {
+			document.querySelectorAll('.indo-format').forEach(el => {
+				el.removeEventListener('input', maskHandler);
+				el.addEventListener('input', maskHandler);
+			});
+		}
+
+		// BARU - GANTI DENGAN INI
+		function maskHandler(e) {
+			let val = this.value.replace(/[^0-9,]/g, '');
+			let parts = val.split(',');
+
+			if (parts.length > 2) val = parts[0] + ',' + parts.slice(1).join('');
+
+			let splitVal = val.split(',');
+			splitVal[0] = splitVal[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+			this.value = splitVal.join(',');
+		}
+
+		applyIndoMask();
+
 		// ==========================================
-		// FUNGSI KALKULASI BERAT & TOTAL
+		// CORE LOGIC: KALKULASI BERAT & TOTAL
 		// ==========================================
 		function calculateAll() {
 			let actual = parseIndoNumber(inputActual.value);
 			let totalVolume = 0;
 			let totalKoli = 0;
 
-			// Hitung dari Multi-Row Dimensi
 			document.querySelectorAll('.dim-row').forEach(row => {
 				let p = parseIndoNumber(row.querySelector('.dim-p').value);
 				let l = parseIndoNumber(row.querySelector('.dim-l').value);
@@ -348,43 +377,44 @@
 				}
 			});
 
-			// Update Tampilan Koli & Volume
 			totalKoliDisplay.value = totalKoli > 0 ? totalKoli : 1;
 			lblVolume.innerText = formatIndoNumber(totalVolume.toFixed(2));
 
-			// Hitung Chargeable Weight
 			let chargeable = Math.max(actual, totalVolume);
 			if (chargeable < minWeightKg) chargeable = minWeightKg;
-			chargeable = Math.ceil(chargeable); // Pembulatan ke atas
-
+			chargeable = Math.ceil(chargeable);
 			lblChargeable.innerText = formatIndoNumber(chargeable);
 
-			// Hitung Total Uang
-			let total = chargeable * currentPricePerKg;
-			lblTotal.innerText = formatRp(total);
+			let pickupFee = 0;
+			if (usePickupCheck.checked && pickupSelect.value !== "") {
+				const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
+				pickupFee = parseFloat(selectedOption.dataset.price || 0);
+			}
 
-			btnSubmit.disabled = (total <= 0);
+			let shippingCost = chargeable * currentPricePerKg;
+			let grandTotal = shippingCost + pickupFee;
+
+			lblTotal.innerText = formatRp(grandTotal);
+			btnSubmit.disabled = (shippingCost <= 0);
 		}
-		$("#origin, #destination, #service_type_id").on("change", function() {
-			checkPrice();
-		});
 
 		// ==========================================
-		// FUNGSI AJAX CEK HARGA
+		// AJAX: CEK HARGA
 		// ==========================================
 		function checkPrice() {
 			let o = document.getElementById('origin').value;
 			let d = document.getElementById('destination').value;
 			let s = document.getElementById('service_type_id').value;
+			let w = parseIndoNumber(lblChargeable.innerText);
 
 			if (o && d && s) {
-				let url = "<?= site_url('master/ajax_cek_harga') ?>";
 				let formData = new FormData();
 				formData.append('origin', o);
 				formData.append('destination', d);
 				formData.append('service_type_id', s);
+				formData.append('weight', w);
 
-				fetch(url, {
+				fetch("<?= site_url('master/ajax_cek_harga') ?>", {
 						method: 'POST',
 						body: formData,
 						headers: {
@@ -397,30 +427,84 @@
 							alertPrice.classList.add('d-none');
 							currentPricePerKg = parseFloat(res.data.price_per_kg);
 							minWeightKg = parseFloat(res.data.min_weight_kg);
-							lblPrice.innerText = formatRp(currentPricePerKg);
+
+							const bTiered = document.getElementById('badge-tiered');
+							res.data.is_tiered == 1 ? bTiered.classList.remove('d-none') : bTiered.classList.add('d-none');
+
+							const icon = res.data.category === 'INTERNATIONAL' ? ' ✈️' : ' 🚛';
+							lblPrice.innerText = formatRp(currentPricePerKg) + icon;
+
 							calculateAll();
 						} else {
 							alertPrice.classList.remove('d-none');
 							currentPricePerKg = 0;
-							lblPrice.innerText = "Rp 0";
 							calculateAll();
 						}
-					})
-					.catch(err => console.log(err));
+					});
 			}
+		}
+
+
+
+		// --- Autocomplete Logic (Tetap Sama) ---
+		if (jQuery().autocomplete) {
+			$("#nama_pengirim, #nama_penerima").autocomplete({
+				source: function(request, response) {
+					$.ajax({
+						url: "<?= site_url('shipment/autocompleteCustomer') ?>",
+						dataType: "json",
+						data: {
+							term: request.term
+						},
+						success: function(data) {
+							response(data);
+						}
+					});
+				},
+				minLength: 2,
+				select: function(event, ui) {
+					const prefix = event.target.id === 'nama_pengirim' ? 'pengirim' : 'penerima';
+					$(`#nama_${prefix}`).val(ui.item.nama_customer);
+					$(`#telepon_${prefix}`).val(ui.item.telepon_customer);
+					$(`#alamat_${prefix}`).val(ui.item.alamat_customer);
+				}
+			});
 		}
 
 		// ==========================================
 		// EVENT LISTENERS
 		// ==========================================
-		// Listener untuk input berat dan dimensi (Event delegate karena baris bisa ditambah)
 		document.body.addEventListener('input', function(e) {
 			if (e.target.classList.contains('calc-weight')) {
 				calculateAll();
+				if (e.target.id === 'actual_weight' || e.target.closest('.dim-row')) {
+					checkPrice();
+				}
 			}
 		});
 
-		// Barang Berharga Toggle
+		usePickupCheck.addEventListener('change', function() {
+			const detail = document.getElementById('pickup_detail');
+			const weight = parseIndoNumber(lblChargeable.innerText);
+
+			if (this.checked) {
+				if (weight < 50) {
+					Swal.fire('Opps!', 'Minimal berat untuk pickup adalah 50 Kg, bro.', 'warning');
+					this.checked = false;
+					return;
+				}
+				detail.classList.remove('d-none');
+			} else {
+				detail.classList.add('d-none');
+				pickupSelect.value = '';
+			}
+			calculateAll();
+		});
+
+		pickupSelect.addEventListener('change', function() {
+			calculateAll();
+		});
+
 		document.getElementById('is_valuable').addEventListener('change', function() {
 			let box = document.getElementById('wrap_goods_value');
 			let inputVal = document.getElementById('goods_value');
@@ -434,30 +518,26 @@
 			}
 		});
 
-		// Multi Row Dimensi: Tambah
 		document.getElementById('btn-add-dim').addEventListener('click', function() {
 			const container = document.getElementById('dimension-container');
 			const newRow = document.createElement('div');
 			newRow.className = 'row g-1 dim-row mb-2';
 			newRow.innerHTML = `
-            <div class="col-3"><input type="text" name="dim_length[]" class="form-control calc-weight dim-p indo-format" placeholder="P"></div>
-            <div class="col-3"><input type="text" name="dim_width[]" class="form-control calc-weight dim-l indo-format" placeholder="L"></div>
-            <div class="col-3">
-               <div class="input-group">
-                  <input type="text" name="dim_height[]" class="form-control calc-weight dim-t indo-format" placeholder="T">
-                  <button type="button" class="btn btn-danger btn-remove-dim" title="Hapus">X</button>
-               </div>
-            </div>
-            <div class="col-3"><input type="text" name="dim_qty[]" class="form-control calc-weight dim-qty indo-format" placeholder="Qty" value="1" required></div>
-         `;
+             <div class="col-3"><input type="text" name="dim_length[]" class="form-control calc-weight dim-p indo-format" placeholder="P"></div>
+             <div class="col-3"><input type="text" name="dim_width[]" class="form-control calc-weight dim-l indo-format" placeholder="L"></div>
+             <div class="col-3">
+                <div class="input-group">
+                   <input type="text" name="dim_height[]" class="form-control calc-weight dim-t indo-format" placeholder="T">
+                   <button type="button" class="btn btn-danger btn-remove-dim">X</button>
+                </div>
+             </div>
+             <div class="col-3"><input type="text" name="dim_qty[]" class="form-control calc-weight dim-qty indo-format" value="1" required></div>
+          `;
 			container.appendChild(newRow);
-
-			// Apply mask ke element baru
 			applyIndoMask();
 			calculateAll();
 		});
 
-		// Multi Row Dimensi: Hapus
 		document.body.addEventListener('click', function(e) {
 			if (e.target.classList.contains('btn-remove-dim')) {
 				e.target.closest('.dim-row').remove();
@@ -465,107 +545,34 @@
 			}
 		});
 
-		// ==========================================
-		// AUTOCOMPLETE (Sudah Pakai jQuery Global)
-		// ==========================================
-		if (jQuery().autocomplete) {
-			$("#nama_pengirim").autocomplete({
-				source: function(request, response) {
-					$.ajax({
-						url: "<?= site_url('shipment/autocompleteCustomer') ?>",
-						dataType: "json",
-						data: {
-							term: request.term
-						},
-						success: function(data) {
-							response(data);
-						}
-					});
-				},
-				minLength: 2,
-				select: function(event, ui) {
-					$("#nama_pengirim").val(ui.item.nama_customer);
-					$("#telepon_pengirim").val(ui.item.telepon_customer);
-					$("#alamat_pengirim").val(ui.item.alamat_customer);
-				}
-			});
-
-			$("#nama_penerima").autocomplete({
-				source: function(request, response) {
-					$.ajax({
-						url: "<?= site_url('shipment/autocompleteCustomer') ?>",
-						dataType: "json",
-						data: {
-							term: request.term
-						},
-						success: function(data) {
-							response(data);
-						}
-					});
-				},
-				minLength: 2,
-				select: function(event, ui) {
-					$("#nama_penerima").val(ui.item.nama_customer);
-					$("#telepon_penerima").val(ui.item.telepon_customer);
-					$("#alamat_penerima").val(ui.item.alamat_customer);
-				}
-			});
-		}
-	});
-
-	// ==========================================
-	// LOGIC SUBMIT DENGAN SWEETALERT2
-	// ==========================================
-	const form = document.getElementById('form-booking');
-
-	form.addEventListener('submit', function(e) {
-		e.preventDefault(); // Stop submit manual
-
-		// 1. Cek validasi HTML5 (required, dll)
-		if (!form.checkValidity()) {
-			form.reportValidity(); // Munculin bubble error bawaan browser
-			return;
-		}
-
-		// 2. Jika valid, munculkan SweetAlert
-		Swal.fire({
-			title: 'Konfirmasi Booking?',
-			text: "Pastikan data pengirim, penerima, dan berat barang sudah benar.",
-			icon: 'question',
-			showCancelButton: true,
-			confirmButtonColor: '#206bc4', // Warna biru Tabler
-			cancelButtonColor: '#d33',
-			confirmButtonText: 'Ya, Buat Shipment!',
-			cancelButtonText: 'Cek Lagi',
-			reverseButtons: true
-		}).then((result) => {
-			if (result.isConfirmed) {
-				// Tampilkan loading saat submit
-				Swal.fire({
-					title: 'Memproses...',
-					text: 'Harap tunggu sebentar',
-					allowOutsideClick: false,
-					didOpen: () => {
-						Swal.showLoading();
-					}
-				});
-
-				form.submit(); // Kirim data ke PHP
+		const form = document.getElementById('form-booking');
+		form.addEventListener('submit', function(e) {
+			e.preventDefault();
+			if (!form.checkValidity()) {
+				form.reportValidity();
+				return;
 			}
-		});
-	});
 
-	// Update toggle barang berharga (sesuai permintaan validasi)
-	document.getElementById('is_valuable').addEventListener('change', function() {
-		let box = document.getElementById('wrap_goods_value');
-		let inputVal = document.getElementById('goods_value');
-		if (this.checked) {
-			box.classList.remove('d-none');
-			inputVal.setAttribute('required', 'required'); // Wajib isi kalau dicentang
-		} else {
-			box.classList.add('d-none');
-			inputVal.removeAttribute('required'); // Tidak wajib kalau tidak dicentang
-			inputVal.value = '';
-		}
+			Swal.fire({
+				title: 'Konfirmasi Booking?',
+				text: "Pastikan semua data sudah benar sebelum diproses.",
+				icon: 'question',
+				showCancelButton: true,
+				confirmButtonText: 'Ya, Buat Shipment!',
+				cancelButtonText: 'Cek Lagi',
+				reverseButtons: true
+			}).then((result) => {
+				if (result.isConfirmed) {
+					Swal.fire({
+						title: 'Memproses...',
+						allowOutsideClick: false,
+						didOpen: () => {
+							Swal.showLoading();
+						}
+					});
+					form.submit();
+				}
+			});
+		});
 	});
 </script>

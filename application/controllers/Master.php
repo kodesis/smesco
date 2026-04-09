@@ -11,7 +11,7 @@ class Master extends Authenticated_Controller
 
 		$this->load->model(['M_Pricelist']);
 		$this->load->library('form_validation');
-		$this->load->helper('url');
+		$this->load->helper(['url', 'tabler_icon']);
 	}
 
 	public function index()
@@ -144,6 +144,7 @@ class Master extends Authenticated_Controller
 		$data = [
 			'title'     => 'Detail Pricelist',
 			'pricelist' => $pricelist,
+			'tiers'     => ($pricelist->is_tiered) ? $this->db->get_where('pricelist_tiers', ['pricelist_id' => $id])->result() : []
 		];
 
 		$this->render('app/pages/master/pricelist/detail', $data);
@@ -285,53 +286,49 @@ class Master extends Authenticated_Controller
 
 					$preview_data = [];
 
+					$groups = []; // Kita grupkan berdasarkan rute
+
 					for ($i = 2; $i <= count($sheetData); $i++) {
 						$origin       = trim($sheetData[$i]['A'] ?? '');
-						$destination  = trim($sheetData[$i]['B'] ?? '');
+						$dest         = trim($sheetData[$i]['B'] ?? '');
 						$service_id   = trim($sheetData[$i]['C'] ?? '');
-						$price_kribo  = $this->_parse_indo_number($sheetData[$i]['D'] ?? 0);
-						$price_smesco = $this->_parse_indo_number($sheetData[$i]['E'] ?? 0);
-						$min_weight   = $this->_parse_indo_number($sheetData[$i]['F'] ?? 1);
+						$category     = strtoupper(trim($sheetData[$i]['D'] ?? 'DOMESTIC')); // Kolom Baru
 
-						if (empty($origin) || empty($destination)) continue;
+						if (empty($origin) || empty($dest)) continue;
 
-						// LOGIC PENGECEKAN STATUS
-						$existing = $this->db->get_where('pricelist', [
-							'origin' => $origin,
-							'destination' => $destination,
-							'service_type_id' => $service_id
-						])->row();
+						$key = $origin . '|' . $dest . '|' . $service_id;
 
-						$status = 'NEW'; // Default
-						$diff = [];
-
-						if ($existing) {
-							if ($existing->price_kribo != $price_kribo || $existing->price_smesco != $price_smesco) {
-								$status = 'UPDATE';
-								$diff = ['old_kribo' => $existing->price_kribo, 'old_smesco' => $existing->price_smesco];
-							} else {
-								$status = 'SKIP'; // Data sama persis
-							}
+						// Jika rute belum ada di grup, inisialisasi master data
+						if (!isset($groups[$key])) {
+							$groups[$key] = [
+								'origin'          => $origin,
+								'destination'     => $dest,
+								'service_type_id' => $service_id,
+								'category'        => $category,
+								'is_tiered'       => ($category === 'INTERNATIONAL') ? 1 : 0,
+								'price_kribo'     => ($category === 'DOMESTIC') ? $this->_parse_indo_number($sheetData[$i]['E'] ?? 0) : 0,
+								'price_smesco'    => ($category === 'DOMESTIC') ? $this->_parse_indo_number($sheetData[$i]['F'] ?? 0) : 0,
+								'min_weight_kg'   => $this->_parse_indo_number($sheetData[$i]['G'] ?? 1),
+								'tiers'           => []
+							];
 						}
 
-						$preview_data[] = [
-							'origin'       => $origin,
-							'destination'  => $destination,
-							'service_id'   => $service_id,
-							'price_kribo'  => $price_kribo,
-							'price_smesco' => $price_smesco,
-							'min_weight'   => $min_weight,
-							'status'       => $status,
-							'diff'         => $diff
+						// Simpan harga ke dalam list tiers
+						$groups[$key]['tiers'][] = [
+							'price_kribo'  => $this->_parse_indo_number($sheetData[$i]['E'] ?? 0),
+							'price_smesco' => $this->_parse_indo_number($sheetData[$i]['F'] ?? 0),
+							'tier_min'     => $this->_parse_indo_number($sheetData[$i]['H'] ?? 0), // Kolom Baru
+							'tier_max'     => $this->_parse_indo_number($sheetData[$i]['I'] ?? 9999), // Kolom Baru
 						];
 					}
 
 					// Simpan ke Session buat diproses nanti
-					$this->session->set_userdata('temp_import_pricelist', $preview_data);
+					$this->session->set_userdata('temp_import_pricelist', $groups);
 					unlink($filePath); // Hapus file temp
 
 					$data['title']   = 'Preview Import Pricelist';
-					$data['preview'] = $preview_data;
+					$data['preview'] = $groups;
+
 					$this->render('app/pages/master/pricelist/pricelist_import_preview', $data);
 					return;
 				} catch (Exception $e) {
@@ -345,42 +342,61 @@ class Master extends Authenticated_Controller
 	public function confirm_import_pricelist()
 	{
 		$this->_check_access();
-		$data_import = $this->session->userdata('temp_import_pricelist');
+		$groups = $this->session->userdata('temp_import_pricelist');
 
-		if (empty($data_import)) {
-			redirect('master/pricelist');
-		}
+		if (empty($groups)) redirect('master/pricelist');
 
 		$this->db->trans_start();
-		foreach ($data_import as $item) {
-			if ($item['status'] == 'SKIP') continue;
 
-			$db_data = [
-				'origin'          => $item['origin'],
-				'destination'     => $item['destination'],
-				'service_type_id' => $item['service_id'],
-				'price_kribo'     => $item['price_kribo'],
-				'price_smesco'    => $item['price_smesco'],
-				'min_weight_kg'   => $item['min_weight'],
+		foreach ($groups as $g) {
+			// 1. Cek apakah master rute sudah ada
+			$existing = $this->db->get_where('pricelist', [
+				'origin' => $g['origin'],
+				'destination' => $g['destination'],
+				'service_type_id' => $g['service_type_id']
+			])->row();
+
+			$master_data = [
+				'origin'          => $g['origin'],
+				'destination'     => $g['destination'],
+				'service_type_id' => $g['service_type_id'],
+				'category'        => $g['category'],
+				'is_tiered'       => $g['is_tiered'],
+				'min_weight_kg'   => $g['min_weight_kg'],
 				'is_active'       => 1,
-				'created_by'      => $this->session->userdata('user')['id']
+				// Jika DOMESTIC, ambil harga dari baris pertama tiers
+				'price_kribo'     => ($g['is_tiered'] == 0) ? $g['tiers']['price_kribo'] : 0,
+				'price_smesco'    => ($g['is_tiered'] == 0) ? $g['tiers']['price_smesco'] : 0,
 			];
 
-			if ($item['status'] == 'NEW') {
-				$this->db->insert('pricelist', $db_data);
+			if ($existing) {
+				$pricelist_id = $existing->id;
+				$this->db->where('id', $pricelist_id)->update('pricelist', $master_data);
 			} else {
-				$this->db->where([
-					'origin' => $item['origin'],
-					'destination' => $item['destination'],
-					'service_type_id' => $item['service_id']
-				]);
-				$this->db->update('pricelist', $db_data);
+				$this->db->insert('pricelist', $master_data);
+				$pricelist_id = $this->db->insert_id();
+			}
+
+			// 2. Jika INTERNATIONAL, kelola Tiers
+			if ($g['is_tiered'] == 1) {
+				// Hapus tier lama agar data fresh (sinkron)
+				$this->db->where('pricelist_id', $pricelist_id)->delete('pricelist_tiers');
+
+				foreach ($g['tiers'] as $t) {
+					$this->db->insert('pricelist_tiers', [
+						'pricelist_id' => $pricelist_id,
+						'min_weight'   => $t['tier_min'],
+						'max_weight'   => $t['tier_max'],
+						'price_kribo'  => $t['price_kribo'],
+						'price_smesco' => $t['price_smesco']
+					]);
+				}
 			}
 		}
-		$this->db->trans_complete();
 
+		$this->db->trans_complete();
 		$this->session->unset_userdata('temp_import_pricelist');
-		$this->session->set_flashdata('success', 'Data pricelist berhasil disinkronkan!');
+		$this->session->set_flashdata('success', 'Data pricelist internasional & domestik berhasil disinkronkan!');
 		redirect('master/pricelist');
 	}
 
@@ -392,14 +408,18 @@ class Master extends Authenticated_Controller
 		$this->_check_access();
 		$this->load->helper('download');
 
-		// Header Baru: D = Modal, E = Jual
-		$csv_content = "Origin,Destination,Service_Type_ID,Price_Kribo,Price_Smesco,Min_Weight_KG\n";
+		// Header Lengkap A-I
+		$csv_content = "Origin,Destination,Service_ID,Category,Price_Kribo,Price_Smesco,Min_Weight_Charge,Tier_Min,Tier_Max\n";
 
-		// Contoh Data: Jakarta-Batam
-		$csv_content .= "Jakarta,Batam,1,39000,42000,10.00\n";
-		$csv_content .= "Jakarta,Medan,1,35000,38500,10.00\n";
+		// Contoh Domestik (Flat)
+		$csv_content .= "JAKARTA,BATAM,1,DOMESTIC,35000,42000,10,0,0\n";
 
-		force_download('Template_Import_Pricelist_Smesco.csv', $csv_content);
+		// Contoh Internasional (Tiering) - Masukkan beberapa baris untuk rute yang sama
+		$csv_content .= "JAKARTA,SINGAPORE,1,INTERNATIONAL,80000,95000,1,0,1\n";
+		$csv_content .= "JAKARTA,SINGAPORE,1,INTERNATIONAL,70000,85000,1,1.01,15\n";
+		$csv_content .= "JAKARTA,SINGAPORE,1,INTERNATIONAL,60000,75000,1,15.01,999\n";
+
+		force_download('Template_Pricelist_Smesco_V2.csv', $csv_content);
 	}
 
 	// ----------------------------------------------------------------
@@ -407,13 +427,12 @@ class Master extends Authenticated_Controller
 	// ----------------------------------------------------------------
 	public function ajax_cek_harga()
 	{
-		if (!$this->input->is_ajax_request()) {
-			exit('No direct script access allowed');
-		}
+		if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
 
 		$origin          = $this->input->post('origin');
 		$destination     = $this->input->post('destination');
 		$service_type_id = $this->input->post('service_type_id');
+		$weight          = floatval($this->input->post('weight') ?? 0);
 
 		$pricelist = $this->db->get_where('pricelist', [
 			'origin'          => $origin,
@@ -423,28 +442,45 @@ class Master extends Authenticated_Controller
 		])->row();
 
 		if ($pricelist) {
-			$sess = $this->session->userdata('user');
+			$price_smesco = $pricelist->price_smesco;
+			$price_kribo  = $pricelist->price_kribo;
+			$category     = $pricelist->category;
+			$min_weight   = $pricelist->min_weight_kg;
 
-			// Data dasar yang dikirim ke frontend
-			$res_data = [
-				'price_per_kg'  => $pricelist->price_smesco, // Kita lempar price_smesco sebagai 'price_per_kg'
-				'min_weight_kg' => $pricelist->min_weight_kg
-			];
+			// LOGIC TIERING: Jika rute ini pake tiering
+			if ($pricelist->is_tiered == 1) {
+				// Cari tier yang sesuai dengan berat input
+				$tier = $this->db->where('pricelist_id', $pricelist->id)
+					->where('min_weight <=', $weight)
+					->where('max_weight >=', $weight)
+					->get('pricelist_tiers')->row();
 
-			// OPSIONAL: Kalau yang nge-cek adalah Superadmin, kasih info tambahan harga modal
-			if ($sess['role_slug'] === 'superadmin') {
-				$res_data['price_modal_kribo'] = $pricelist->price_kribo;
+				if ($tier) {
+					$price_smesco = $tier->price_smesco;
+					$price_kribo  = $tier->price_kribo;
+				} else {
+					// Jika berat melebihi tier tertinggi, ambil tier terakhir (max_weight 9999)
+					$last_tier = $this->db->where('pricelist_id', $pricelist->id)
+						->order_by('max_weight', 'DESC')
+						->get('pricelist_tiers', 1)->row();
+					if ($last_tier) {
+						$price_smesco = $last_tier->price_smesco;
+						$price_kribo  = $last_tier->price_kribo;
+					}
+				}
 			}
 
 			echo json_encode([
 				'status' => true,
-				'data'   => $res_data
+				'data'   => [
+					'price_per_kg'  => $price_smesco,
+					'min_weight_kg' => $min_weight,
+					'category'      => $category,
+					'is_tiered'     => $pricelist->is_tiered
+				]
 			]);
 		} else {
-			echo json_encode([
-				'status'  => false,
-				'message' => 'Harga tidak ditemukan untuk rute dan layanan ini.'
-			]);
+			echo json_encode(['status' => false, 'message' => 'Harga tidak ditemukan.']);
 		}
 	}
 

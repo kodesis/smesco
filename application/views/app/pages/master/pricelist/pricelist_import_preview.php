@@ -2,56 +2,74 @@
 	<div class="container-xl">
 		<div class="card">
 			<div class="card-header justify-content-between">
-				<h3 class="card-title">Konfirmasi Perubahan Data</h3>
+				<h3 class="card-title"><?= tabler_icon('file-search', 'me-2') ?>Konfirmasi Perubahan Data Pricelist</h3>
 				<div class="btn-list">
 					<a href="<?= site_url('master/pricelist') ?>" class="btn btn-link">Batal</a>
-					<a href="<?= site_url('master/confirm_import_pricelist') ?>" class="btn btn-primary">
+					<a href="<?= site_url('master/confirm_import_pricelist') ?>" class="btn btn-primary shadow-sm">
 						<?= tabler_icon('check', 'me-2') ?> Ya, Sinkronkan Data
 					</a>
 				</div>
 			</div>
 			<div class="table-responsive">
-				<table class="table table-vcenter card-table table-striped">
-					<thead>
+				<table class="table table-vcenter card-table table-bordered">
+					<thead class="bg-light">
 						<tr>
-							<th>Status</th>
-							<th>Rute & Service</th>
-							<th>Harga Kribo (Modal)</th>
-							<th>Harga Smesco (Jual)</th>
+							<th width="10%">Tipe</th>
+							<th>Rute & Layanan</th>
+							<th width="15%">Kategori</th>
+							<th>Rincian Harga (Tiering)</th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ($preview as $p): ?>
+						<?php foreach ($preview as $p):
+							$is_intl = ($p['category'] === 'INTERNATIONAL');
+						?>
 							<tr>
 								<td>
-									<?php if ($p['status'] == 'NEW'): ?>
-										<span class="badge bg-success">BARU</span>
-									<?php elseif ($p['status'] == 'UPDATE'): ?>
-										<span class="badge bg-warning">UPDATE</span>
-									<?php else: ?>
-										<span class="badge bg-secondary">SAMA</span>
-									<?php endif; ?>
+									<span class="badge bg-azure-lt">PROSES</span>
 								</td>
 								<td>
-									<strong><?= $p['origin'] ?> → <?= $p['destination'] ?></strong><br>
-									<small class="text-muted">Service ID: <?= $p['service_id'] ?></small>
+									<div class="fw-bold text-uppercase"><?= $p['origin'] ?> <?= tabler_icon('arrow-right', 'mx-1') ?> <?= $p['destination'] ?></div>
+									<div class="small text-muted">Service ID: <?= $p['service_type_id'] ?></div>
 								</td>
 								<td>
-									<?php if ($p['status'] == 'UPDATE' && $p['price_kribo'] != $p['diff']['old_kribo']): ?>
-										<small class="text-danger text-decoration-line-through"><?= number_format($p['diff']['old_kribo']) ?></small> →
-									<?php endif; ?>
-									<strong><?= number_format($p['price_kribo']) ?></strong>
+									<span class="badge <?= $is_intl ? 'bg-purple' : 'bg-azure' ?>-lt">
+										<?= $is_intl ? '✈️ INTERNATIONAL' : '🚛 DOMESTIC' ?>
+									</span>
 								</td>
-								<td>
-									<?php if ($p['status'] == 'UPDATE' && $p['price_smesco'] != $p['diff']['old_smesco']): ?>
-										<small class="text-danger text-decoration-line-through"><?= number_format($p['diff']['old_smesco']) ?></small> →
-									<?php endif; ?>
-									<strong><?= number_format($p['price_smesco']) ?></strong>
+								<td class="p-0">
+									<table class="table table-vcenter table-sm card-table table-borderless m-0">
+										<thead class="small border-bottom">
+											<tr>
+												<th>Range Berat</th>
+												<th class="text-end">Modal (Kribo)</th>
+												<th class="text-end">Jual (Smesco)</th>
+											</tr>
+										</thead>
+										<tbody>
+											<?php foreach ($p['tiers'] as $t): ?>
+												<tr>
+													<td class="small text-muted">
+														<?php if ($p['is_tiered']): ?>
+															<?= $t['tier_min'] ?> - <?= $t['tier_max'] ?> Kg
+														<?php else: ?>
+															Min. <?= $p['min_weight_kg'] ?> Kg (Flat)
+														<?php endif; ?>
+													</td>
+													<td class="text-end fw-bold">Rp <?= number_format($t['price_kribo']) ?></td>
+													<td class="text-end fw-bold text-primary">Rp <?= number_format($t['price_smesco']) ?></td>
+												</tr>
+											<?php endforeach; ?>
+										</tbody>
+									</table>
 								</td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
+			</div>
+			<div class="card-footer small text-muted">
+				* Pastikan range berat tidak tumpang tindih untuk rute Internasional.
 			</div>
 		</div>
 	</div>

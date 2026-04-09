@@ -4,7 +4,19 @@
 <head>
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-	<title><?= $title ?> - Smesco Express</title>
+	<title>Smesco Express - <?= $title ?></title>
+	<meta name="description" content="SMESCO Express — jasa pengiriman terpercaya untuk UMKM Indonesia. Layanan pengiriman udara, darat, ekspor impor, dan fulfillment ke seluruh Indonesia dan mancanegara." />
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://smesco.kodesis.id/" />
+	<meta property="og:title" content="SMESCO Express — Teman Kirim Terpercaya UMKM Indonesia" />
+	<meta property="og:description" content="Layanan pengiriman udara, darat, ekspor impor, dan fulfillment untuk UMKM Indonesia. Cepat, aman, dan terpercaya." />
+	<meta property="og:image" content="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" />
+	<meta property="og:locale" content="id_ID" />
+	<meta property="og:site_name" content="SMESCO Express" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:title" content="SMESCO Express — Teman Kirim Terpercaya UMKM Indonesia" />
+	<meta name="twitter:description" content="Layanan pengiriman udara, darat, ekspor impor, dan fulfillment untuk UMKM Indonesia." />
+	<meta name="twitter:image" content="<?= base_url() ?>assets/logo/logo-smesco-hera-2.png" />
 	<link href="<?= base_url() ?>assets/logo/icon-smesco.png" rel="icon">
 	<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 

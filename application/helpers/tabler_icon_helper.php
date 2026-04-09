@@ -163,7 +163,11 @@ if (! function_exists('tabler_icon')) {
 
 			'shield-exclamation' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15.04 19.745c-.942 .551 -1.964 .976 -3.04 1.255a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3a12 12 0 0 0 8.5 3a12 12 0 0 1 .195 6.015" /><path d="M19 16v3" /><path d="M19 22v.01" />',
 
-			'coin' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" /><path d="M12 7v10" />'
+			'coin' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" /><path d="M14.8 9a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" /><path d="M12 7v10" />',
+
+			'file-search' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M12 21h-5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v4.5" /><path d="M14 17.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" /><path d="M18.5 19.5l2.5 2.5" />',
+
+			'layers-difference' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M16 16v2a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2h2v-2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-2" /><path d="M10 8l-2 0l0 2" /><path d="M8 14l0 2l2 0" /><path d="M14 8l2 0l0 2" /><path d="M16 14l0 2l-2 0" />'
 		];
 
 		// Fallback kalau icon tidak ditemukan
@@ -192,5 +196,24 @@ if (!function_exists('human_readable_minutes')) {
 		$hours = floor($minutes / 60);
 		$rem   = $minutes % 60;
 		return $rem > 0 ? "{$hours} jam {$rem} menit" : "{$hours} jam";
+	}
+}
+
+if (!function_exists('hide_if_not_admin')) {
+	function hide_if_not_admin()
+	{
+		$CI = &get_instance();
+		$sess = $CI->session->userdata('user');
+		$role = $sess['role_slug'];
+
+		// Tentukan role mana saja yang BOLEH liat harga modal
+		$allowed = ['superadmin', 'finance-kribo', 'admin-kribo'];
+
+		if (!in_array($role, $allowed)) {
+			// Kalau bukan admin, kita kasih class CSS 'd-none' (Bootstrap) buat sembunyiin elemennya
+			return 'd-none';
+		}
+
+		return '';
 	}
 }

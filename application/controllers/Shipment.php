@@ -73,50 +73,47 @@ class Shipment extends Authenticated_Controller
 		$this->_check_access();
 
 		if ($this->input->server('REQUEST_METHOD') === 'POST') {
-
-			$origin = $this->input->post('origin', TRUE);
+			// 1. Dapatkan Input Dasar
+			$origin      = $this->input->post('origin', TRUE);
 			$destination = $this->input->post('destination', TRUE);
-			$service_id = $this->input->post('service_type_id', TRUE);
+			$service_id  = $this->input->post('service_type_id', TRUE);
 
-			// 1. CEK ULANG HARGA DI SERVER
+			// 2. Validasi Master Pricelist
 			$pricelist = $this->db->get_where('pricelist', [
-				'origin' => $origin,
-				'destination' => $destination,
+				'origin'          => $origin,
+				'destination'     => $destination,
 				'service_type_id' => $service_id,
-				'is_active' => 1
+				'is_active'       => 1
 			])->row();
 
 			if (!$pricelist) {
-				$this->session->set_flashdata('error', 'Transaksi ditolak! Rute dan Harga tidak valid.');
+				$this->session->set_flashdata('error', 'Rute atau layanan tidak tersedia!');
 				redirect('shipment/create');
 			}
 
-			// 2. PARSING ANGKA FORMAT INDONESIA KE FLOAT STANDAR
+			// 3. Hitung Berat (Actual vs Volume)
 			$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
-
-			// 3. HITUNG VOLUME DIMENSI DI SERVER (Total Volume dari array)
-			$dim_qtys   = $this->input->post('dim_qty');
-			$dim_lengths = $this->input->post('dim_length');
-			$dim_widths  = $this->input->post('dim_width');
-			$dim_heights = $this->input->post('dim_height');
+			$dim_qtys      = $this->input->post('dim_qty');
+			$dim_lengths   = $this->input->post('dim_length');
+			$dim_widths    = $this->input->post('dim_width');
+			$dim_heights   = $this->input->post('dim_height');
 
 			$total_volume_weight = 0;
 			$total_koli = 0;
 			$insert_dimensions = [];
 
 			if (!empty($dim_qtys)) {
-				for ($i = 0; $i < count($dim_qtys); $i++) {
-					$q = intval($this->_parse_indo_number($dim_qtys[$i]));
+				foreach ($dim_qtys as $i => $qty_val) {
+					$q = intval($this->_parse_indo_number($qty_val));
 					$p = $this->_parse_indo_number($dim_lengths[$i]);
 					$l = $this->_parse_indo_number($dim_widths[$i]);
 					$t = $this->_parse_indo_number($dim_heights[$i]);
 
 					if ($q > 0) {
 						$total_koli += $q;
-						$row_volume = (($p * $l * $t) / 5000) * $q;
-						$total_volume_weight += $row_volume;
+						$row_vol = (($p * $l * $t) / 5000) * $q;
+						$total_volume_weight += $row_vol;
 
-						// Siapkan untuk insert batch nanti (Hanya simpan kalau ada dimensinya)
 						if ($p > 0 || $l > 0 || $t > 0) {
 							$insert_dimensions[] = [
 								'qty'    => $q,
@@ -129,76 +126,97 @@ class Shipment extends Authenticated_Controller
 				}
 			}
 
-			// 4. CHARGEABLE WEIGHT & TOTAL BIAYA
+			// 4. Tentukan Chargeable Weight (Pembulatan ke Atas)
 			$chargeable = max($actual_weight, $total_volume_weight);
-
 			if ($chargeable < $pricelist->min_weight_kg) {
 				$chargeable = $pricelist->min_weight_kg;
 			}
+			$chargeable = ceil($chargeable);
 
-			$chargeable = ceil($chargeable); // Bulatkan ke atas
+			// 5. Logic Penentuan Harga & Margin Ongkir
+			$cost_per_kg = $pricelist->price_kribo;
+			$sell_per_kg = $pricelist->price_smesco;
 
-			$final_price = $pricelist->price_per_kg;
-			$final_total = $chargeable * $final_price;
+			if ($pricelist->is_tiered == 1) {
+				$tier = $this->db->where('pricelist_id', $pricelist->id)
+					->where('min_weight <=', $chargeable)
+					->where('max_weight >=', $chargeable)
+					->get('pricelist_tiers')->row();
+				if ($tier) {
+					$cost_per_kg = $tier->price_kribo;
+					$sell_per_kg = $tier->price_smesco;
+				} else {
+					$last_tier = $this->db->where('pricelist_id', $pricelist->id)
+						->order_by('max_weight', 'DESC')->limit(1)->get('pricelist_tiers')->row();
+					if ($last_tier) {
+						$cost_per_kg = $last_tier->price_kribo;
+						$sell_per_kg = $last_tier->price_smesco;
+					}
+				}
+			}
 
-			$cost_per_kg  = $pricelist->price_kribo;  // Harga Modal Kribo
-			$sell_per_kg  = $pricelist->price_smesco; // Harga Jual Smesco
-			$final_total  = $chargeable * $sell_per_kg;
-			$total_margin = ($sell_per_kg - $cost_per_kg) * $chargeable;
+			$shipping_total  = $chargeable * $sell_per_kg;
+			$shipping_margin = ($sell_per_kg - $cost_per_kg) * $chargeable;
 
-			// 5. GENERATE RESI
-			$no_resi = $this->M_Shipment->generate_no_resi();
+			// 6. Logic Pickup Service
+			$pickup_fee    = 0;
+			$pickup_margin = 0;
+			$pickup_id     = NULL;
 
-			// 6. SIAPKAN DATA INSERT
-			$sess = $this->session->userdata('user');
+			if ($this->input->post('use_pickup') == 1) {
+				$p_id = $this->input->post('pickup_rate_id');
+				$rate_db = $this->db->get_where('master_pickup_rates', ['id' => $p_id])->row();
 
-			$is_valuable = $this->input->post('is_valuable') ? 1 : 0;
-			$goods_value = $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0;
+				if ($rate_db && $chargeable >= $rate_db->min_weight) {
+					$pickup_id     = $p_id;
+					$pickup_fee    = $rate_db->price_smesco;
+					$pickup_margin = ($rate_db->price_smesco - $rate_db->price_kribo);
+				}
+			}
+
+			// 7. Kalkulasi Final & Persiapan Data
+			$no_resi      = $this->M_Shipment->generate_no_resi();
+			$sess         = $this->session->userdata('user');
+			$is_valuable  = $this->input->post('is_valuable') ? 1 : 0;
+			$total_margin = $shipping_margin + $pickup_margin;
 
 			$insert_shipment = [
-				'no_resi'        => $no_resi,
+				'no_resi'           => $no_resi,
 				'agent_id'          => $sess['agent_id'] ?? NULL,
 				'origin'            => $origin,
 				'destination'       => $destination,
 				'service_type_id'   => $service_id,
-
+				'category'          => $pricelist->category,
 				'sender_name'       => $this->input->post('sender_name', TRUE),
 				'sender_phone'      => $this->input->post('sender_phone', TRUE),
 				'sender_address'    => $this->input->post('sender_address', TRUE),
-
 				'receiver_name'     => $this->input->post('receiver_name', TRUE),
 				'receiver_phone'    => $this->input->post('receiver_phone', TRUE),
 				'receiver_address'  => $this->input->post('receiver_address', TRUE),
-
 				'commodity_id'      => $this->input->post('commodity_id', TRUE),
 				'commodity_detail'  => $this->input->post('commodity_detail', TRUE),
-
 				'is_valuable'       => $is_valuable,
-				'goods_value'       => $goods_value,
+				'goods_value'       => $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0,
 				'payment_type'      => $this->input->post('payment_type', TRUE),
-				'koli'              => $total_koli ?: 1, // Pastikan minimal 1
-
+				'koli'              => $total_koli ?: 1,
 				'actual_weight'     => $actual_weight,
 				'volume_weight'     => $total_volume_weight,
 				'chargeable_weight' => $chargeable,
-
-				'cost_price'        => $cost_per_kg,   // Simpan harga modal saat transaksi terjadi
-				'sell_price'        => $sell_per_kg,   // Simpan harga jual saat transaksi terjadi
-				'price_per_kg'      => $sell_per_kg,   // Tetap simpan di sini sebagai acuan invoice agen
-				'total_amount'      => $final_total,   // Total yang harus dibayar Agen
-				'margin_amount'     => $total_margin,  // Cuan Smesco dari transaksi ini
-				
+				'cost_price'        => $cost_per_kg,
+				'sell_price'        => $sell_per_kg,
+				'pickup_rate_id'    => $pickup_id,
+				'pickup_fee'        => $pickup_fee,
+				'total_amount'      => $shipping_total + $pickup_fee,
+				'margin_amount'     => $total_margin,
 				'status'            => 'BOOKED',
-				'created_by'        => $sess['id'],
+				'created_by'        => $sess['id']
 			];
 
-			// 7. DATABASE TRANSACTION
+			// 8. Database Transaction
 			$this->db->trans_start();
-
 			$this->db->insert('shipments', $insert_shipment);
 			$shipment_id = $this->db->insert_id();
 
-			// Insert Dimensions
 			if (!empty($insert_dimensions)) {
 				foreach ($insert_dimensions as &$dim) {
 					$dim['shipment_id'] = $shipment_id;
@@ -206,35 +224,32 @@ class Shipment extends Authenticated_Controller
 				$this->db->insert_batch('shipment_dimensions', $insert_dimensions);
 			}
 
-			// Insert Tracking
-			$insert_tracking = [
+			$this->db->insert('shipment_tracking', [
 				'shipment_id' => $shipment_id,
 				'status'      => 'BOOKED',
 				'location'    => $origin,
-				'note'        => 'Shipment dibuat oleh agen asal.',
-				'created_by'  => $sess['id'],
-			];
-			$this->db->insert('shipment_tracking', $insert_tracking);
-
+				'note'        => 'Shipment berhasil dibuat.',
+				'created_by'  => $sess['id']
+			]);
 			$this->db->trans_complete();
 
 			if ($this->db->trans_status() === FALSE) {
-				$this->session->set_flashdata('error', 'Terjadi kesalahan saat menyimpan transaksi.');
+				$this->session->set_flashdata('error', 'Gagal menyimpan data.');
 				redirect('shipment/create');
 			} else {
-				$this->session->set_flashdata('success', "Booking berhasil! No. Resi: <b>$awb_number</b>");
+				$this->session->set_flashdata('success', "Resi <b>$no_resi</b> berhasil dibuat!");
 				redirect('shipment/detail/' . $shipment_id);
-				return;
 			}
+			return;
 		}
 
+		// Tampilan Form
 		$data = [
-			'title'    => 'Buat Booking',
-			'cities'   => $this->M_Pricelist->get_cities(),
-			'services' => $this->M_Pricelist->get_services(),
+			'title'       => 'Buat Booking',
+			'cities'      => $this->M_Pricelist->get_cities(),
+			'services'    => $this->M_Pricelist->get_services(),
 			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result()
 		];
-
 		$this->render('app/pages/shipment/create', $data);
 	}
 

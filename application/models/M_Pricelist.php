@@ -31,7 +31,7 @@ class M_Pricelist extends MY_Model
 			->select('service_types.name AS service_name, service_types.code AS service_code');
 
 		if ($status_filter !== '' && $status_filter !== NULL) {
-			$this->db->where('is_active', $status_filter);
+			$this->db->where('pricelist.is_active', $status_filter);
 		}
 
 		if ($search) {

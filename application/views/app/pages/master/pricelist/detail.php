@@ -35,67 +35,85 @@
 		<?php endif; ?>
 
 		<div class="row">
-			<div class="col-md-8">
-				<div class="card">
+			<div class="col-md-12">
+				<div class="card mb-3">
 					<div class="card-header">
 						<h3 class="card-title">Informasi Rute</h3>
 					</div>
 					<div class="card-body">
 						<div class="datagrid">
 							<div class="datagrid-item">
-								<div class="datagrid-title">Kota Asal (Origin)</div>
-								<div class="datagrid-content"><?= htmlspecialchars($pricelist->origin) ?></div>
-							</div>
-							<div class="datagrid-item">
-								<div class="datagrid-title">Kota Tujuan (Destination)</div>
-								<div class="datagrid-content"><?= htmlspecialchars($pricelist->destination) ?></div>
-							</div>
-							<div class="datagrid-item">
-								<div class="datagrid-title">Tipe Layanan</div>
+								<div class="datagrid-title">Kategori</div>
 								<div class="datagrid-content">
-									<span class="badge bg-blue-lt"><?= htmlspecialchars($pricelist->service_name ?? 'ID: ' . $pricelist->service_type_id) ?></span>
-								</div>
-							</div>
-							<div class="datagrid-item">
-								<div class="datagrid-title">Harga per Kg</div>
-								<div class="datagrid-content text-success font-weight-bold">
-									Rp <?= number_format($pricelist->price_per_kg, 0, ',', '.') ?>
-								</div>
-							</div>
-							<div class="datagrid-item">
-								<div class="datagrid-title">Minimum Berat</div>
-								<div class="datagrid-content"><?= floatval($pricelist->min_weight_kg) ?> Kg</div>
-							</div>
-							<div class="datagrid-item">
-								<div class="datagrid-title">Status</div>
-								<div class="datagrid-content">
-									<span class="badge <?= $pricelist->is_active ? 'bg-success' : 'bg-danger' ?>">
-										<?= $pricelist->is_active ? 'Aktif' : 'Nonaktif' ?>
+									<span class="badge <?= $pricelist->category === 'INTERNATIONAL' ? 'bg-purple' : 'bg-azure' ?>-lt">
+										<?= $pricelist->category ?>
 									</span>
 								</div>
 							</div>
 							<div class="datagrid-item">
-								<div class="datagrid-title">Dibuat Pada</div>
-								<div class="datagrid-content"><?= date('d M Y H:i', strtotime($pricelist->created_at)) ?></div>
+								<div class="datagrid-title">Rute</div>
+								<div class="datagrid-content fw-bold"><?= $pricelist->origin ?> → <?= $pricelist->destination ?></div>
 							</div>
 							<div class="datagrid-item">
-								<div class="datagrid-title">Terakhir Diupdate</div>
-								<div class="datagrid-content"><?= date('d M Y H:i', strtotime($pricelist->updated_at)) ?></div>
+								<div class="datagrid-title">Layanan</div>
+								<div class="datagrid-content"><?= $pricelist->service_name ?></div>
 							</div>
 							<div class="datagrid-item">
-								<div class="datagrid-title">Dibuat oleh</div>
-								<div class="datagrid-content"><?= htmlspecialchars($pricelist->created_by_name ?? 'N/A') ?></div>
+								<div class="datagrid-title">Min. Charge</div>
+								<div class="datagrid-content"><?= floatval($pricelist->min_weight_kg) ?> Kg</div>
 							</div>
 						</div>
 					</div>
-					<div class="card-footer d-flex">
-						<a href="<?= site_url('master/toggle_status_pricelist/' . $pricelist->id) ?>" class="btn btn-outline-warning" onclick="return confirm('Ubah status Pricelist ini?')">
-							<?= tabler_icon('refresh', 'me-2') ?>Toggle Status
-						</a>
-						<a href="<?= site_url('master/delete_pricelist/' . $pricelist->id) ?>" class="btn btn-outline-danger ms-auto" onclick="return confirm('Hapus Pricelist ini secara permanen?')">
-							<?= tabler_icon('trash', 'me-2') ?>Hapus Pricelist
-						</a>
+				</div>
+			</div>
+
+			<div class="col-md-12">
+				<div class="card">
+					<div class="card-header">
+						<h3 class="card-title">Informasi Harga</h3>
 					</div>
+
+					<?php if ($pricelist->is_tiered == 0): ?>
+						<div class="card-body">
+							<div class="datagrid">
+								<div class="datagrid-item <?= hide_if_not_admin() ?>">
+									<div class="datagrid-title">Harga Modal (Kribo)</div>
+									<div class="datagrid-content text-danger">Rp <?= number_format($pricelist->price_kribo) ?></div>
+								</div>
+								<div class="datagrid-item">
+									<div class="datagrid-title">Harga Jual (Smesco)</div>
+									<div class="datagrid-content text-success h3 mb-0">Rp <?= number_format($pricelist->price_smesco) ?></div>
+								</div>
+								<div class="datagrid-item <?= hide_if_not_admin() ?>">
+									<div class="datagrid-title">Potensi Margin</div>
+									<div class="datagrid-content fw-bold">Rp <?= number_format($pricelist->price_smesco - $pricelist->price_kribo) ?></div>
+								</div>
+							</div>
+						</div>
+					<?php else: ?>
+						<div class="table-responsive">
+							<table class="table table-vcenter card-table">
+								<thead>
+									<tr>
+										<th>Range Berat</th>
+										<th class="text-end <?= hide_if_not_admin() ?>">Modal (Kribo)</th>
+										<th class="text-end">Jual (Smesco)</th>
+										<th class="text-end <?= hide_if_not_admin() ?>">Margin</th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ($tiers as $t): ?>
+										<tr>
+											<td><?= $t->min_weight ?> - <?= $t->max_weight ?> Kg</td>
+											<td class="text-end text-danger <?= hide_if_not_admin() ?>">Rp <?= number_format($t->price_kribo) ?></td>
+											<td class="text-end text-success fw-bold">Rp <?= number_format($t->price_smesco) ?></td>
+											<td class="text-end fw-bold <?= hide_if_not_admin() ?>">Rp <?= number_format($t->price_smesco - $t->price_kribo) ?></td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+						</div>
+					<?php endif; ?>
 				</div>
 			</div>
 		</div>
