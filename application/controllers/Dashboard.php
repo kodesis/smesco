@@ -9,7 +9,7 @@ class Dashboard extends Authenticated_Controller
 		parent::__construct();
 		$this->load->model('M_User');
 		$this->load->model('M_Agent');
-		$this->load->model('M_VisitorLog');
+		$this->load->model('M_Visitorlog');
 	}
 
 	public function index()
