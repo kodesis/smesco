@@ -352,7 +352,7 @@ class Shipment extends Authenticated_Controller
 		$logoBase64 = (file_exists($logoPath)) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : '';
 
 		// 2. QR Tracking (Sama untuk semua koli karena merujuk ke halaman tracking yang sama)
-		$linkTracking = base_url("home/track/$no_resi");
+		$linkTracking = base_url("home/tracking?awb=$no_resi");
 		$fileTracking = 'qr_trc_' . $no_resi . '.png';
 		$pathTracking = $tempDir . DIRECTORY_SEPARATOR . $fileTracking;
 		$this->ciqrcode->generate([
