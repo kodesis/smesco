@@ -1,58 +1,34 @@
-<style>
-	ol,
-	ul {
-		padding-left: 0;
-	}
-
-	dl,
-	ol,
-	ul {
-		margin-top: 0;
-		margin-bottom: 0;
-	}
-</style>
-<!-- v_home.php -->
+<!-- ══ HERO SLIDER (tidak diubah) ══ -->
 <section class="hero-slider" id="heroSlider">
-
 	<div class="slider-progress" id="sliderProgress"></div>
-	<div class="slider-pause-badge">
-		<i class="bi bi-pause-fill"></i> Paused
-	</div>
+	<div class="slider-pause-badge"><i class="bi bi-pause-fill"></i> Paused</div>
 
 	<div class="slide active" data-index="0">
-		<img src="assets/landing-page/img/hero/slide-1.jpeg" alt="Slide 1" class="slide-img" />
+		<img src="assets/landing-page/img/hero/slide-1.jpeg" alt="Slide 1" class="slide-img">
 	</div>
 	<div class="slide" data-index="1">
-		<img src="assets/landing-page/img/hero/slide-2.jpeg" alt="Slide 2" class="slide-img" />
+		<img src="assets/landing-page/img/hero/slide-2.jpeg" alt="Slide 2" class="slide-img">
 	</div>
 	<div class="slide" data-index="2">
-		<img src="assets/landing-page/img/hero/slide-3.jpeg" alt="Slide 3" class="slide-img" />
+		<img src="assets/landing-page/img/hero/slide-3.jpeg" alt="Slide 3" class="slide-img">
 	</div>
 
-	<button class="slider-arrow prev" id="sliderPrev" aria-label="Slide sebelumnya">
-		<i class="bi bi-chevron-left"></i>
-	</button>
-	<button class="slider-arrow next" id="sliderNext" aria-label="Slide berikutnya">
-		<i class="bi bi-chevron-right"></i>
-	</button>
+	<button class="slider-arrow prev" id="sliderPrev" aria-label="Slide sebelumnya"><i class="bi bi-chevron-left"></i></button>
+	<button class="slider-arrow next" id="sliderNext" aria-label="Slide berikutnya"><i class="bi bi-chevron-right"></i></button>
 
-	<div class="slider-dots" role="tablist" aria-label="Navigasi slide">
-		<button class="slider-dot active" data-target="0" aria-label="Slide 1"></button>
-		<button class="slider-dot" data-target="1" aria-label="Slide 2"></button>
-		<button class="slider-dot" data-target="2" aria-label="Slide 3"></button>
+	<div class="slider-dots" role="tablist">
+		<button class="slider-dot active" data-target="0"></button>
+		<button class="slider-dot" data-target="1"></button>
+		<button class="slider-dot" data-target="2"></button>
 	</div>
-
 	<div class="slider-counter">
 		<span class="counter-current" id="counterCurrent">1</span>
 		<span class="counter-sep">/</span>
 		<span class="counter-total">3</span>
 	</div>
-
 </section>
 
-<!-- ════════════════════════════════════════════
-     TICKER
-════════════════════════════════════════════ -->
+<!-- ══ TICKER (tidak diubah) ══ -->
 <div class="ticker-bar" aria-hidden="true">
 	<div class="ticker-track">
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> Pengiriman Udara</span>
@@ -63,6 +39,7 @@
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> Fulfillment UMKM</span>
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> Bea Cukai</span>
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> 98% Area Indonesia</span>
+		<!-- duplikat untuk loop -->
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> Pengiriman Udara</span>
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> Pengiriman Darat</span>
 		<span class="ticker-item"><i class="bi bi-circle-fill"></i> Ekspor Internasional</span>
@@ -74,12 +51,10 @@
 	</div>
 </div>
 
-<!-- ════════════════════════════════════════════
-     STATS
-════════════════════════════════════════════ -->
+<!-- ══ STATS BAND ══ -->
 <section class="stats-band">
 	<div class="container">
-		<div class="row g-4 align-items-center">
+		<div class="row g-0">
 			<div class="col-6 col-md-3">
 				<div class="stat-block">
 					<span class="stat-number">98<span class="stat-accent-char">%</span></span>
@@ -98,9 +73,8 @@
 					<span class="stat-label">Pantau Paketmu Kapan Saja</span>
 				</div>
 			</div>
-			<!-- ✅ UPDATED: Ganti "2023 Melayani Sejak" dengan data Smesco -->
 			<div class="col-6 col-md-3">
-				<div class="stat-block">
+				<div class="stat-block" style="border-right:none;">
 					<span class="stat-number">82<span class="stat-accent-char">rb+</span></span>
 					<span class="stat-label">UMKM Terfasilitasi Smesco</span>
 				</div>
@@ -109,14 +83,12 @@
 	</div>
 </section>
 
-<!-- ════════════════════════════════════════════
-     TRACKING WIDGET
-════════════════════════════════════════════ -->
+<!-- ══ WIDGET SECTION ══ -->
 <section class="widget-section" id="tracking">
 	<div class="container">
 		<div class="row justify-content-center text-center mb-5">
 			<div class="col-lg-6">
-				<div class="t-label mb-2">Tracking & Tarif</div>
+				<div class="t-label mb-3">Tracking & Tarif</div>
 				<h2 class="t-section">Mau Kirim atau<br>Cek Paketmu?</h2>
 			</div>
 		</div>
@@ -132,57 +104,83 @@
 						</button>
 					</div>
 					<div class="widget-body">
+
+						<!-- Tab: Lacak Resi -->
 						<div class="wpane active" id="wpane-resi">
 							<form action="<?= site_url('home/tracking') ?>" method="GET">
 								<label class="field-label">Nomor Resi / AWB</label>
 								<div style="display:flex;gap:10px;">
-									<input name="awb" class="field-input" type="text" placeholder="Contoh: SMX2024123456..." style="flex:1;" required />
-									<button type="submit" class="btn-dark" style="padding:13px 24px;border-radius:10px;white-space:nowrap;font-size:0.875rem;">
+									<input name="awb" class="field-input" type="text"
+										placeholder="Contoh: SMC2604120001..."
+										style="flex:1;" required>
+									<button type="submit" class="btn-dark" style="white-space:nowrap;">
 										<i class="bi bi-search"></i> Lacak
 									</button>
 								</div>
-								<p style="font-size:0.75rem;color:var(--grey-light);margin-top:10px;margin-bottom:0;">
+								<p style="font-size:0.72rem;color:var(--grey);margin-top:10px;margin-bottom:0;">
 									Ketik nomor resimu di sini, langsung ketahuan posisinya! 📦
 								</p>
 							</form>
 						</div>
+
+						<!-- Tab: Cek Ongkir -->
 						<div class="wpane" id="wpane-ongkir">
 							<div class="row g-2">
 								<div class="col-md-4">
 									<label class="field-label">Kota Asal</label>
-									<input type="text" id="home_origin" class="field-input" placeholder="Contoh: JAKARTA" oninput="this.value = this.value.toUpperCase()">
+									<input type="text" id="home_origin" class="field-input"
+										placeholder="Contoh: JAKARTA"
+										oninput="this.value = this.value.toUpperCase()">
 								</div>
 								<div class="col-md-4">
 									<label class="field-label">Kota Tujuan</label>
-									<input type="text" id="home_destination" class="field-input" placeholder="Contoh: SINGAPORE" oninput="this.value = this.value.toUpperCase()">
+									<input type="text" id="home_destination" class="field-input"
+										placeholder="Contoh: SURABAYA"
+										oninput="this.value = this.value.toUpperCase()">
 								</div>
 								<div class="col-md-2">
 									<label class="field-label">Berat (kg)</label>
 									<input type="number" id="home_weight" class="field-input" value="1" min="1">
 								</div>
 								<div class="col-md-2 d-flex align-items-end">
-									<button type="button" onclick="cekOngkirPublic()" class="btn-dark w-100" style="padding:13px 12px;border-radius:10px;">
+									<button type="button" onclick="cekOngkirPublic()" class="btn-dark w-100">
 										<i class="bi bi-search"></i> Cek
 									</button>
 								</div>
 							</div>
 
-							<div id="result-ongkir" class="mt-3 p-3 rounded-3 d-none" style="background: #f8f9fa; border: 1px dashed #dee2e6;">
-								<div class="d-flex justify-content-between align-items-center">
-									<div>
-										<span class="badge bg-primary mb-1" id="res_service">SERVICE</span>
-										<div class="small text-muted">Tarif: <span id="res_price_per_kg" class="fw-bold">Rp 0</span> /kg</div>
-										<div class="h2 mb-0 text-dark fw-bold" id="res_total">Rp 0</div>
-										<div class="small text-muted italic">*Berat dibulatkan ke atas</div>
+							<!-- Result Box -->
+							<div id="result-ongkir" class="result-ongkir-box d-none">
+								<div class="res-badges">
+									<span class="res-badge-service" id="res_service">SERVICE</span>
+									<span class="res-badge-est">Estimasi Harga</span>
+								</div>
+								<div class="res-price-per-kg">
+									Tarif: <strong id="res_price_per_kg">Rp 0</strong>/kg
+								</div>
+								<div class="res-total" id="res_total">Rp 0</div>
+								<div class="res-notes">
+									<div class="res-note-item">
+										<i class="bi bi-info-circle-fill"></i>
+										<span>Minimal pengiriman <strong>10 kg</strong>.</span>
 									</div>
-									<div class="text-end">
-										<a href="<?= site_url('home/cek_ongkir') ?>" class="btn btn-sm btn-outline-primary rounded-pill">
-											Detail & Pickup →
-										</a>
+									<div class="res-note-item">
+										<i class="bi bi-truck-flatbed"></i>
+										<span>Belum termasuk biaya <strong>pickup</strong>.</span>
 									</div>
+									<div class="res-note-item">
+										<i class="bi bi-exclamation-triangle-fill"></i>
+										<span>*Berat dibulatkan ke atas.</span>
+									</div>
+								</div>
+								<div style="margin-top:16px;">
+									<a href="<?= site_url('home/cek_ongkir') ?>" class="btn-dark">
+										Detail & Pickup <i class="bi bi-arrow-right ms-1"></i>
+									</a>
 								</div>
 							</div>
 						</div>
+
 					</div>
 				</div>
 			</div>
@@ -190,18 +188,15 @@
 	</div>
 </section>
 
-<!-- ════════════════════════════════════════════
-     SERVICES
-════════════════════════════════════════════ -->
+<!-- ══ SERVICES ══ -->
 <section class="services-section" id="layanan">
 	<div class="container">
 		<div class="section-header">
 			<div>
-				<div class="t-label mb-2">Layanan Kami</div>
-				<h2 class="t-section">Semua Kebutuhan<br>Kirimmu, Kami Urus</h2>
+				<div class="t-label">Layanan Kami</div>
+				<h2 class="t-section" style="margin-top:10px;">Semua Kebutuhan<br>Kirimmu, Kami Urus</h2>
 			</div>
-			<!-- ✅ UPDATED: Tone lebih konsisten casual -->
-			<p class="t-body" style="max-width:320px;margin:0;flex-shrink:0;">
+			<p class="t-body" style="max-width:300px;margin:0;flex-shrink:0;">
 				Mau kirim antar kota, antar pulau, sampai luar negeri? Satu platform, semua bisa diurus dari sini.
 			</p>
 		</div>
@@ -210,7 +205,6 @@
 				<div class="svc-num">01</div>
 				<div class="svc-icon-wrap"><i class="bi bi-airplane-fill"></i></div>
 				<div class="svc-name">Pengiriman Udara</div>
-				<!-- ✅ UPDATED: Hapus kata "ekspres" yang redundan, tone lebih natural -->
 				<p class="svc-desc">Kirim kargo antar pulau lewat jalur udara — cepat, aman, dan bisa dipantau kapan saja.</p>
 				<span class="svc-arrow"><i class="bi bi-arrow-up-right"></i></span>
 			</div>
@@ -218,7 +212,6 @@
 				<div class="svc-num">02</div>
 				<div class="svc-icon-wrap"><i class="bi bi-truck"></i></div>
 				<div class="svc-name">Pengiriman Darat</div>
-				<!-- ✅ UPDATED: Hilangkan "Armada trucking handal" yang terlalu formal -->
 				<p class="svc-desc">Jangkau seluruh pelosok Nusantara dengan tarif yang bersaing dan armada yang terpercaya.</p>
 				<span class="svc-arrow"><i class="bi bi-arrow-up-right"></i></span>
 			</div>
@@ -226,7 +219,6 @@
 				<div class="svc-num">03</div>
 				<div class="svc-icon-wrap"><i class="bi bi-globe2"></i></div>
 				<div class="svc-name">Ekspor Internasional</div>
-				<!-- ✅ UPDATED: Lebih ringkas dan actionable -->
 				<p class="svc-desc">Urusan bea cukai dan dokumen ekspor-impor? Kami bantu dari awal sampai paketmu sampai tujuan.</p>
 				<span class="svc-arrow"><i class="bi bi-arrow-up-right"></i></span>
 			</div>
@@ -255,16 +247,15 @@
 	</div>
 </section>
 
-<!-- ════════════════════════════════════════════
-     COVERAGE
-════════════════════════════════════════════ -->
+<!-- ══ COVERAGE (struktur dipertahankan, hanya CSS diselaraskan) ══ -->
 <section class="coverage-section" id="jangkauan">
 	<div class="container">
 		<div class="row align-items-center g-5">
-			<div class="col-lg-6 cov-left">
-				<div class="t-label mb-2">Jangkauan</div>
-				<h2 class="t-section mb-3">Dari Ujung Aceh<br>sampai Papua, Kita Bisa!</h2>
-				<!-- ✅ UPDATED: Lebih personal dan mengalir -->
+			<div class="col-lg-6">
+				<div class="t-label">Jangkauan</div>
+				<h2 class="t-section" style="margin-top:10px;margin-bottom:14px;">
+					Dari Ujung Aceh<br>sampai Papua, Kita Bisa!
+				</h2>
 				<p class="t-body" style="max-width:420px;">
 					Produk lokalmu layak go global. Smesco Express siap jadi mitra kirimmu ke mana pun tujuannya — dalam negeri maupun luar negeri.
 				</p>
@@ -335,42 +326,35 @@
 	</div>
 </section>
 
-<!-- ════════════════════════════════════════════
-     CTA
-════════════════════════════════════════════ -->
-<section class="cta-section">
-	<div class="container">
-		<div class="cta-box">
-			<div>
-				<div class="cta-eyebrow">Bergabung Sekarang</div>
-				<h2 class="cta-title">Yuk, Gabung Jadi<br>Mitra Agen Kami!</h2>
-				<!-- ✅ UPDATED: Lebih spesifik soal benefit -->
-				<p class="cta-sub">
-					Komisi menarik, sistem siap pakai, dan tim support kami siap bantu dari hari pertama. Mulai agenmu sekarang — gratis daftar!
-				</p>
-			</div>
-			<div class="cta-actions">
-				<a href="#" class="btn-primary-cta" style="font-size:0.95rem;padding:15px 32px;">
-					<i class="bi bi-people-fill"></i> Daftar Mitra Agen
-				</a>
-				<!-- ✅ UPDATED: Ganti "Tanya-tanya dulu" → link WhatsApp yang actionable -->
-				<a href="https://wa.me/6281234567890" target="_blank" class="cta-link">
-					<i class="bi bi-whatsapp"></i> Chat CS Kami →
-				</a>
-			</div>
-		</div>
-	</div>
-</section>
+<!-- ══ CTA ══ -->
+<!-- <section class="cta-section">
+    <div class="container">
+        <div class="cta-box">
+            <div>
+                <div class="cta-eyebrow">Bergabung Sekarang</div>
+                <h2 class="cta-title">Yuk, Gabung Jadi<br>Mitra Agen Kami!</h2>
+                <p class="cta-sub">
+                    Komisi menarik, sistem siap pakai, dan tim support kami siap bantu dari hari pertama. Mulai agenmu sekarang — gratis daftar!
+                </p>
+            </div>
+            <div class="cta-actions">
+                <a href="#" class="btn-primary-cta">
+                    <i class="bi bi-people-fill"></i> Daftar Mitra Agen
+                </a>
+                <a href="https://wa.me/6281234567890" target="_blank" class="cta-link">
+                    <i class="bi bi-whatsapp"></i> Chat CS Kami →
+                </a>
+            </div>
+        </div>
+    </div>
+</section> -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-	/* ════════════════════════════════════════════
-     HERO SLIDER LOGIC
-  		════════════════════════════════════════════ */
+	/* ══ HERO SLIDER ══ */
 	(function() {
 		const SLIDE_DURATION = 5000;
 		const FADE_DURATION = 900;
-
 		const wrapper = document.getElementById('heroSlider');
 		const slides = Array.from(wrapper.querySelectorAll('.slide'));
 		const dots = Array.from(wrapper.querySelectorAll('.slider-dot'));
@@ -379,27 +363,21 @@
 		const btnPrev = document.getElementById('sliderPrev');
 		const btnNext = document.getElementById('sliderNext');
 
-		let current = 0;
-		let timer = null;
-		let isPaused = false;
-		let isAnimating = false;
+		let current = 0,
+			timer = null,
+			isPaused = false,
+			isAnimating = false;
 
-		function goTo(index, direction) {
+		function goTo(index) {
 			if (isAnimating || index === current) return;
 			isAnimating = true;
-
 			slides[current].classList.remove('active');
-			slides[index].classList.add('active');
-
 			dots[current].classList.remove('active');
+			slides[index].classList.add('active');
 			dots[index].classList.add('active');
-
 			counter.textContent = index + 1;
-
 			current = index;
-
 			resetProgress();
-
 			setTimeout(() => {
 				isAnimating = false;
 				if (!isPaused) startProgress();
@@ -423,11 +401,7 @@
 
 		function startProgress() {
 			resetProgress();
-			requestAnimationFrame(() => {
-				requestAnimationFrame(() => {
-					progress.classList.add('animating');
-				});
-			});
+			requestAnimationFrame(() => requestAnimationFrame(() => progress.classList.add('animating')));
 		}
 
 		function startTimer() {
@@ -461,16 +435,11 @@
 			prev();
 			resume();
 		});
-
-		dots.forEach(dot => {
-			dot.addEventListener('click', () => {
-				const target = parseInt(dot.dataset.target);
-				pause();
-				goTo(target);
-				resume();
-			});
-		});
-
+		dots.forEach(dot => dot.addEventListener('click', () => {
+			pause();
+			goTo(parseInt(dot.dataset.target));
+			resume();
+		}));
 		wrapper.addEventListener('mouseenter', pause);
 		wrapper.addEventListener('mouseleave', resume);
 
@@ -494,12 +463,9 @@
 		}, {
 			passive: true
 		});
-
 		wrapper.addEventListener('touchend', (e) => {
 			const diff = touchStartX - e.changedTouches[0].clientX;
-			if (Math.abs(diff) > 50) {
-				diff > 0 ? next() : prev();
-			}
+			if (Math.abs(diff) > 50) diff > 0 ? next() : prev();
 			resume();
 		}, {
 			passive: true
@@ -509,9 +475,7 @@
 		startTimer();
 	})();
 
-	/* ════════════════════════════════════════════
-	   TRACKING WIDGET TAB
-	════════════════════════════════════════════ */
+	/* ══ WIDGET TAB ══ */
 	function switchTab(e, target) {
 		document.querySelectorAll('.wtab').forEach(t => t.classList.remove('active'));
 		document.querySelectorAll('.wpane').forEach(p => p.classList.remove('active'));
@@ -519,6 +483,7 @@
 		document.getElementById(target).classList.add('active');
 	}
 
+	/* ══ CEK ONGKIR PUBLIC ══ */
 	function cekOngkirPublic() {
 		const origin = document.getElementById('home_origin').value;
 		const destination = document.getElementById('home_destination').value;
@@ -530,8 +495,7 @@
 			return;
 		}
 
-		// Pakai Fetch API biar simpel
-		let formData = new FormData();
+		const formData = new FormData();
 		formData.append('origin', origin);
 		formData.append('destination', destination);
 		formData.append('weight', weight);
@@ -540,22 +504,18 @@
 				method: 'POST',
 				body: formData
 			})
-			.then(response => response.json())
+			.then(r => r.json())
 			.then(res => {
-				// Di dalam success fetch cekOngkirPublic()
 				if (res.status) {
-					resultBox.classList.remove('d-none');
-					document.getElementById('res_service').innerText = res.data.service;
-
-					// Format Rupiah untuk harga per kg
-					const formatter = new Intl.NumberFormat('id-ID', {
+					const fmt = new Intl.NumberFormat('id-ID', {
 						style: 'currency',
 						currency: 'IDR',
 						minimumFractionDigits: 0
 					});
-
-					document.getElementById('res_price_per_kg').innerText = formatter.format(res.data.price);
-					document.getElementById('res_total').innerText = formatter.format(res.data.total);
+					resultBox.classList.remove('d-none');
+					document.getElementById('res_service').innerText = res.data.service;
+					document.getElementById('res_price_per_kg').innerText = fmt.format(res.data.price);
+					document.getElementById('res_total').innerText = fmt.format(res.data.total);
 				} else {
 					alert(res.message);
 					resultBox.classList.add('d-none');
@@ -564,9 +524,7 @@
 			.catch(err => console.error(err));
 	}
 
-	/* ════════════════════════════════════════════
-   AUTOCOMPLETE CEK ONGKIR PUBLIC
-	════════════════════════════════════════════ */
+	/* ══ AUTOCOMPLETE ══ */
 	$(document).ready(function() {
 		if (jQuery().autocomplete) {
 			$("#home_origin, #home_destination").autocomplete({
@@ -583,10 +541,9 @@
 					});
 				},
 				minLength: 2,
-				// --- INI KUNCINYA BRO ---
 				open: function() {
 					$(this).autocomplete("widget").css({
-						"width": ($(this).outerWidth() + "px")
+						"width": $(this).outerWidth() + "px"
 					});
 				},
 				select: function(event, ui) {

@@ -178,11 +178,12 @@
 									</div>
 
 									<div class="col-md-6">
-										<div class="p-3 border rounded bg-light-lt">
+										<div class="p-3 border rounded">
 											<div class="form-check mb-2">
-												<input class="form-check-input" type="checkbox" name="is_valuable" id="is_valuable" value="1">
+												<input class="form-check-input" type="checkbox" name="is_valuable" id="is_valuable" value="1" disabled>
 												<label class="form-check-label text-danger fw-bold" for="is_valuable">
-													<?= tabler_icon('shield-check') ?> Proteksi Barang Berharga (Valuable Goods)
+													<?= tabler_icon('shield-check') ?> Proteksi Barang Berharga (Valuable Goods) 
+													<small class="text-muted">Hanya untuk barang dengan nilai tinggi atau mudah rusak. Aktifkan jika diperlukan untuk perlindungan ekstra. (Coming soon)</small>
 												</label>
 											</div>
 											<div class="d-none" id="wrap_goods_value">
@@ -195,7 +196,7 @@
 										</div>
 									</div>
 
-									<div class="col-md-3 mb-3">
+									<div class="col-md-6 mb-3">
 										<label class="form-label required">Metode Pembayaran</label>
 										<select name="payment_type" class="form-select" required>
 											<option value="TRANSFER">TRANSFER (PREPAID)</option>

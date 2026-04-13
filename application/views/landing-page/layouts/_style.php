@@ -26,26 +26,6 @@
 		font-size: 16px;
 	}
 
-	ol,
-	ul {
-		padding-left: 0;
-	}
-
-	dl,
-	ol,
-	ul {
-		margin-top: 0;
-		margin-bottom: 0;
-	}
-
-	body {
-		font-family: 'Inter', sans-serif;
-		font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-		color: var(--grey);
-		background: var(--white);
-		overflow-x: hidden;
-		-webkit-font-smoothing: antialiased;
-	}
 
 	/* ── TYPOGRAPHY ─────────────────────────────────────── */
 	.t-label {

@@ -1,3 +1,4 @@
+<!-- index.php -->
 <!DOCTYPE html>
 <html lang="id">
 
@@ -20,7 +21,8 @@
 	<link href="<?= base_url() ?>assets/logo/icon-smesco.png" rel="icon">
 	<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 
-	<?php $this->load->view('landing-page/layouts/_style') ?>
+	<!-- <?php $this->load->view('landing-page/layouts/_style') ?> -->
+	<link rel="stylesheet" href="<?= base_url() ?>assets/landing-page/css/style.css">
 	<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
 	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
 	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
@@ -36,26 +38,40 @@
      NAVBAR
 ════════════════════════════════════════════ -->
 	<?php
-	// Cek apakah user sedang di fungsi index() pada controller Home
-	$is_home = (empty($this->uri->segment(2)) || $this->uri->segment(2) === 'index');
+	// Ambil segment ke-2 dari URI (nama function di controller)
+	$page = $this->uri->segment(2);
 
-	// Tentukan URL berdasarkan posisi user
+	// Logic untuk mengecek apakah kita di halaman home/index
+	$is_home = (empty($page) || $page === 'index');
+
+	// Tentukan URL berdasarkan posisi user untuk anchor links
 	$link_layanan   = $is_home ? '#layanan' : base_url('home#layanan');
 	$link_jangkauan = $is_home ? '#jangkauan' : base_url('home#jangkauan');
+
+	// Helper function untuk class active
+	function set_active($current_page, $target_page = '')
+	{
+		if (is_array($target_page)) {
+			return in_array($current_page, $target_page) ? 'active' : '';
+		}
+		return ($current_page == $target_page || (empty($current_page) && $target_page == 'index')) ? 'active' : '';
+	}
 	?>
+
+
 	<nav class="site-nav">
 		<div class="container">
 			<div class="nav-inner">
 				<a href="<?= base_url('home') ?>" class="nav-brand">
-					<img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2-small.png" width="150" height="" alt="SMESCO Express" class="navbar-brand-image">
+					<img src="<?= base_url() ?>assets/logo/logo-smesco-hera-2-small.png" width="150" alt="SMESCO Express" class="navbar-brand-image">
 				</a>
 
 				<ul class="nav-menu">
-					<li><a href="<?= base_url('home') ?>">Home</a></li>
+					<li><a href="<?= base_url('home') ?>" class="<?= $is_home ? 'active' : '' ?>">Home</a></li>
 					<li><a href="<?= $link_layanan ?>">Layanan</a></li>
 					<li><a href="<?= $link_jangkauan ?>">Jangkauan</a></li>
-					<li><a href="<?= base_url('home/cek_ongkir') ?>">Cek Ongkir</a></li>
-					<li><a href="<?= base_url('home/tracking') ?>">Lacak Resi</a></li>
+					<li><a href="<?= base_url('home/cek_ongkir') ?>" class="<?= ($page == 'cek_ongkir') ? 'active' : '' ?>">Cek Ongkir</a></li>
+					<li><a href="<?= base_url('home/tracking') ?>" class="<?= ($page == 'tracking') ? 'active' : '' ?>">Lacak Resi</a></li>
 				</ul>
 
 				<div class="nav-end">
@@ -66,7 +82,7 @@
 					<?php endif; ?>
 				</div>
 
-				<!-- Hamburger Button (mobile only) -->
+				<!-- Hamburger Button -->
 				<button class="nav-hamburger" id="navToggle" aria-label="Toggle menu">
 					<span></span>
 					<span></span>
@@ -86,11 +102,11 @@
 			</button>
 		</div>
 		<ul class="drawer-menu">
-			<li><a href="<?= base_url('home') ?>"><i class="bi bi-house"></i> Home</a></li>
+			<li><a href="<?= base_url('home') ?>" class="<?= $is_home ? 'active' : '' ?>"><i class="bi bi-house"></i> Home</a></li>
 			<li><a href="<?= $link_layanan ?>"><i class="bi bi-box-seam"></i> Layanan</a></li>
 			<li><a href="<?= $link_jangkauan ?>"><i class="bi bi-geo-alt"></i> Jangkauan</a></li>
-			<li><a href="<?= base_url('home/tracking') ?>"><i class="bi bi-search"></i> Lacak Resi</a></li>
-			<li><a href="<?= base_url('home/cek_ongkir') ?>"><i class="bi bi-calculator"></i> Cek Ongkir</a></li>
+			<li><a href="<?= base_url('home/tracking') ?>" class="<?= ($page == 'tracking') ? 'active' : '' ?>"><i class="bi bi-search"></i> Lacak Resi</a></li>
+			<li><a href="<?= base_url('home/cek_ongkir') ?>" class="<?= ($page == 'cek_ongkir') ? 'active' : '' ?>"><i class="bi bi-calculator"></i> Cek Ongkir</a></li>
 		</ul>
 		<div class="drawer-footer">
 			<?php if ($this->session->userdata('is_logged_in')) : ?>
