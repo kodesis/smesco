@@ -154,11 +154,11 @@
 
 		.barcode-area img {
 			width: 85%;
-			height: 45px;
+			height: 35px;
 		}
 
 		.no-resi-text {
-			font-size: 13px;
+			font-size: 12px;
 			font-weight: bold;
 			letter-spacing: 3px;
 			margin-top: 4px;
@@ -173,7 +173,7 @@
 
 		.cut-line span {
 			background: #fff;
-			padding: 0 12px;
+			padding: 0 10px;
 			font-size: 8px;
 			color: #444;
 			position: absolute;
@@ -200,11 +200,11 @@
 			<div class="resi-container">
 				<div class="header">
 					<div class="header-logo">
-						<img src="<?= $logo_base64 ?>" style="width: 100px;">
+						<img src="<?= $logo_base64 ?>" style="width: 200px;">
 						<!-- <div class="koli-tag">KOLI: <?= $l['koli_ke'] ?>/<?= $total_koli ?></div> -->
 					</div>
 					<div class="header-qr">
-						<img src="<?= $l['qr_internal'] ?>" style="width: 85px; height: 85px;">
+						<img src="<?= $l['qr_internal'] ?>" style="width: 80px; height: 80px;">
 						<div style="font-size: 7px; color: #555;"><?= $l['piece_id'] ?></div>
 
 						<div style="font-size: 7px; color: #555; font-weight: bold;">KOLI: <?= $l['koli_ke'] ?>/<?= $total_koli ?></div>
@@ -233,7 +233,7 @@
 					</tr>
 					<tr>
 						<td>Layanan</td>
-						<td class="text-bold">: REGULAR AIR FREIGHT</td>
+						<td class="text-bold">: <?= $resi['service_name'] ?? 'REGULAR AIR FREIGHT' ?></td>
 					</tr>
 				</table>
 

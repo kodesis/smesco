@@ -191,7 +191,7 @@
 										$bg = 'bg-secondary';
 
 										if ($s->status == 'BOOKED')           $bg = 'bg-cyan';
-										if ($s->status == 'READY_TO_PICKUP')  $bg = 'bg-yellow text-dark';
+										if ($s->status == 'READY_TO_PICKUP')  $bg = 'bg-yellow';
 										if ($s->status == 'PICKED_UP')             $bg = 'bg-teal';
 										if ($s->status == 'RECEIVED_ORIGIN')  $bg = 'bg-indigo';
 										if ($s->status == 'MANIFESTED')       $bg = 'bg-blue';
@@ -212,7 +212,9 @@
 												</button>
 											<?php endif; ?>
 											<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-icon btn-outline-primary" title="Detail"><?= tabler_icon('eye') ?></a>
-											<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-icon btn-outline-secondary" title="Cetak Label"><?= tabler_icon('printer') ?></a>
+											<?php if ($s->status !== 'BOOKED' && $s->status !== 'CANCELLED'): ?>
+												<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-icon btn-outline-secondary" title="Cetak Label"><?= tabler_icon('printer') ?></a>
+											<?php endif; ?>
 											<!-- <button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-cancel-shipment"
 												data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>" title="Batalkan"><?= tabler_icon('trash') ?></button> -->
 											<?php if ($role_slug !== 'staff-mitra'): ?>

@@ -4,7 +4,7 @@ function shipment_status_badge($status)
 {
 	$map = [
 		'BOOKED'               => ['bg-cyan',              'Booked'],
-		'READY_TO_PICKUP'      => ['bg-yellow text-dark',  'Ready to Pickup'],
+		'READY_TO_PICKUP'      => ['bg-yellow',  'Ready to Pickup'],
 		'PICKED_UP'            => ['bg-teal',              'Picked Up'],
 		'RECEIVED_ORIGIN'      => ['bg-indigo',            'Received at Origin'],
 		'MANIFESTED'           => ['bg-blue',              'Manifested'],

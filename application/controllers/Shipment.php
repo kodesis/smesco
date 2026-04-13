@@ -175,10 +175,83 @@ class Shipment extends Authenticated_Controller
 			}
 
 			// 7. Kalkulasi Final & Persiapan Data
-			$no_resi      = $this->M_Shipment->generate_no_resi();
 			$sess         = $this->session->userdata('user');
 			$is_valuable  = $this->input->post('is_valuable') ? 1 : 0;
 			$total_margin = $shipping_margin + $pickup_margin;
+
+			// Helper: ambil nama wilayah dari ID
+			$sender_prov_name  = $this->db->get_where('mt_provinsi',   ['id' => $this->input->post('sender_provinsi')])->row();
+			$sender_kota_name  = $this->db->get_where('mt_kota',       ['id' => $this->input->post('sender_kota')])->row();
+			$sender_kec_name   = $this->db->get_where('mt_kecamatan',  ['id' => $this->input->post('sender_kecamatan')])->row();
+			$sender_kel_name   = $this->db->get_where('mt_kelurahan',  ['id' => $this->input->post('sender_kelurahan')])->row();
+
+			$receiver_prov_name = $this->db->get_where('mt_provinsi',  ['id' => $this->input->post('receiver_provinsi')])->row();
+			$receiver_kota_name = $this->db->get_where('mt_kota',      ['id' => $this->input->post('receiver_kota')])->row();
+			$receiver_kec_name  = $this->db->get_where('mt_kecamatan', ['id' => $this->input->post('receiver_kecamatan')])->row();
+			$receiver_kel_name  = $this->db->get_where('mt_kelurahan', ['id' => $this->input->post('receiver_kelurahan')])->row();
+
+			$full_sender_address = implode(', ', array_filter([
+				$this->input->post('sender_address_detail', TRUE),
+				$sender_kel_name  ? $sender_kel_name->nama_kelurahan  : '',
+				$sender_kec_name  ? 'Kec. ' . $sender_kec_name->nama_kecamatan  : '',
+				$sender_kota_name ? 'Kab/Kota ' . $sender_kota_name->nama_kota      : '',
+				$sender_prov_name ? $sender_prov_name->nama_provinsi  : '',
+			]));
+
+			$full_receiver_address = implode(', ', array_filter([
+				$this->input->post('receiver_address_detail', TRUE),
+				$receiver_kel_name  ? $receiver_kel_name->nama_kelurahan  : '',
+				$receiver_kec_name  ? 'Kec. ' . $receiver_kec_name->nama_kecamatan  : '',
+				$receiver_kota_name ? 'Kab/Kota ' . $receiver_kota_name->nama_kota      : '',
+				$receiver_prov_name ? $receiver_prov_name->nama_provinsi  : '',
+			]));
+
+			// ── Upload Foto Barang ──
+			$photo_path = NULL;
+			$pending_upload = [];
+
+			if (isset($_FILES['shipment_photo']) && $_FILES['shipment_photo']['error'] === UPLOAD_ERR_OK) {
+				$file    = $_FILES['shipment_photo'];
+				$allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+
+				if (!in_array($file['type'], $allowed)) {
+					$this->session->set_flashdata('error', 'Format foto tidak valid.');
+					redirect('shipment/create');
+				}
+
+				if ($file['size'] > 2 * 1024 * 1024) {
+					$this->session->set_flashdata('error', 'Ukuran foto maksimal 2MB.');
+					redirect('shipment/create');
+				}
+
+				// Simpan dulu tmp_name-nya, upload setelah no_resi di-generate
+				$pending_upload = [
+					'tmp_name' => $file['tmp_name'],
+					'ext'      => strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)),
+				];
+			}
+
+			// ← Generate no_resi di SINI, setelah semua validasi lewat
+			$no_resi = $this->M_Shipment->generate_no_resi();
+
+			// ← Baru eksekusi move file-nya kalau ada pending upload
+			if (!empty($pending_upload)) {
+				$upload_dir = FCPATH . 'uploads/shipments/' . date('Y') . '/' . date('m') . '/';
+
+				if (!is_dir($upload_dir)) {
+					mkdir($upload_dir, 0755, TRUE);
+				}
+
+				$file_name = $no_resi . '_photo.' . $pending_upload['ext'];
+				$full_path = $upload_dir . $file_name;
+
+				if (!move_uploaded_file($pending_upload['tmp_name'], $full_path)) {
+					$this->session->set_flashdata('error', 'Gagal mengupload foto. Coba lagi bro.');
+					redirect('shipment/create');
+				}
+
+				$photo_path = 'uploads/shipments/' . date('Y') . '/' . date('m') . '/' . $file_name;
+			}
 
 			$insert_shipment = [
 				'no_resi'           => $no_resi,
@@ -187,12 +260,22 @@ class Shipment extends Authenticated_Controller
 				'destination'       => $destination,
 				'service_type_id'   => $service_id,
 				'category'          => $pricelist->category,
-				'sender_name'       => $this->input->post('sender_name', TRUE),
-				'sender_phone'      => $this->input->post('sender_phone', TRUE),
-				'sender_address'    => $this->input->post('sender_address', TRUE),
-				'receiver_name'     => $this->input->post('receiver_name', TRUE),
-				'receiver_phone'    => $this->input->post('receiver_phone', TRUE),
-				'receiver_address'  => $this->input->post('receiver_address', TRUE),
+				'sender_name'             => $this->input->post('sender_name', TRUE),
+				'sender_phone'            => $this->input->post('sender_phone', TRUE),
+				'sender_provinsi'   => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
+				'sender_kota'       => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
+				'sender_kecamatan'  => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
+				'sender_kelurahan'  => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
+				'sender_address_detail'   => $this->input->post('sender_address_detail', TRUE),
+				'sender_address'          => $full_sender_address,
+				'receiver_name'           => $this->input->post('receiver_name', TRUE),
+				'receiver_phone'          => $this->input->post('receiver_phone', TRUE),
+				'receiver_provinsi'  => $receiver_prov_name  ? $receiver_prov_name->nama_provinsi  : NULL,
+				'receiver_kota'      => $receiver_kota_name  ? $receiver_kota_name->nama_kota      : NULL,
+				'receiver_kecamatan' => $receiver_kec_name   ? $receiver_kec_name->nama_kecamatan  : NULL,
+				'receiver_kelurahan' => $receiver_kel_name   ? $receiver_kel_name->nama_kelurahan  : NULL,
+				'receiver_address_detail' => $this->input->post('receiver_address_detail', TRUE),
+				'receiver_address'        => $full_receiver_address,
 				'commodity_id'      => $this->input->post('commodity_id', TRUE),
 				'commodity_detail'  => $this->input->post('commodity_detail', TRUE),
 				'is_valuable'       => $is_valuable,
@@ -208,6 +291,7 @@ class Shipment extends Authenticated_Controller
 				'pickup_fee'        => $pickup_fee,
 				'total_amount'      => $shipping_total + $pickup_fee,
 				'margin_amount'     => $total_margin,
+				'shipment_photo' => $photo_path,
 				'status'            => 'BOOKED',
 				'created_by'        => $sess['id']
 			];
@@ -343,12 +427,19 @@ class Shipment extends Authenticated_Controller
 			return;
 		}
 
+		$no_print_statuses = ['BOOKED', 'CANCELLED'];
+		if (in_array($resi['status'], $no_print_statuses)) {
+			$this->session->set_flashdata('error', 'Shipment dengan status ' . $resi['status'] . ' tidak bisa dicetak.');
+			redirect('shipment/detail/' . $resi['id']); // ← sesuaikan dengan route detail kamu
+		}
+
 		$this->load->library('ciqrcode');
 		$this->load->library('cibarcode');
 		$tempDir = sys_get_temp_dir();
 
 		// 1. Logo Base64 (Cukup sekali saja)
-		$logoPath = FCPATH . 'assets/logo/icon-smesco.png';
+		// $logoPath = FCPATH . 'assets/logo/icon-smesco.png';
+		$logoPath = FCPATH . 'assets/logo/logo-smesco-hera-2-small.png';
 		$logoBase64 = (file_exists($logoPath)) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : '';
 
 		// 2. QR Tracking (Sama untuk semua koli karena merujuk ke halaman tracking yang sama)

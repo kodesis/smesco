@@ -8,7 +8,7 @@
 
 <div class="page-body">
 	<div class="container-xl">
-		<?= form_open('shipment/create', ['id' => 'form-booking']) ?>
+		<?= form_open_multipart('shipment/create', ['id' => 'form-booking']) ?>
 
 		<div class="row row-cards">
 			<div class="col-lg-8">
@@ -69,8 +69,37 @@
 									<input type="text" name="sender_phone" id="telepon_pengirim" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: 081234567890" required>
 								</div>
 								<div class="mb-3">
-									<label class="form-label required">Alamat Lengkap</label>
-									<textarea name="sender_address" id="alamat_pengirim" class="form-control" rows="3" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Jl. Sudirman No. 12, RT 01/RW 02, Gedung X Lantai 3..." required></textarea>
+									<label class="form-label required">Provinsi</label>
+									<select name="sender_provinsi" id="sender_provinsi" class="form-select select2-wilayah" required>
+										<option value="">- Pilih Provinsi -</option>
+									</select>
+								</div>
+
+								<div class="row g-2 mb-3">
+									<div class="col-6">
+										<label class="form-label required">Kota/Kabupaten</label>
+										<select name="sender_kota" id="sender_kota" class="form-select select2-wilayah" required disabled>
+											<option value="">- Pilih Kota -</option>
+										</select>
+									</div>
+									<div class="col-6">
+										<label class="form-label required">Kecamatan</label>
+										<select name="sender_kecamatan" id="sender_kecamatan" class="form-select select2-wilayah" required disabled>
+											<option value="">- Pilih Kecamatan -</option>
+										</select>
+									</div>
+								</div>
+
+								<div class="mb-3">
+									<label class="form-label required">Kelurahan / Desa</label>
+									<select name="sender_kelurahan" id="sender_kelurahan" class="form-select select2-wilayah" required disabled>
+										<option value="">- Pilih Kelurahan -</option>
+									</select>
+								</div>
+
+								<div class="mb-3">
+									<label class="form-label required">Detail Jalan / Gedung / RT RW</label>
+									<textarea name="sender_address_detail" id="alamat_pengirim" class="form-control" rows="2" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Jl. Sudirman No. 12, Gedung X Lantai 3, RT 01/RW 02" required></textarea>
 								</div>
 							</div>
 						</div>
@@ -91,8 +120,34 @@
 									<input type="text" name="receiver_phone" id="telepon_penerima" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: 081234567890" required>
 								</div>
 								<div class="mb-3">
-									<label class="form-label required">Alamat Lengkap</label>
-									<textarea name="receiver_address" id="alamat_penerima" class="form-control" rows="3" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Jl. Merdeka No. 45, Komplek Y, Blok B..." required></textarea>
+									<label class="form-label required">Provinsi</label>
+									<select name="receiver_provinsi" id="receiver_provinsi" class="form-select" required>
+										<option value="">- Pilih Provinsi -</option>
+									</select>
+								</div>
+								<div class="row g-2 mb-3">
+									<div class="col-6">
+										<label class="form-label required">Kota/Kabupaten</label>
+										<select name="receiver_kota" id="receiver_kota" class="form-select" required disabled>
+											<option value="">- Pilih Kota -</option>
+										</select>
+									</div>
+									<div class="col-6">
+										<label class="form-label required">Kecamatan</label>
+										<select name="receiver_kecamatan" id="receiver_kecamatan" class="form-select" required disabled>
+											<option value="">- Pilih Kecamatan -</option>
+										</select>
+									</div>
+								</div>
+								<div class="mb-3">
+									<label class="form-label required">Kelurahan / Desa</label>
+									<select name="receiver_kelurahan" id="receiver_kelurahan" class="form-select" required disabled>
+										<option value="">- Pilih Kelurahan -</option>
+									</select>
+								</div>
+								<div class="mb-3">
+									<label class="form-label required">Detail Jalan / Gedung / RT RW</label>
+									<textarea name="receiver_address_detail" id="alamat_penerima" class="form-control" rows="2" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Jl. Merdeka No. 45, Blok B, RT 03/RW 05" required></textarea>
 								</div>
 							</div>
 						</div>
@@ -147,14 +202,23 @@
 											<option value="CASH">TUNAI (CASH)</option>
 										</select>
 									</div>
+								</div>
+							</div>
+						</div>
 
-									<div class="col-md-3 mb-3">
-										<label class="form-label">Total Koli</label>
-										<div class="input-group">
-											<input type="text" id="total_koli_display" class="form-control bg-light fw-bold" value="1" readonly tabindex="-1">
-											<span class="input-group-text">Pcs</span>
-										</div>
-									</div>
+						<div class="card mt-3">
+							<div class="card-header">
+								<h3 class="card-title">Bukti Fisik Barang</h3>
+							</div>
+							<div class="card-body">
+								<div class="mb-3">
+									<label class="form-label required">Upload Foto Barang</label>
+									<input type="file" name="shipment_photo" id="shipment_photo" class="form-control" accept="image/jpeg, image/png, image/jpg" required>
+									<small class="form-hint">Format yang diizinkan: JPG, JPEG, PNG. Maksimal ukuran 2MB.</small>
+								</div>
+
+								<div class="mt-2 d-none" id="preview-container">
+									<img id="photo-preview" src="" alt="Preview Foto Barang" class="img-fluid rounded border" style="max-height: 200px;">
 								</div>
 							</div>
 						</div>
@@ -184,7 +248,6 @@
 							</div>
 						</div>
 					</div>
-
 				</div>
 			</div>
 
@@ -194,6 +257,14 @@
 						<h3 class="card-title">Kalkulasi Berat (Kg)</h3>
 					</div>
 					<div class="card-body">
+
+						<div class="mb-3">
+							<label class="form-label">Total Koli</label>
+							<div class="input-group">
+								<input type="text" id="total_koli_display" class="form-control bg-light fw-bold" value="1" readonly tabindex="-1">
+								<span class="input-group-text">Pcs</span>
+							</div>
+						</div>
 
 						<div class="mb-3">
 							<label class="form-label required">Total Berat Aktual (Timbangan)</label>
@@ -447,29 +518,29 @@
 
 
 		// --- Autocomplete Logic (Tetap Sama) ---
-		if (jQuery().autocomplete) {
-			$("#nama_pengirim, #nama_penerima").autocomplete({
-				source: function(request, response) {
-					$.ajax({
-						url: "<?= site_url('shipment/autocompleteCustomer') ?>",
-						dataType: "json",
-						data: {
-							term: request.term
-						},
-						success: function(data) {
-							response(data);
-						}
-					});
-				},
-				minLength: 2,
-				select: function(event, ui) {
-					const prefix = event.target.id === 'nama_pengirim' ? 'pengirim' : 'penerima';
-					$(`#nama_${prefix}`).val(ui.item.nama_customer);
-					$(`#telepon_${prefix}`).val(ui.item.telepon_customer);
-					$(`#alamat_${prefix}`).val(ui.item.alamat_customer);
-				}
-			});
-		}
+		// if (jQuery().autocomplete) {
+		// 	$("#nama_pengirim, #nama_penerima").autocomplete({
+		// 		source: function(request, response) {
+		// 			$.ajax({
+		// 				url: "<?= site_url('shipment/autocompleteCustomer') ?>",
+		// 				dataType: "json",
+		// 				data: {
+		// 					term: request.term
+		// 				},
+		// 				success: function(data) {
+		// 					response(data);
+		// 				}
+		// 			});
+		// 		},
+		// 		minLength: 2,
+		// 		select: function(event, ui) {
+		// 			const prefix = event.target.id === 'nama_pengirim' ? 'pengirim' : 'penerima';
+		// 			$(`#nama_${prefix}`).val(ui.item.nama_customer);
+		// 			$(`#telepon_${prefix}`).val(ui.item.telepon_customer);
+		// 			$(`#alamat_${prefix}`).val(ui.item.alamat_customer);
+		// 		}
+		// 	});
+		// }
 
 		// ==========================================
 		// EVENT LISTENERS
@@ -574,5 +645,154 @@
 				}
 			});
 		});
+	});
+
+	// Function global buat init Select2 wilayah
+	function initWilayah(type) {
+		const selProv = $(`#${type}_provinsi`);
+		const selKota = $(`#${type}_kota`);
+		const selKec = $(`#${type}_kecamatan`);
+		const selKel = $(`#${type}_kelurahan`);
+
+		// Helper: init atau reinit select2 pada elemen
+		function initS2(el) {
+			if (el.hasClass('select2-hidden-accessible')) {
+				el.select2('destroy');
+			}
+			el.select2({
+				width: '100%'
+			});
+		}
+
+		// 1. Load Provinsi → BARU init Select2-nya
+		$.ajax({
+			url: "<?= site_url('master/ajax_get_provinsi') ?>",
+			type: "GET",
+			dataType: "json",
+			success: function(res) {
+				let html = '<option value="">- Pilih Provinsi -</option>';
+				res.forEach(item => {
+					html += `<option value="${item.id}">${item.nama_provinsi}</option>`;
+				});
+				selProv.html(html);
+				initS2(selProv); // ← Select2 init SETELAH data ada
+			}
+		});
+
+		// 2. Provinsi → Kota
+		selProv.on('change', function() {
+			let id = $(this).val();
+
+			selKota.html('<option value="">- Pilih Kota -</option>').prop('disabled', true);
+			selKec.html('<option value="">- Pilih Kecamatan -</option>').prop('disabled', true);
+			selKel.html('<option value="">- Pilih Kelurahan -</option>').prop('disabled', true);
+
+			if (id) {
+				$.ajax({
+					url: "<?= site_url('master/ajax_get_kota/') ?>" + id,
+					type: "GET",
+					dataType: "json",
+					success: function(res) {
+						let html = '<option value="">- Pilih Kota -</option>';
+						res.forEach(item => {
+							html += `<option value="${item.id}">${item.nama_kota}</option>`;
+						});
+						selKota.html(html).prop('disabled', false);
+						initS2(selKota); // ← reinit setelah data masuk
+					}
+				});
+			}
+		});
+
+		// 3. Kota → Kecamatan
+		selKota.on('change', function() {
+			let id = $(this).val();
+
+			selKec.html('<option value="">- Pilih Kecamatan -</option>').prop('disabled', true);
+			selKel.html('<option value="">- Pilih Kelurahan -</option>').prop('disabled', true);
+
+			if (id) {
+				$.ajax({
+					url: "<?= site_url('master/ajax_get_kecamatan/') ?>" + id,
+					type: "GET",
+					dataType: "json",
+					success: function(res) {
+						let html = '<option value="">- Pilih Kecamatan -</option>';
+						res.forEach(item => {
+							html += `<option value="${item.id}">${item.nama_kecamatan}</option>`;
+						});
+						selKec.html(html).prop('disabled', false);
+						initS2(selKec);
+					}
+				});
+			}
+		});
+
+		// 4. Kecamatan → Kelurahan
+		selKec.on('change', function() {
+			let id = $(this).val();
+			selKel.html('<option value="">- Pilih Kelurahan -</option>').prop('disabled', true);
+
+			if (id) {
+				$.ajax({
+					url: "<?= site_url('master/ajax_get_kelurahan/') ?>" + id,
+					type: "GET",
+					dataType: "json",
+					success: function(res) {
+						let html = '<option value="">- Pilih Kelurahan -</option>';
+						res.forEach(item => {
+							html += `<option value="${item.id}">${item.nama_kelurahan}</option>`;
+						});
+						selKel.html(html).prop('disabled', false);
+						initS2(selKel);
+					}
+				});
+			}
+		});
+	}
+
+	// Di ready: JANGAN init select2-wilayah di sini
+	$(document).ready(function() {
+		initWilayah('sender');
+		initWilayah('receiver');
+	});
+
+	// Tambahkan di dalam blok <script> lu
+	document.getElementById('shipment_photo').addEventListener('change', function() {
+		const previewContainer = document.getElementById('preview-container');
+		const photoPreview = document.getElementById('photo-preview');
+
+		// Guard: tidak ada file (user cancel dialog)
+		if (!this.files || this.files.length === 0) {
+			previewContainer.classList.add('d-none');
+			return;
+		}
+
+		const file = this.files[0]; // ← ambil File object dari index 0
+
+		// Validasi tipe
+		const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+		if (!allowedTypes.includes(file.type)) {
+			Swal.fire('Format Tidak Valid', 'Hanya JPG, JPEG, dan PNG yang diizinkan.', 'error');
+			this.value = '';
+			previewContainer.classList.add('d-none');
+			return;
+		}
+
+		// Validasi ukuran 2MB
+		if (file.size > 2 * 1024 * 1024) {
+			Swal.fire('File Terlalu Besar', 'Maksimal ukuran foto adalah 2MB.', 'error');
+			this.value = '';
+			previewContainer.classList.add('d-none');
+			return;
+		}
+
+		// Preview
+		const reader = new FileReader();
+		reader.onload = function(e) {
+			photoPreview.src = e.target.result;
+			previewContainer.classList.remove('d-none');
+		};
+		reader.readAsDataURL(file); // ← sekarang File object, bukan FileList
 	});
 </script>

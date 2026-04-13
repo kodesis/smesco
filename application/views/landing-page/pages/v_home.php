@@ -1,6 +1,17 @@
-<!-- ════════════════════════════════════════════
-     HERO SLIDER
-════════════════════════════════════════════ -->
+<style>
+	ol,
+	ul {
+		padding-left: 0;
+	}
+
+	dl,
+	ol,
+	ul {
+		margin-top: 0;
+		margin-bottom: 0;
+	}
+</style>
+<!-- v_home.php -->
 <section class="hero-slider" id="heroSlider">
 
 	<div class="slider-progress" id="sliderProgress"></div>
@@ -116,9 +127,9 @@
 						<button class="wtab active" onclick="switchTab(event,'wpane-resi')">
 							<i class="bi bi-geo-alt-fill"></i> Lacak Resi
 						</button>
-						<!-- <button class="wtab" onclick="switchTab(event,'wpane-ongkir')">
+						<button class="wtab" onclick="switchTab(event,'wpane-ongkir')">
 							<i class="bi bi-calculator-fill"></i> Cek Ongkir
-						</button> -->
+						</button>
 					</div>
 					<div class="widget-body">
 						<div class="wpane active" id="wpane-resi">
@@ -136,19 +147,39 @@
 							</form>
 						</div>
 						<div class="wpane" id="wpane-ongkir">
-							<div class="row g-3">
-								<div class="col-md-5">
+							<div class="row g-2">
+								<div class="col-md-4">
 									<label class="field-label">Kota Asal</label>
-									<input class="field-input" type="text" placeholder="Contoh: Pekanbaru" />
+									<input type="text" id="home_origin" class="field-input" placeholder="Contoh: JAKARTA" oninput="this.value = this.value.toUpperCase()">
 								</div>
-								<div class="col-md-5">
+								<div class="col-md-4">
 									<label class="field-label">Kota Tujuan</label>
-									<input class="field-input" type="text" placeholder="Contoh: Jakarta" />
+									<input type="text" id="home_destination" class="field-input" placeholder="Contoh: SINGAPORE" oninput="this.value = this.value.toUpperCase()">
+								</div>
+								<div class="col-md-2">
+									<label class="field-label">Berat (kg)</label>
+									<input type="number" id="home_weight" class="field-input" value="1" min="1">
 								</div>
 								<div class="col-md-2 d-flex align-items-end">
-									<button class="btn-dark w-100" style="padding:13px 12px;border-radius:10px;">
-										<i class="bi bi-search"></i>
+									<button type="button" onclick="cekOngkirPublic()" class="btn-dark w-100" style="padding:13px 12px;border-radius:10px;">
+										<i class="bi bi-search"></i> Cek
 									</button>
+								</div>
+							</div>
+
+							<div id="result-ongkir" class="mt-3 p-3 rounded-3 d-none" style="background: #f8f9fa; border: 1px dashed #dee2e6;">
+								<div class="d-flex justify-content-between align-items-center">
+									<div>
+										<span class="badge bg-primary mb-1" id="res_service">SERVICE</span>
+										<div class="small text-muted">Tarif: <span id="res_price_per_kg" class="fw-bold">Rp 0</span> /kg</div>
+										<div class="h2 mb-0 text-dark fw-bold" id="res_total">Rp 0</div>
+										<div class="small text-muted italic">*Berat dibulatkan ke atas</div>
+									</div>
+									<div class="text-end">
+										<a href="<?= site_url('home/cek_ongkir') ?>" class="btn btn-sm btn-outline-primary rounded-pill">
+											Detail & Pickup →
+										</a>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -487,4 +518,82 @@
 		e.currentTarget.classList.add('active');
 		document.getElementById(target).classList.add('active');
 	}
+
+	function cekOngkirPublic() {
+		const origin = document.getElementById('home_origin').value;
+		const destination = document.getElementById('home_destination').value;
+		const weight = document.getElementById('home_weight').value;
+		const resultBox = document.getElementById('result-ongkir');
+
+		if (!origin || !destination) {
+			alert('Isi kota asal dan tujuan dulu, bro!');
+			return;
+		}
+
+		// Pakai Fetch API biar simpel
+		let formData = new FormData();
+		formData.append('origin', origin);
+		formData.append('destination', destination);
+		formData.append('weight', weight);
+
+		fetch("<?= site_url('home/ajax_cek_ongkir_public') ?>", {
+				method: 'POST',
+				body: formData
+			})
+			.then(response => response.json())
+			.then(res => {
+				// Di dalam success fetch cekOngkirPublic()
+				if (res.status) {
+					resultBox.classList.remove('d-none');
+					document.getElementById('res_service').innerText = res.data.service;
+
+					// Format Rupiah untuk harga per kg
+					const formatter = new Intl.NumberFormat('id-ID', {
+						style: 'currency',
+						currency: 'IDR',
+						minimumFractionDigits: 0
+					});
+
+					document.getElementById('res_price_per_kg').innerText = formatter.format(res.data.price);
+					document.getElementById('res_total').innerText = formatter.format(res.data.total);
+				} else {
+					alert(res.message);
+					resultBox.classList.add('d-none');
+				}
+			})
+			.catch(err => console.error(err));
+	}
+
+	/* ════════════════════════════════════════════
+   AUTOCOMPLETE CEK ONGKIR PUBLIC
+	════════════════════════════════════════════ */
+	$(document).ready(function() {
+		if (jQuery().autocomplete) {
+			$("#home_origin, #home_destination").autocomplete({
+				source: function(request, response) {
+					$.ajax({
+						url: "<?= site_url('home/ajax_autocomplete_route') ?>",
+						dataType: "json",
+						data: {
+							term: request.term
+						},
+						success: function(data) {
+							response(data);
+						}
+					});
+				},
+				minLength: 2,
+				// --- INI KUNCINYA BRO ---
+				open: function() {
+					$(this).autocomplete("widget").css({
+						"width": ($(this).outerWidth() + "px")
+					});
+				},
+				select: function(event, ui) {
+					$(this).val(ui.item.value);
+					return false;
+				}
+			});
+		}
+	});
 </script>
