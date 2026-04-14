@@ -18,26 +18,28 @@
 		<div class="col-lg-8">
 			<div class="card-tracking bg-white">
 
-				<!-- Search Bar -->
 				<div class="search-wrap">
 					<form action="<?= site_url('home/tracking') ?>" method="GET">
-						<div class="row g-2 align-items-end">
-							<div class="col">
-								<label class="info-label mb-2" style="color: var(--navy);">
-									<i class="bi bi-search me-1"></i> Nomor Resi / AWB
-								</label>
-								<input name="awb"
-									type="text"
-									class="form-control"
-									placeholder="Contoh: SMC2604120001"
-									value="<?= $awb ?>"
-									required>
-							</div>
-							<div class="col-auto">
-								<button type="submit" class="btn-search">
-									<i class="bi bi-search"></i> Lacak
-								</button>
-							</div>
+						<label class="search-label">
+							<i class="bi bi-box-seam me-1"></i> Nomor Resi / AWB
+						</label>
+						<div class="search-input-group">
+							<i class="bi bi-search search-icon"></i>
+							<input name="awb"
+								type="text"
+								class="search-input"
+								placeholder="Contoh: SMC2604120001"
+								value="<?= $awb ?>"
+								autocomplete="off"
+								required>
+							<button type="submit" class="search-btn">
+								<i class="bi bi-search me-1"></i>
+								<span>Lacak</span>
+							</button>
+						</div>
+						<div class="search-hint">
+							<i class="bi bi-info-circle me-1"></i>
+							Masukkan nomor resi lengkap yang tertera pada bukti pengiriman kamu.
 						</div>
 					</form>
 				</div>

@@ -228,7 +228,7 @@
 							<div class="card-body">
 								<label class="form-check form-switch">
 									<input class="form-check-input" type="checkbox" name="use_pickup" id="use_pickup" value="1">
-									<span class="form-check-label fw-bold">Request Pickup (Penjemputan)</span>
+									<span class="form-check-label fw-bold">Request Pickup Barang Customer (Penjemputan)</span>
 								</label>
 
 								<div id="pickup_detail" class="mt-3 d-none">

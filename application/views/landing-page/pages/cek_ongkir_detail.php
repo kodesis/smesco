@@ -28,14 +28,14 @@
 								<i class="bi bi-map"></i> Rute Pengiriman
 							</div>
 							<div class="row g-3">
-								<div class="col-6">
+								<div class="col-md-6 col-12">
 									<label class="field-label">Kota Asal</label>
 									<input type="text" id="calc_origin"
 										class="form-control trigger-calc"
 										placeholder="Contoh: JAKARTA"
 										oninput="this.value = this.value.toUpperCase()">
 								</div>
-								<div class="col-6">
+								<div class="col-md-6 col-12">
 									<label class="field-label">Kota Tujuan</label>
 									<input type="text" id="calc_destination"
 										class="form-control trigger-calc"
@@ -73,20 +73,24 @@
 
 							<div id="dim_container">
 								<div class="dim-row" id="row_0">
-									<div class="row g-2 align-items-center">
-										<div class="col-3">
+									<div class="dim-row-inner">
+										<div class="dim-field dim-field-qty">
 											<div class="dim-sub-label">Jml Koli</div>
 											<input type="number" class="form-control trigger-calc row-qty" value="1" min="1">
 										</div>
-										<div class="col-9">
-											<div class="dim-sub-label">P × L × T (cm)</div>
-											<div class="input-group">
-												<input type="number" class="form-control trigger-calc row-p" placeholder="P">
-												<span class="input-group-text px-2">×</span>
-												<input type="number" class="form-control trigger-calc row-l" placeholder="L">
-												<span class="input-group-text px-2">×</span>
-												<input type="number" class="form-control trigger-calc row-t" placeholder="T">
-											</div>
+										<div class="dim-field dim-field-p">
+											<div class="dim-sub-label">P (cm)</div>
+											<input type="number" class="form-control trigger-calc row-p" placeholder="0">
+										</div>
+										<div class="dim-field dim-field-sep">×</div>
+										<div class="dim-field dim-field-l">
+											<div class="dim-sub-label">L (cm)</div>
+											<input type="number" class="form-control trigger-calc row-l" placeholder="0">
+										</div>
+										<div class="dim-field dim-field-sep">×</div>
+										<div class="dim-field dim-field-t">
+											<div class="dim-sub-label">T (cm)</div>
+											<input type="number" class="form-control trigger-calc row-t" placeholder="0">
 										</div>
 									</div>
 								</div>
@@ -144,7 +148,19 @@
 								<span class="value" id="sum_volume">0 Kg</span>
 							</div>
 							<div class="summary-row">
-								<span class="label">Chargeable Weight</span>
+								<span class="label d-flex align-items-center">
+									Chargeable Weight
+									<i class="bi bi-info-circle ms-2 text-white"
+										style="cursor: pointer; font-size: 0.95rem; transition: color 0.2s;"
+										onmouseover="this.classList.replace('text-white', 'text-secondary')"
+										onmouseout="this.classList.replace('text-secondary', 'text-white')"
+										data-bs-toggle="tooltip"
+										data-bs-placement="top"
+										data-bs-html="true"
+										data-bs-custom-class="custom-smesco-tooltip"
+										title="Berat yang dijadikan dasar hitungan tarif.<br><br>Kami mengambil nilai tertinggi antara <strong>Berat Aktual</strong> (timbangan) atau <strong>Berat Volume</strong> (dimensi P x L x T).">
+									</i>
+								</span>
 								<span class="chargeable-badge" id="sum_chargeable">1 Kg</span>
 							</div>
 
@@ -202,27 +218,31 @@
 	function addDimRow() {
 		const id = rowCount++;
 		const html = `
-        <div class="dim-row" id="row_${id}">
-            <button type="button" class="btn btn-danger btn-remove-row" onclick="removeDimRow(${id})">
-                <i class="bi bi-x"></i>
-            </button>
-            <div class="row g-2 align-items-center">
-                <div class="col-3">
-                    <div class="dim-sub-label">Jml Koli</div>
-                    <input type="number" class="form-control trigger-calc row-qty" value="1" min="1">
-                </div>
-                <div class="col-9">
-                    <div class="dim-sub-label">P × L × T (cm)</div>
-                    <div class="input-group">
-                        <input type="number" class="form-control trigger-calc row-p" placeholder="P">
-                        <span class="input-group-text px-2">×</span>
-                        <input type="number" class="form-control trigger-calc row-l" placeholder="L">
-                        <span class="input-group-text px-2">×</span>
-                        <input type="number" class="form-control trigger-calc row-t" placeholder="T">
-                    </div>
-                </div>
+    <div class="dim-row" id="row_${id}">
+        <button type="button" class="btn btn-danger btn-remove-row" onclick="removeDimRow(${id})">
+            <i class="bi bi-x"></i>
+        </button>
+        <div class="dim-row-inner">
+            <div class="dim-field dim-field-qty">
+                <div class="dim-sub-label">Jml Koli</div>
+                <input type="number" class="form-control trigger-calc row-qty" value="1" min="1">
             </div>
-        </div>`;
+            <div class="dim-field dim-field-p">
+                <div class="dim-sub-label">P (cm)</div>
+                <input type="number" class="form-control trigger-calc row-p" placeholder="0">
+            </div>
+            <div class="dim-field dim-field-sep">×</div>
+            <div class="dim-field dim-field-l">
+                <div class="dim-sub-label">L (cm)</div>
+                <input type="number" class="form-control trigger-calc row-l" placeholder="0">
+            </div>
+            <div class="dim-field dim-field-sep">×</div>
+            <div class="dim-field dim-field-t">
+                <div class="dim-sub-label">T (cm)</div>
+                <input type="number" class="form-control trigger-calc row-t" placeholder="0">
+            </div>
+        </div>
+    </div>`;
 		$('#dim_container').append(html);
 		attachEvents();
 		calculateAll();
@@ -346,5 +366,12 @@
 
 		attachEvents();
 		calculateAll();
+
+
+		// --- Inisialisasi Tooltip Bootstrap ---
+		var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+		var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
+			return new bootstrap.Tooltip(tooltipTriggerEl);
+		});
 	});
 </script>
