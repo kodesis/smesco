@@ -193,7 +193,8 @@ class Home extends CI_Controller {
 				'data'   => [
 					'price_per_kg'  => $price,
 					'min_weight_kg' => $pricelist->min_weight_kg,
-					'category'      => $pricelist->category
+					'category'      => $pricelist->category,
+					'is_tiered'     => $pricelist->is_tiered
 				]
 			]);
 		} else {

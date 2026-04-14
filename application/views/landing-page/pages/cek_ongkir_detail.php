@@ -1,3 +1,4 @@
+<!-- cek_ongkir.php -->
 <!-- ── PAGE HEADER ── -->
 <section class="page-header">
 	<div class="container">
@@ -218,31 +219,31 @@
 	function addDimRow() {
 		const id = rowCount++;
 		const html = `
-    <div class="dim-row" id="row_${id}">
-        <button type="button" class="btn btn-danger btn-remove-row" onclick="removeDimRow(${id})">
-            <i class="bi bi-x"></i>
-        </button>
-        <div class="dim-row-inner">
-            <div class="dim-field dim-field-qty">
-                <div class="dim-sub-label">Jml Koli</div>
-                <input type="number" class="form-control trigger-calc row-qty" value="1" min="1">
+        <div class="dim-row" id="row_${id}">
+            <button type="button" class="btn btn-danger btn-remove-row" onclick="removeDimRow(${id})">
+                <i class="bi bi-x"></i>
+            </button>
+            <div class="dim-row-inner">
+                <div class="dim-field dim-field-qty">
+                    <div class="dim-sub-label">Jml Koli</div>
+                    <input type="number" class="form-control trigger-calc row-qty" value="1" min="1">
+                </div>
+                <div class="dim-field dim-field-p">
+                    <div class="dim-sub-label">P (cm)</div>
+                    <input type="number" class="form-control trigger-calc row-p" placeholder="0">
+                </div>
+                <div class="dim-field dim-field-sep">×</div>
+                <div class="dim-field dim-field-l">
+                    <div class="dim-sub-label">L (cm)</div>
+                    <input type="number" class="form-control trigger-calc row-l" placeholder="0">
+                </div>
+                <div class="dim-field dim-field-sep">×</div>
+                <div class="dim-field dim-field-t">
+                    <div class="dim-sub-label">T (cm)</div>
+                    <input type="number" class="form-control trigger-calc row-t" placeholder="0">
+                </div>
             </div>
-            <div class="dim-field dim-field-p">
-                <div class="dim-sub-label">P (cm)</div>
-                <input type="number" class="form-control trigger-calc row-p" placeholder="0">
-            </div>
-            <div class="dim-field dim-field-sep">×</div>
-            <div class="dim-field dim-field-l">
-                <div class="dim-sub-label">L (cm)</div>
-                <input type="number" class="form-control trigger-calc row-l" placeholder="0">
-            </div>
-            <div class="dim-field dim-field-sep">×</div>
-            <div class="dim-field dim-field-t">
-                <div class="dim-sub-label">T (cm)</div>
-                <input type="number" class="form-control trigger-calc row-t" placeholder="0">
-            </div>
-        </div>
-    </div>`;
+        </div>`;
 		$('#dim_container').append(html);
 		attachEvents();
 		calculateAll();
@@ -258,8 +259,11 @@
 	}
 
 	document.addEventListener("DOMContentLoaded", function() {
+
+		// ← Semua state di sini, SATU scope, tidak ada redeclare
 		let currentRate = 0;
 		let minWeightGlobal = 1;
+		let isTiered = false;
 
 		const formatRp = (num) => new Intl.NumberFormat('id-ID', {
 			style: 'currency',
@@ -296,14 +300,39 @@
 			});
 		}
 
+		// Juga trigger fetchRate saat user manual ketik (blur)
+		$('#calc_origin, #calc_destination').on('change blur', function() {
+			fetchRate();
+		});
+
+		function getChargeableWeight() {
+			let actual = parseFloat($('#calc_actual_weight').val()) || 0;
+			let totalVol = 0;
+
+			$('.dim-row').each(function() {
+				let qty = parseInt($(this).find('.row-qty').val()) || 0;
+				let p = parseFloat($(this).find('.row-p').val()) || 0;
+				let l = parseFloat($(this).find('.row-l').val()) || 0;
+				let t = parseFloat($(this).find('.row-t').val()) || 0;
+				if (p > 0 && l > 0 && t > 0) totalVol += ((p * l * t) / 5000) * qty;
+			});
+
+			let chargeable = Math.max(actual, totalVol);
+			if (chargeable > 0 && chargeable < minWeightGlobal) chargeable = minWeightGlobal;
+			return Math.ceil(chargeable);
+		}
+
 		function fetchRate() {
 			const origin = $('#calc_origin').val();
 			const dest = $('#calc_destination').val();
 			if (!origin || !dest) return;
 
+			const chargeable = getChargeableWeight();
+
 			let fd = new FormData();
 			fd.append('origin', origin);
 			fd.append('destination', dest);
+			fd.append('weight', chargeable);
 
 			fetch("<?= site_url('home/ajax_get_rate_public') ?>", {
 					method: 'POST',
@@ -311,13 +340,21 @@
 				})
 				.then(r => r.json())
 				.then(res => {
-					currentRate = res.status ? parseFloat(res.data.price_per_kg) : 0;
-					minWeightGlobal = res.status ? parseFloat(res.data.min_weight_kg) : 1;
-					calculateAll();
-				}).catch(e => console.error(e));
+					if (res.status) {
+						currentRate = parseFloat(res.data.price_per_kg);
+						minWeightGlobal = parseFloat(res.data.min_weight_kg);
+						isTiered = res.data.is_tiered == 1;
+					} else {
+						currentRate = 0;
+						minWeightGlobal = 1;
+						isTiered = false;
+					}
+					renderSummary();
+				})
+				.catch(e => console.error(e));
 		}
 
-		window.calculateAll = function() {
+		function renderSummary() {
 			let actual = parseFloat($('#calc_actual_weight').val()) || 0;
 			let totalVol = 0;
 			let totalKoli = 0;
@@ -327,7 +364,6 @@
 				let p = parseFloat($(this).find('.row-p').val()) || 0;
 				let l = parseFloat($(this).find('.row-l').val()) || 0;
 				let t = parseFloat($(this).find('.row-t').val()) || 0;
-
 				if (p > 0 && l > 0 && t > 0) totalVol += ((p * l * t) / 5000) * qty;
 				totalKoli += qty;
 			});
@@ -362,16 +398,27 @@
 			$('#sum_shipping').text(formatRp(shippingFee));
 			$('#sum_pickup').text(formatRp(pickupFee));
 			$('#sum_grand_total').text(formatRp(grandTotal));
+		}
+
+		// ← expose ke global agar attachEvents() bisa manggilnya
+		window.calculateAll = function() {
+			const origin = $('#calc_origin').val();
+			const dest = $('#calc_destination').val();
+
+			if (origin && dest && isTiered) {
+				fetchRate(); // re-fetch bawa berat terbaru → update harga tier
+			} else {
+				renderSummary(); // non-tiered, langsung render
+			}
 		};
 
 		attachEvents();
-		calculateAll();
+		renderSummary();
 
-
-		// --- Inisialisasi Tooltip Bootstrap ---
+		// Tooltip Bootstrap
 		var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-		var tooltipList = tooltipTriggerList.map(function(tooltipTriggerEl) {
-			return new bootstrap.Tooltip(tooltipTriggerEl);
+		tooltipTriggerList.map(function(el) {
+			return new bootstrap.Tooltip(el);
 		});
 	});
 </script>
