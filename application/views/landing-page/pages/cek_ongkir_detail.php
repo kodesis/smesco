@@ -179,7 +179,7 @@
 							</div>
 
 							<!-- CTA -->
-							<a href="https://wa.me/6281234567890?text=Halo%20Smesco,%20saya%20mau%20booking%20kargo"
+							<a href="https://wa.me/6282220282863?text=Halo%20Smesco,%20saya%20mau%20booking%20kargo"
 								target="_blank" class="btn-wa">
 								<i class="bi bi-whatsapp fs-6"></i> Pesan via WhatsApp
 							</a>

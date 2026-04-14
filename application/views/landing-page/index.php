@@ -160,7 +160,7 @@
 				<div class="col-lg-3">
 					<div class="footer-col-head">Hubungi Kami</div>
 					<ul class="footer-links">
-						<li><a href="#"><i class="bi bi-whatsapp me-2" style="color:#25d366;"></i>+62 812-3456-7890</a></li>
+						<li><a href="#"><i class="bi bi-whatsapp me-2" style="color:#25d366;"></i>+62 822-2028-2863</a></li>
 						<li><a href="#"><i class="bi bi-envelope me-2" style="color:var(--navy);"></i>info@smesco.go.id</a></li>
 						<li><a href="#"><i class="bi bi-geo-alt me-2" style="color:var(--navy);"></i>DKI Jakarta, Indonesia</a></li>
 					</ul>
@@ -174,7 +174,7 @@
 	</footer>
 
 	<!-- WA Float -->
-	<a href="https://wa.me/6281234567890" class="wa-float" target="_blank" aria-label="WhatsApp">
+	<a href="https://wa.me/6282220282863?text=Halo%20Smesco,%20saya%20mau%20booking%20kargo" class="wa-float" target="_blank" aria-label="WhatsApp">
 		<i class="bi bi-whatsapp"></i>
 	</a>
 
