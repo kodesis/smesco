@@ -98,10 +98,10 @@ class Dashboard extends Authenticated_Controller
 			->get()->result();
 
 		// ✅ Visitor stats
-		$visitor_stats       = $this->M_VisitorLog->get_dashboard_stats();
-		$visitor_trend       = $this->M_VisitorLog->get_trend_7days();
-		$suspicious_ips      = $this->M_VisitorLog->get_suspicious_ips();
-		$recent_suspicious   = $this->M_VisitorLog->get_recent_suspicious();
+		$visitor_stats       = $this->M_Visitorlog->get_dashboard_stats();
+		$visitor_trend       = $this->M_Visitorlog->get_trend_7days();
+		$suspicious_ips      = $this->M_Visitorlog->get_suspicious_ips();
+		$recent_suspicious   = $this->M_Visitorlog->get_recent_suspicious();
 
 		$data = [
 			'title'              => 'Dashboard Superadmin',
