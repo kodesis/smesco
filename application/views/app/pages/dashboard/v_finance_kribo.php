@@ -16,7 +16,7 @@
 			<div class="col-12">
 				<div class="alert alert-info alert-dismissible" role="alert">
 					<?= tabler_icon('info-circle', 'me-2') ?>
-					<strong>Finance Kribo</strong> — Modul keuangan penuh akan tersedia di Phase 3.
+					<strong>Finance</strong> — Modul keuangan penuh akan tersedia di Phase 3.
 					Berikut ringkasan data yang tersedia saat ini.
 					<a href="#" class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
 				</div>
