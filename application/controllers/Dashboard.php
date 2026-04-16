@@ -166,10 +166,10 @@ class Dashboard extends Authenticated_Controller
 			->count_all_results('users');
 
 		$agents_list = $this->M_Agent->get_all_with_stats();
+		$title = 'Dashboard Finance Kribo';
+		$data = compact('total_agents', 'total_users', 'agents_list', 'title');
 
-		$data = compact('total_agents', 'total_users', 'agents_list');
-
-		$this->render('dashboard/v_finance_kribo', 'Dashboard Finance Kribo', $data);
+		$this->render('app/pages/dashboard/v_finance_kribo', $data);
 	}
 
 	private function _mitra($sess)

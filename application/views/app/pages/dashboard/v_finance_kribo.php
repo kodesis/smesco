@@ -110,9 +110,9 @@
 								<?php if ($agents_list): ?>
 									<?php foreach ($agents_list as $a): ?>
 										<tr>
-											<td><span class="badge bg-blue-lt"><?= esc($a->code) ?></span></td>
-											<td><strong><?= esc($a->name) ?></strong></td>
-											<td class="text-muted"><?= esc($a->city) ?></td>
+											<td><span class="badge bg-blue-lt"><?= ($a->code) ?></span></td>
+											<td><strong><?= ($a->name) ?></strong></td>
+											<td class="text-muted"><?= ($a->city) ?></td>
 											<td><?= $a->total_users ?></td>
 											<td>
 												<?= $a->is_active

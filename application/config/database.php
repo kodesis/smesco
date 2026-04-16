@@ -83,6 +83,7 @@ $db['default'] = array(
 	'username' => 'kriboexp_kriboexp',
 	'password' => 'kribo123!@#',
 	'database' => 'kriboexp_smesco',
+	// 'database' => 'kriboexp_smesco_sandbox',
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
 	'pconnect' => FALSE,

@@ -139,6 +139,14 @@ class M_Shipment extends CI_Model
 		if (!empty($filters['end'])) {
 			$this->db->where('DATE(shipments.created_at) <=', $filters['end']);
 		}
+
+		// Di dalam method pencarian M_Shipment
+		if (!empty($filters['payment_type'])) {
+			$this->db->where('payment_type', $filters['payment_type']);
+		}
+		if (!empty($filters['payment_status'])) {
+			$this->db->where('payment_status', $filters['payment_status']);
+		}
 	}
 
 	// Di M_Shipment.php atau M_Manifest.php
@@ -283,6 +291,17 @@ class M_Shipment extends CI_Model
 			->where('shipments.id', $id)
 			->get()
 			->row_array();
+	}
+
+	public function get_by_no_resi($no_resi)
+	{
+		return $this->db->select('shipments.*, service_types.name as service_name, service_types.code as service_code, master_commodities.name as commodity_name')
+			->from('shipments')
+			->join('service_types', 'service_types.id = shipments.service_type_id', 'left')
+			->join('master_commodities', 'master_commodities.id = shipments.commodity_id', 'left')
+			->where('shipments.no_resi', $no_resi)
+			->get()
+			->row();
 	}
 
 	public function get_dimensions($shipment_id)

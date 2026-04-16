@@ -201,4 +201,73 @@ class Home extends CI_Controller {
 			echo json_encode(['status' => false, 'message' => 'Rute tidak ditemukan.']);
 		}
 	}
+
+	public function confirm_payment($no_resi)
+	{
+		$shipment = $this->M_Shipment->get_by_no_resi($no_resi);
+
+		if (!$shipment) {
+			show_404();
+		}
+
+		// Cek expired
+		if ($shipment->payment_expired_at && strtotime($shipment->payment_expired_at) < time()) {
+			$data['expired'] = TRUE;
+		}
+
+		if ($this->input->server('REQUEST_METHOD') === 'POST') {
+			// Upload bukti transfer
+			if (!isset($_FILES['payment_proof']) || $_FILES['payment_proof']['error'] !== UPLOAD_ERR_OK) {
+				$this->session->set_flashdata('error', 'File tidak valid.');
+				redirect('home/confirm_payment/' . $no_resi);
+			}
+
+			$file    = $_FILES['payment_proof'];
+			$allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+
+			if (!in_array($file['type'], $allowed) || $file['size'] > 2 * 1024 * 1024) {
+				$this->session->set_flashdata('error', 'Format/ukuran tidak valid.');
+				redirect('home/confirm_payment/' . $no_resi);
+			}
+
+			$upload_dir = FCPATH . 'uploads/payment_proofs/' . date('Y/m/');
+			if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, TRUE);
+
+			$ext       = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+			$file_name = $no_resi . '_proof_' . time() . '.' . $ext;
+
+			if (!move_uploaded_file($file['tmp_name'], $upload_dir . $file_name)) {
+				$this->session->set_flashdata('error', 'Gagal upload file.');
+				redirect('home/confirm_payment/' . $no_resi);
+			}
+
+			$proof_path = 'uploads/payment_proofs/' . date('Y/m/') . $file_name;
+
+			$this->db->update('shipments', [
+				'payment_proof' => $proof_path,
+				'payment_status' => 'UPLOADED'
+			], ['no_resi' => $no_resi]);
+
+			// Notifikasi WA ke admin
+			$admin_phone = '628xxxxxxxxxx'; // ambil dari config/db
+			$pesan_admin = "*SMESCO EXPRESS — Bukti Transfer Masuk*\n\n" .
+				"No. Resi: *$no_resi*\n" .
+				"Pengirim: *{$shipment->sender_name}*\n" .
+				"Total: *Rp " . number_format($shipment->total_amount, 0, ',', '.') . "*\n\n" .
+				"Silakan verifikasi di panel admin.";
+
+			try {
+				$this->api_whatsapp->wa_notif_v2($admin_phone, $pesan_admin);
+			} catch (Exception $e) {
+				log_message('error', 'WA Admin Notif Error: ' . $e->getMessage());
+			}
+
+			$data['success'] = TRUE;
+		}
+
+		$data['shipment'] = $shipment;
+		$data['pages'] = 'landing-page/pages/payment_confirm';
+
+		$this->load->view('landing-page/index', $data);
+	}
 }

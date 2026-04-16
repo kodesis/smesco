@@ -209,6 +209,7 @@ class Users extends Authenticated_Controller
 
 			$update = [
 				'name'    => $this->input->post('name'),
+				'phone'    => $this->input->post('phone'),
 				'email'   => $email,
 				'role_id' => $this->input->post('role_id'),
 			];
@@ -237,11 +238,6 @@ class Users extends Authenticated_Controller
 			'agents'   => $agents,
 			'agent_id' => $agent_id,
 		];
-
-		echo '<pre>';
-		print_r($agent_id);
-		echo '</pre>';
-		exit;
 
 		$this->render('app/pages/users/edit', $data);
 	}

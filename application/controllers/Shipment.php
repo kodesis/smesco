@@ -8,7 +8,7 @@ class Shipment extends Authenticated_Controller
 	public function __construct()
 	{
 		parent::__construct();
-		$this->load->library(['pdfgenerator']);
+		$this->load->library(['pdfgenerator', 'api_whatsapp']);
 		$this->load->model(['M_Shipment', 'M_Pricelist']); // Model yang bikin AWB tadi
 	}
 
@@ -77,6 +77,8 @@ class Shipment extends Authenticated_Controller
 			$origin      = $this->input->post('origin', TRUE);
 			$destination = $this->input->post('destination', TRUE);
 			$service_id  = $this->input->post('service_type_id', TRUE);
+			$sender_name  = $this->input->post('sender_name', TRUE);  // <-- TAMBAH INI
+			$sender_phone = $this->input->post('sender_phone', TRUE);  // <-- TAMBAH INI
 
 			// 2. Validasi Master Pricelist
 			$pricelist = $this->db->get_where('pricelist', [
@@ -253,6 +255,13 @@ class Shipment extends Authenticated_Controller
 				$photo_path = 'uploads/shipments/' . date('Y') . '/' . date('m') . '/' . $file_name;
 			}
 
+			// Tentukan Expired Date (Hanya jika tipe pembayaran TRANSFER)
+			$payment_expired_at = NULL;
+			if ($this->input->post('payment_type') === 'TRANSFER') {
+				// Set batas waktu 10 menit dari sekarang
+				$payment_expired_at = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+			}
+
 			$insert_shipment = [
 				'no_resi'           => $no_resi,
 				'agent_id'          => $sess['agent_id'] ?? NULL,
@@ -292,6 +301,7 @@ class Shipment extends Authenticated_Controller
 				'total_amount'      => $shipping_total + $pickup_fee,
 				'margin_amount'     => $total_margin,
 				'shipment_photo' => $photo_path,
+				'payment_expired_at'  => $payment_expired_at,
 				'status'            => 'BOOKED',
 				'created_by'        => $sess['id']
 			];
@@ -321,6 +331,29 @@ class Shipment extends Authenticated_Controller
 				$this->session->set_flashdata('error', 'Gagal menyimpan data.');
 				redirect('shipment/create');
 			} else {
+				if ($payment_type === 'TRANSFER') {
+					$url = base_url('home/confirm_payment/' . $no_resi);
+					$total_rp = number_format($shipping_total + $pickup_fee, 0, ',', '.');
+
+					$pesan_user = "*SMESCO EXPRESS*\n\n" .
+						"*RESERVASI BERHASIL*\n" .
+						"---------------------\n\n" .
+						"No. Resi: *$no_resi*\n" .
+						"Atas Nama: *$sender_name*\n" .
+						"Rute: $origin - $destination\n" .
+						"Total Pembayaran: *Rp $total_rp*\n\n" .
+						"📤 *Upload bukti transfer dalam 10 menit:*\n" .
+						"$url\n\n" .
+						"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
+						"_Terima kasih telah memilih Smesco Express_";
+
+					try {
+						$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+					} catch (Exception $e) {
+						log_message('error', 'WA Notif Error: ' . $e->getMessage());
+					}
+				}
+
 				$this->session->set_flashdata('success', "Resi <b>$no_resi</b> berhasil dibuat!");
 				redirect('shipment/detail/' . $shipment_id);
 			}
@@ -815,5 +848,10 @@ class Shipment extends Authenticated_Controller
 		if ($update) {
 			$this->_respond(['status' => true, 'message' => "Resi $shipment->no_resi telah di-void."]);
 		}
+	}
+
+	public function test_wa()
+	{
+		$this->_send_finance_wa_notif($shipment, 'APPROVE', $next_status);
 	}
 }

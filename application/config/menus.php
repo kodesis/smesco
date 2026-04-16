@@ -110,7 +110,7 @@ $config['menus'] = [
 
 	'finance-kribo' => [
 		['title' => 'Dashboard',     'url' => 'dashboard',       'segment' => 'dashboard',   'icon' => 'dashboard'],
-		['title' => 'Tagihan Agen',   'url' => 'finance/invoice', 'segment' => 'finance',     'icon' => 'file-invoice'],
-		['title' => 'Rekonsiliasi',   'url' => 'finance/reconcile', 'segment' => 'finance',    'icon' => 'cash'],
+		['title' => 'Verifikasi',   'url' => 'finance/verifikasi', 'segment' => 'finance',     'icon' => 'message-check'],
+		// ['title' => 'Rekonsiliasi',   'url' => 'finance/reconcile', 'segment' => 'finance',    'icon' => 'cash'],
 	],
 ];
