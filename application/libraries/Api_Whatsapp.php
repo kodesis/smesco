@@ -3,7 +3,7 @@
 if (!defined('BASEPATH')) exit('No direct script access allowed');
 // require_once('PHPExcel.php');
 
-class Api_Whatsapp
+class Api_whatsapp
 {
   function wa_notif($msgg, $phonee)
   {
