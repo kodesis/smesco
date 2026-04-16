@@ -8,7 +8,7 @@ class Shipment extends Authenticated_Controller
 	public function __construct()
 	{
 		parent::__construct();
-		$this->load->library(['pdfgenerator', 'api_whatsapp']);
+		$this->load->library(['pdfgenerator', 'Api_whatsapp']);
 		$this->load->model(['M_Shipment', 'M_Pricelist']); // Model yang bikin AWB tadi
 	}
 
@@ -348,7 +348,7 @@ class Shipment extends Authenticated_Controller
 						"_Terima kasih telah memilih Smesco Express_";
 
 					try {
-						$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+						$this->Api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
 					} catch (Exception $e) {
 						log_message('error', 'WA Notif Error: ' . $e->getMessage());
 					}
