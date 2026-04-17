@@ -1,6 +1,13 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
 
+
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+
 class Shipment extends Authenticated_Controller
 {
 	protected $allowed_roles = ['admin-kribo', 'finance-kribo', 'admin-mitra', 'staff-mitra', 'checker', 'driver'];
@@ -8,7 +15,7 @@ class Shipment extends Authenticated_Controller
 	public function __construct()
 	{
 		parent::__construct();
-		$this->load->library(['pdfgenerator', 'Api_whatsapp']);
+		$this->load->library(['pdfgenerator', 'api_whatsapp']);
 		$this->load->model(['M_Shipment', 'M_Pricelist']); // Model yang bikin AWB tadi
 	}
 
@@ -73,12 +80,18 @@ class Shipment extends Authenticated_Controller
 		$this->_check_access();
 
 		if ($this->input->server('REQUEST_METHOD') === 'POST') {
+
+			echo '<pre>';
+			print_r($_POST);
+			echo '</pre>';
+			exit;
 			// 1. Dapatkan Input Dasar
 			$origin      = $this->input->post('origin', TRUE);
 			$destination = $this->input->post('destination', TRUE);
 			$service_id  = $this->input->post('service_type_id', TRUE);
 			$sender_name  = $this->input->post('sender_name', TRUE);  // <-- TAMBAH INI
 			$sender_phone = $this->input->post('sender_phone', TRUE);  // <-- TAMBAH INI
+			$payment_type = $this->input->post('payment_type', TRUE);
 
 			// 2. Validasi Master Pricelist
 			$pricelist = $this->db->get_where('pricelist', [
@@ -161,9 +174,8 @@ class Shipment extends Authenticated_Controller
 			$shipping_margin = ($sell_per_kg - $cost_per_kg) * $chargeable;
 
 			// 6. Logic Pickup Service
-			$pickup_fee    = 0;
-			$pickup_margin = 0;
-			$pickup_id     = NULL;
+			$pickup_fee = 0;
+			$pickup_id  = NULL;
 
 			if ($this->input->post('use_pickup') == 1) {
 				$p_id = $this->input->post('pickup_rate_id');
@@ -172,14 +184,59 @@ class Shipment extends Authenticated_Controller
 				if ($rate_db && $chargeable >= $rate_db->min_weight) {
 					$pickup_id     = $p_id;
 					$pickup_fee    = $rate_db->price_smesco;
-					$pickup_margin = ($rate_db->price_smesco - $rate_db->price_kribo);
 				}
 			}
 
 			// 7. Kalkulasi Final & Persiapan Data
 			$sess         = $this->session->userdata('user');
 			$is_valuable  = $this->input->post('is_valuable') ? 1 : 0;
-			$total_margin = $shipping_margin + $pickup_margin;
+			$addon_codes      = $this->input->post('addons') ?: [];
+			$total_addon_fee  = 0;
+			$insert_addons    = [];
+
+			if (!empty($addon_codes)) {
+				// Ambil semua addon yang dipilih sekaligus (1 query)
+				$this->db->where_in('code', $addon_codes)->where('is_active', 1);
+				$selected_addons = $this->db->get('master_addons')->result();
+
+				foreach ($selected_addons as $addon) {
+					$fee = 0;
+
+					// Hitung fee per addon berdasarkan calc_method — mirror logic JS
+					if (!empty($insert_dimensions)) {
+						foreach ($insert_dimensions as $dim) {
+							$p = $dim['length'];
+							$l = $dim['width'];
+							$t = $dim['height'];
+							$q = $dim['qty'];
+
+							if ($addon->calc_method === 'VOLUME') {
+								$fee += ($p * $l * $t * $addon->base_factor) * $q;
+							} elseif ($addon->calc_method === 'VOLUME_PLUS') {
+								$fee += (($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor) * $q;
+							} elseif ($addon->calc_method === 'PER_KOLI') {
+								$fee += $addon->base_factor * $q;
+							}
+						}
+					} else {
+						// Fallback: tidak ada dimensi, pakai total_koli
+						if ($addon->calc_method === 'PER_KOLI') {
+							$fee = $addon->base_factor * ($total_koli ?: 1);
+						}
+					}
+
+					if ($fee > 0) {
+						$total_addon_fee += $fee;
+						$insert_addons[] = [
+							'addon_id'     => $addon->id,
+							'addon_amount' => $fee,
+							// shipment_id akan di-inject setelah insert
+						];
+					}
+				}
+			}
+
+			$total_margin = $shipping_margin; // margin mitra hanya dari biaya pengiriman
 
 			// Helper: ambil nama wilayah dari ID
 			$sender_prov_name  = $this->db->get_where('mt_provinsi',   ['id' => $this->input->post('sender_provinsi')])->row();
@@ -257,53 +314,54 @@ class Shipment extends Authenticated_Controller
 
 			// Tentukan Expired Date (Hanya jika tipe pembayaran TRANSFER)
 			$payment_expired_at = NULL;
-			if ($this->input->post('payment_type') === 'TRANSFER') {
+			if ($payment_type === 'TRANSFER') {
 				// Set batas waktu 10 menit dari sekarang
 				$payment_expired_at = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 			}
 
 			$insert_shipment = [
-				'no_resi'           => $no_resi,
-				'agent_id'          => $sess['agent_id'] ?? NULL,
-				'origin'            => $origin,
-				'destination'       => $destination,
-				'service_type_id'   => $service_id,
-				'category'          => $pricelist->category,
+				'no_resi'           		  => $no_resi,
+				'agent_id'          		  => $sess['agent_id'] ?? NULL,
+				'origin'            		  => $origin,
+				'destination'       		  => $destination,
+				'service_type_id'   		  => $service_id,
+				'category'          		  => $pricelist->category,
 				'sender_name'             => $this->input->post('sender_name', TRUE),
 				'sender_phone'            => $this->input->post('sender_phone', TRUE),
-				'sender_provinsi'   => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
-				'sender_kota'       => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
-				'sender_kecamatan'  => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
-				'sender_kelurahan'  => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
+				'sender_provinsi'   		  => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
+				'sender_kota'       		  => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
+				'sender_kecamatan'  		  => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
+				'sender_kelurahan'  		  => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
 				'sender_address_detail'   => $this->input->post('sender_address_detail', TRUE),
 				'sender_address'          => $full_sender_address,
 				'receiver_name'           => $this->input->post('receiver_name', TRUE),
 				'receiver_phone'          => $this->input->post('receiver_phone', TRUE),
-				'receiver_provinsi'  => $receiver_prov_name  ? $receiver_prov_name->nama_provinsi  : NULL,
-				'receiver_kota'      => $receiver_kota_name  ? $receiver_kota_name->nama_kota      : NULL,
-				'receiver_kecamatan' => $receiver_kec_name   ? $receiver_kec_name->nama_kecamatan  : NULL,
-				'receiver_kelurahan' => $receiver_kel_name   ? $receiver_kel_name->nama_kelurahan  : NULL,
+				'receiver_provinsi'  	  => $receiver_prov_name  ? $receiver_prov_name->nama_provinsi  : NULL,
+				'receiver_kota'      	  => $receiver_kota_name  ? $receiver_kota_name->nama_kota      : NULL,
+				'receiver_kecamatan' 	  => $receiver_kec_name   ? $receiver_kec_name->nama_kecamatan  : NULL,
+				'receiver_kelurahan' 	  => $receiver_kel_name   ? $receiver_kel_name->nama_kelurahan  : NULL,
 				'receiver_address_detail' => $this->input->post('receiver_address_detail', TRUE),
 				'receiver_address'        => $full_receiver_address,
-				'commodity_id'      => $this->input->post('commodity_id', TRUE),
-				'commodity_detail'  => $this->input->post('commodity_detail', TRUE),
-				'is_valuable'       => $is_valuable,
-				'goods_value'       => $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0,
-				'payment_type'      => $this->input->post('payment_type', TRUE),
-				'koli'              => $total_koli ?: 1,
-				'actual_weight'     => $actual_weight,
-				'volume_weight'     => $total_volume_weight,
-				'chargeable_weight' => $chargeable,
-				'cost_price'        => $cost_per_kg,
-				'sell_price'        => $sell_per_kg,
-				'pickup_rate_id'    => $pickup_id,
-				'pickup_fee'        => $pickup_fee,
-				'total_amount'      => $shipping_total + $pickup_fee,
-				'margin_amount'     => $total_margin,
-				'shipment_photo' => $photo_path,
-				'payment_expired_at'  => $payment_expired_at,
-				'status'            => 'BOOKED',
-				'created_by'        => $sess['id']
+				'commodity_id'      		  => $this->input->post('commodity_id', TRUE),
+				'commodity_detail'  		  => $this->input->post('commodity_detail', TRUE),
+				'is_valuable'       		  => $is_valuable,
+				'goods_value'       		  => $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0,
+				'payment_type'      		  => $payment_type,
+				'koli'              		  => $total_koli ?: 1,
+				'actual_weight'     		  => $actual_weight,
+				'volume_weight'     		  => $total_volume_weight,
+				'chargeable_weight' 		  => $chargeable,
+				'cost_price'        		  => $cost_per_kg,
+				'sell_price'        		  => $sell_per_kg,
+				'pickup_rate_id'    		  => $pickup_id,
+				'pickup_fee'        		  => $pickup_fee,
+				'total_addon_fee'   		  => $total_addon_fee,
+				'total_amount'      		  => $shipping_total + $pickup_fee + $total_addon_fee,
+				'margin_amount'     		  => $total_margin,
+				'shipment_photo' 			  => $photo_path,
+				'payment_expired_at'  	  => $payment_expired_at,
+				'status'            		  => 'BOOKED',
+				'created_by'        		  => $sess['id']
 			];
 
 			// 8. Database Transaction
@@ -318,6 +376,13 @@ class Shipment extends Authenticated_Controller
 				$this->db->insert_batch('shipment_dimensions', $insert_dimensions);
 			}
 
+			if (!empty($insert_addons)) {
+				foreach ($insert_addons as &$addon_row) {
+					$addon_row['shipment_id'] = $shipment_id;
+				}
+				$this->db->insert_batch('shipment_addons', $insert_addons);
+			}
+
 			$this->db->insert('shipment_tracking', [
 				'shipment_id' => $shipment_id,
 				'status'      => 'BOOKED',
@@ -327,13 +392,38 @@ class Shipment extends Authenticated_Controller
 			]);
 			$this->db->trans_complete();
 
+			// ── Upsert Master Customer ──
+			$customer_data = [
+				'name'           => $this->input->post('sender_name', TRUE),
+				'phone'          => $this->input->post('sender_phone', TRUE),
+				'nik'            => $this->input->post('sender_nik', TRUE) ?: NULL,
+				'provinsi_id'    => $this->input->post('sender_provinsi'),
+				'provinsi_name'  => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
+				'kota_id'        => $this->input->post('sender_kota'),
+				'kota_name'      => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
+				'kecamatan_id'   => $this->input->post('sender_kecamatan'),
+				'kecamatan_name' => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
+				'kelurahan_id'   => $this->input->post('sender_kelurahan'),
+				'kelurahan_name' => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
+				'address_detail' => $this->input->post('sender_address_detail', TRUE),
+				'updated_at'     => date('Y-m-d H:i:s'),
+				'created_by'     => $sess['id'],
+			];
+
+			$existing = $this->db->get_where('master_customers', ['phone' => $customer_data['phone']])->row();
+			if ($existing) {
+				$this->db->where('phone', $customer_data['phone'])->update('master_customers', $customer_data);
+			} else {
+				$this->db->insert('master_customers', $customer_data);
+			}
+
 			if ($this->db->trans_status() === FALSE) {
 				$this->session->set_flashdata('error', 'Gagal menyimpan data.');
 				redirect('shipment/create');
 			} else {
 				if ($payment_type === 'TRANSFER') {
 					$url = base_url('home/confirm_payment/' . $no_resi);
-					$total_rp = number_format($shipping_total + $pickup_fee, 0, ',', '.');
+					$total_rp = number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.');
 
 					$pesan_user = "*SMESCO EXPRESS*\n\n" .
 						"*RESERVASI BERHASIL*\n" .
@@ -348,7 +438,7 @@ class Shipment extends Authenticated_Controller
 						"_Terima kasih telah memilih Smesco Express_";
 
 					try {
-						$this->Api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+						$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
 					} catch (Exception $e) {
 						log_message('error', 'WA Notif Error: ' . $e->getMessage());
 					}
@@ -365,7 +455,8 @@ class Shipment extends Authenticated_Controller
 			'title'       => 'Buat Booking',
 			'cities'      => $this->M_Pricelist->get_cities(),
 			'services'    => $this->M_Pricelist->get_services(),
-			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result()
+			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
+			'addons'      => $this->db->get_where('master_addons', ['is_active' => 1])->result()
 		];
 		$this->render('app/pages/shipment/create', $data);
 	}
@@ -853,5 +944,307 @@ class Shipment extends Authenticated_Controller
 	public function test_wa()
 	{
 		$this->_send_finance_wa_notif($shipment, 'APPROVE', $next_status);
+	}
+
+	public function autocomplete_customer()
+	{
+		if ($this->input->server('REQUEST_METHOD') !== 'GET') return;
+
+		$q = $this->input->get('term', TRUE); // term = input dari user
+
+		$this->db->select('id, name, phone, nik, provinsi_id, provinsi_name, kota_id, kota_name, kecamatan_id, kecamatan_name, kelurahan_id, kelurahan_name, address_detail');
+		$this->db->like('phone', $q, 'after'); // search by phone prefix
+		$this->db->or_like('name', $q, 'both');
+		$this->db->limit(8);
+		$customers = $this->db->get('master_customers')->result();
+
+		echo json_encode($customers);
+	}
+
+	public function manifest_list()
+	{
+		$this->_check_access();
+
+		// 1. Ambil daftar manifest pickup
+		$this->db->select('mp.*, a.name as agent_name');
+		$this->db->from('manifest_pickups mp');
+		$this->db->join('agents a', 'a.id = mp.agent_id', 'left');
+
+		if (!empty($sess['agent_id'])) {
+			$this->db->where('mp.agent_id', $sess['agent_id']);
+		}
+
+		$this->db->order_by('mp.created_at', 'DESC');
+		$manifests = $this->db->get()->result();
+
+		// 2. Hitung jumlah resi di dalam setiap manifest (biar informatif di tabel)
+		foreach ($manifests as $m) {
+			$m->total_resi = $this->db->where('manifest_pickup_id', $m->id)
+				->count_all_results('manifest_pickup_items');
+		}
+
+		$data = [
+			'title'     => 'Daftar Manifest Penjemputan',
+			'manifests' => $manifests
+		];
+
+		$this->render('app/pages/shipment/manifest_index', $data);
+	}
+
+	public function preview_manifest()
+	{
+		$this->_check_access();
+
+		// Ambil data yang SUDAH di-scan supir (PICKED_UP) 
+		// DAN belum pernah masuk ke Surat Jalan manapun
+		$this->db->select('id, no_resi, sender_name, receiver_name, destination, koli, chargeable_weight, commodity_detail, created_at');
+		$this->db->from('shipments');
+		$this->db->where('status', 'PICKED_UP');
+		$this->db->where('NOT EXISTS (SELECT 1 FROM manifest_pickup_items WHERE manifest_pickup_items.shipment_id = shipments.id)', '', FALSE);
+
+		if (!empty($sess['agent_id'])) {
+			$this->db->where('shipments.agent_id', $sess['agent_id']);
+		}
+		
+		$this->db->order_by('destination', 'ASC');
+
+		$shipments = $this->db->get()->result();
+
+		$data = [
+			'title'     => 'Preview Manifest Penjemputan',
+			'shipments' => $shipments
+		];
+
+		$this->render('app/pages/shipment/preview_manifest', $data);
+	}
+
+	public function save_manifest()
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$shipment_ids = $this->input->post('shipment_ids');
+		if (empty($shipment_ids)) {
+			$this->session->set_flashdata('error', 'Pilih minimal satu resi bro!');
+			redirect('shipment/preview_manifest');
+		}
+
+		// Generate Nomor Manifest (Contoh: SJP-2604-0001)
+		$no_manifest = 'SJP-' . date('ym') . '-' . strtoupper(substr(md5(time()), 0, 4));
+
+		$this->db->trans_start(); // Mulai Transaksi Database
+
+		// 1. Simpan Parent (Header Surat Jalan)
+		$data_manifest = [
+			'no_manifest'      => $no_manifest,
+			'tanggal'          => date('Y-m-d H:i:s'),
+			'agent_id'         => $sess['agent_id'] ?? NULL,
+			'forwarder_name'   => $this->input->post('forwarder_name', TRUE),
+			'forwarder_phone'  => $this->input->post('forwarder_phone', TRUE),
+			'receiver_name'    => $this->input->post('receiver_name', TRUE),
+			'receiver_address' => $this->input->post('receiver_address', TRUE),
+			'status'           => 'PRINTED',
+			'created_by'       => $sess['id'],
+			'created_at'       => date('Y-m-d H:i:s')
+		];
+		$this->db->insert('manifest_pickups', $data_manifest);
+		$manifest_id = $this->db->insert_id();
+
+		// 2. Simpan Child (Item Resi) & Update Status Shipment
+		$items = [];
+		foreach ($shipment_ids as $s_id) {
+			$items[] = [
+				'manifest_pickup_id' => $manifest_id,
+				'shipment_id'        => $s_id
+			];
+		}
+		$this->db->insert_batch('manifest_pickup_items', $items);
+
+		$this->db->trans_complete(); // Selesai Transaksi
+
+		if ($this->db->trans_status() === FALSE) {
+			$this->session->set_flashdata('error', 'Gagal membuat manifest. Coba lagi.');
+			redirect('shipment/preview_manifest');
+		}
+
+		// Redirect langsung ke halaman print
+		redirect('shipment/print_manifest/' . $manifest_id);
+	}
+
+	public function print_manifest($manifest_id)
+	{
+		$this->_check_access();
+
+		// 1. Ambil Data Header Surat Jalan
+		$this->db->select('mp.*, a.name as agent_name');
+		$this->db->from('manifest_pickups mp');
+		$this->db->join('agents a', 'a.id = mp.agent_id', 'left');
+		$this->db->where('mp.id', $manifest_id);
+		$manifest = $this->db->get()->row();
+
+		// Guard clause kalau ID diketik ngasal di URL
+		if (!$manifest) {
+			$this->session->set_flashdata('error', 'Data manifest tidak ditemukan!');
+			redirect('shipment');
+		}
+
+		// 2. Ambil Data Rincian Resi yang Masuk ke Manifest Ini
+		$this->db->select('s.no_resi, s.destination, s.sender_name, s.koli, s.chargeable_weight');
+		$this->db->from('manifest_pickup_items mpi');
+		$this->db->join('shipments s', 's.id = mpi.shipment_id');
+		$this->db->where('mpi.manifest_pickup_id', $manifest_id);
+		$this->db->order_by('s.destination', 'ASC');
+		$items = $this->db->get()->result();
+
+		$data = [
+			'title'    => 'Print Surat Jalan',
+			'manifest' => $manifest,
+			'items'    => $items
+		];
+
+		// 3. Load View KHUSUS PRINT (Pakai $this->load->view, bukan render)
+		// Biar sidebar dan navbar Tabler nggak ikut ke-print di kertas
+		$this->load->view('app/pages/shipment/print_manifest', $data);
+	}
+
+	public function export_manifest()
+	{
+		$this->_check_access(); // Sesuaikan dengan fungsi guard lu
+
+		// 1. Ambil data dari database (Hanya yang READY_TO_PICKUP)
+		$this->db->select('no_resi, sender_name, receiver_name, destination, koli, chargeable_weight, commodity_detail');
+		$this->db->where('status', 'READY_TO_PICKUP');
+		$this->db->order_by('destination', 'ASC'); // Urutkan berdasarkan tujuan biar gampang
+		$shipments = $this->db->get('shipments')->result();
+
+		if (empty($shipments)) {
+			$this->session->set_flashdata('error', 'Tidak ada barang yang siap dipickup (READY TO PICKUP).');
+			redirect('shipment'); // Kembali ke halaman sebelumnya
+		}
+
+		require_once FCPATH . 'vendor/autoload.php';
+
+		// 2. Inisiasi PhpSpreadsheet
+		$spreadsheet = new Spreadsheet();
+		$sheet = $spreadsheet->getActiveSheet();
+		$sheet->setTitle('Manifest Penjemputan');
+
+		// 3. Styling Variables (Biar rapi)
+		$styleHeader = [
+			'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+			'alignment' => [
+				'horizontal' => Alignment::HORIZONTAL_CENTER,
+				'vertical' => Alignment::VERTICAL_CENTER,
+			],
+			'borders' => [
+				'allBorders' => ['borderStyle' => Border::BORDER_THIN],
+			],
+			'fill' => [
+				'fillType' => Fill::FILL_SOLID,
+				'startColor' => ['rgb' => '0052CC'] // Warna biru khas Smesco
+			],
+		];
+
+		$styleBorderAll = [
+			'borders' => [
+				'allBorders' => ['borderStyle' => Border::BORDER_THIN],
+			],
+			'alignment' => [
+				'vertical' => Alignment::VERTICAL_CENTER,
+			],
+		];
+
+		// 4. Judul Dokumen
+		$sheet->setCellValue('A1', 'SURAT JALAN / MANIFEST PENJEMPUTAN');
+		$sheet->mergeCells('A1:I1');
+		$sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+		$sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+		$sheet->setCellValue('A2', 'Tanggal Cetak: ' . date('d M Y H:i'));
+		$sheet->mergeCells('A2:I2');
+		$sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+		// 5. Header Tabel
+		$sheet->setCellValue('A4', 'NO');
+		$sheet->setCellValue('B4', 'CEK'); // Kolom Checklist
+		$sheet->setCellValue('C4', 'NO. RESI (AWB)');
+		$sheet->setCellValue('D4', 'KOTA TUJUAN');
+		$sheet->setCellValue('E4', 'PENGIRIM');
+		$sheet->setCellValue('F4', 'KOLI');
+		$sheet->setCellValue('G4', 'BERAT (Kg)');
+		$sheet->setCellValue('H4', 'ISI BARANG');
+		$sheet->setCellValue('I4', 'KETERANGAN');
+
+		$sheet->getStyle('A4:I4')->applyFromArray($styleHeader);
+
+		// 6. Isi Data
+		$row = 5;
+		$no = 1;
+		$total_koli = 0;
+		$total_berat = 0;
+
+		foreach ($shipments as $s) {
+			$sheet->setCellValue('A' . $row, $no);
+			// Simbol Checklist kotak kosong. Kalau di-print sangat jelas.
+			$sheet->setCellValue('B' . $row, '[   ]');
+			$sheet->setCellValue('C' . $row, $s->no_resi);
+			$sheet->setCellValue('D' . $row, $s->destination);
+			$sheet->setCellValue('E' . $row, $s->sender_name);
+			$sheet->setCellValue('F' . $row, $s->koli);
+			$sheet->setCellValue('G' . $row, $s->chargeable_weight);
+			$sheet->setCellValue('H' . $row, $s->commodity_detail);
+			$sheet->setCellValue('I' . $row, ''); // Kosong untuk notes tulisan tangan
+
+			// Center align untuk beberapa kolom
+			$sheet->getStyle("A$row:D$row")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+			$sheet->getStyle("F$row:G$row")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+			$total_koli += $s->koli;
+			$total_berat += $s->chargeable_weight;
+
+			$row++;
+			$no++;
+		}
+
+		// 7. Beri Border ke Seluruh Data
+		$sheet->getStyle('A4:I' . ($row - 1))->applyFromArray($styleBorderAll);
+
+		// 8. Baris Total (Footer Tabel)
+		$sheet->setCellValue('A' . $row, 'TOTAL');
+		$sheet->mergeCells("A$row:E$row");
+		$sheet->setCellValue('F' . $row, $total_koli);
+		$sheet->setCellValue('G' . $row, $total_berat);
+
+		$sheet->getStyle("A$row:I$row")->applyFromArray($styleHeader); // Pakai style header biar tebal
+		$sheet->getStyle("A$row:E$row")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+
+		// 9. Area Tanda Tangan Serah Terima
+		$row += 3;
+		$sheet->setCellValue('B' . $row, 'Diserahkan Oleh (Smesco),');
+		$sheet->setCellValue('G' . $row, 'Diterima Oleh (Kurir Bandara),');
+
+		$sheet->getStyle('B' . $row . ':G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+		$sheet->getStyle('B' . $row . ':G' . $row)->getFont()->setBold(true);
+
+		$row += 4; // Kasih jarak buat ttd
+		$sheet->setCellValue('B' . $row, '(.......................................)');
+		$sheet->setCellValue('G' . $row, '(.......................................)');
+		$sheet->getStyle('B' . $row . ':G' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+		// 10. Auto-Size Lebar Kolom
+		foreach (range('A', 'I') as $col) {
+			$sheet->getColumnDimension($col)->setAutoSize(true);
+		}
+
+		// 11. Eksekusi Output ke Excel (Download)
+		$filename = 'Manifest_Pickup_' . date('Ymd_Hi') . '.xlsx';
+
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment;filename="' . $filename . '"');
+		header('Cache-Control: max-age=0');
+
+		$writer = new Xlsx($spreadsheet);
+		$writer->save('php://output');
+		exit;
 	}
 }

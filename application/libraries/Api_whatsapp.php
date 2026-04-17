@@ -5,7 +5,6 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 class Api_whatsapp
 {
-	// testing
   function wa_notif($msgg, $phonee)
   {
     // $sender = 'buskipm';

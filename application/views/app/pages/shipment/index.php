@@ -4,14 +4,28 @@
 	<div class="container-xl">
 		<div class="row g-2 align-items-center">
 			<div class="col">
-				<h2 class="page-title text-uppercase ls-1">Daftar Transaksi Shipment</h2>
-				<div class="text-muted mt-1">Monitoring & pengolahan data pengiriman kargo.</div>
+				<h2 class="page-title">
+					<?= tabler_icon('package', 'me-2') ?> Data Shipment
+				</h2>
+				<div class="text-muted mt-1">Kelola semua data pengiriman dan resi.</div>
 			</div>
+
 			<div class="col-auto ms-auto d-print-none">
-				<a href="<?= site_url('shipment/create') ?>" class="btn btn-primary shadow-sm">
-					<?= tabler_icon('plus', 'me-2') ?> Buat Booking Baru
-				</a>
+				<div class="btn-list">
+
+					<a href="<?= site_url('shipment/preview_manifest') ?>" class="btn btn-warning">
+						<?= tabler_icon('file-spreadsheet', 'me-1') ?>
+						Buat Manifest
+					</a>
+
+					<a href="<?= site_url('shipment/create') ?>" class="btn btn-primary">
+						<?= tabler_icon('plus', 'me-1') ?>
+						Buat Shipment Baru
+					</a>
+
+				</div>
 			</div>
+
 		</div>
 	</div>
 </div>
@@ -206,10 +220,20 @@
 									<td>
 										<div class="btn-list flex-nowrap">
 											<?php if ($s->status == 'BOOKED'): ?>
-												<button type="button" class="btn btn-sm btn-success btn-confirm-paid"
-													data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>">
-													<?= tabler_icon('cash', 'me-1') ?> Lunas
-												</button>
+												<?php if ($s->payment_type !== 'TRANSFER'): ?>
+
+													<button type="button" class="btn btn-sm btn-success btn-confirm-paid"
+														data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>">
+														<?= tabler_icon('cash', 'me-1') ?> Lunas
+													</button>
+
+												<?php else: ?>
+
+													<span class="btn btn-sm btn-warning disabled pe-none" style="opacity: 1;" title="Menunggu Konfirmasi Finance Pusat">
+														<?= tabler_icon('clock-hour-4', 'me-1') ?> Pending
+													</span>
+
+												<?php endif; ?>
 											<?php endif; ?>
 											<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-icon btn-outline-primary" title="Detail"><?= tabler_icon('eye') ?></a>
 											<?php if ($s->status !== 'BOOKED' && $s->status !== 'CANCELLED'): ?>
@@ -293,10 +317,20 @@
 							<!-- Actions -->
 							<div class="d-flex gap-2 flex-wrap">
 								<?php if ($s->status == 'BOOKED'): ?>
-									<button type="button" class="btn btn-sm btn-success btn-confirm-paid flex-grow-1"
-										data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>">
-										<?= tabler_icon('cash', 'me-1') ?> Konfirmasi Lunas
-									</button>
+									<?php if ($s->payment_type !== 'TRANSFER'): ?>
+
+										<button type="button" class="btn btn-sm btn-success btn-confirm-paid"
+											data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>">
+											<?= tabler_icon('cash', 'me-1') ?> Lunas
+										</button>
+
+									<?php else: ?>
+
+										<span class="btn btn-sm btn-warning disabled pe-none" style="opacity: 1;" title="Menunggu Konfirmasi Finance Pusat">
+											<?= tabler_icon('clock-hour-4', 'me-1') ?> Pending
+										</span>
+
+									<?php endif; ?>
 								<?php endif; ?>
 								<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-outline-primary"><?= tabler_icon('eye', 'me-1') ?> Detail</a>
 								<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('printer') ?></a>

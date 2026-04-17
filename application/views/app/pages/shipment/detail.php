@@ -21,12 +21,24 @@ $can_print = !in_array($shipment['status'], $no_print_statuses);
 					<a href="<?= site_url('shipment') ?>" class="btn btn-outline-secondary">
 						<?= tabler_icon('arrow-left', 'me-1') ?> Kembali
 					</a>
+
 					<?php if ($shipment['status'] == 'BOOKED'): ?>
-						<button type="button" class="btn btn-success btn-confirm-paid"
-							data-id="<?= $shipment['id'] ?>" data-resi="<?= $shipment['no_resi'] ?>">
-							<?= tabler_icon('cash', 'me-1') ?> Lunas
-						</button>
+						<?php if ($shipment['payment_type'] !== 'TRANSFER'): ?>
+
+							<button type="button" class="btn btn-success btn-confirm-paid"
+								data-id="<?= $shipment['id'] ?>" data-resi="<?= $shipment['no_resi'] ?>">
+								<?= tabler_icon('cash', 'me-1') ?> Lunas
+							</button>
+
+						<?php else: ?>
+
+							<span class="btn btn-warning disabled pe-none" style="opacity: 1;">
+								<?= tabler_icon('clock-hour-4', 'me-1') ?> Menunggu Konfirmasi Finance
+							</span>
+
+						<?php endif; ?>
 					<?php endif; ?>
+
 					<?php if ($can_print): ?>
 						<a href="<?= site_url('shipment/print_label/' . $shipment['no_resi']) ?>"
 							target="_blank"
@@ -291,9 +303,9 @@ $can_print = !in_array($shipment['status'], $no_print_statuses);
 											<div class="text-muted small"><?= date('d/m/Y H:i', strtotime($h['created_at'])) ?></div>
 											<div class="fw-bold"><?= shipment_status_badge($h['status']) ?></div>
 											<div class="small text-muted mt-1"><?= $h['note'] ?></div>
-											<?php if ($h['location']): ?>
+											<!-- <?php if ($h['location']): ?>
 												<div class="mt-1 small"><i class="bi bi-geo-alt me-1"></i><?= $h['location'] ?></div>
-											<?php endif; ?>
+											<?php endif; ?> -->
 										</div>
 									</div>
 								</li>

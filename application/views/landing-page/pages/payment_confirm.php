@@ -173,7 +173,7 @@
 						<i class="fa-solid fa-upload" style="color:var(--yellow);"></i> Upload Bukti Transfer
 					</div>
 					<div class="p-4">
-						<form action="<?= base_url('shipment/confirm_payment/' . $shipment->no_resi) ?>" method="POST" enctype="multipart/form-data" id="uploadForm">
+						<form action="<?= base_url('home/confirm_payment/' . $shipment->no_resi) ?>" method="POST" enctype="multipart/form-data" id="uploadForm">
 
 							<div class="upload-zone mb-3" id="uploadZone">
 								<input type="file" name="payment_proof" id="proofFile" accept="image/jpeg,image/jpg,image/png" required>
@@ -293,6 +293,7 @@
 
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 	// ── COUNTDOWN TIMER ──
 	<?php if (!empty($shipment->payment_expired_at) && empty($expired) && empty($success)): ?>
@@ -399,9 +400,26 @@
 	});
 
 	// Loading state on submit
-	document.getElementById('uploadForm')?.addEventListener('submit', function() {
-		submitBtn.disabled = true;
-		submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Mengunggah...</span>';
+	document.getElementById('uploadForm')?.addEventListener('submit', function(e) {
+		e.preventDefault();
+		const form = this;
+
+		Swal.fire({
+			title: 'Kirim Bukti Transfer?',
+			text: 'Pastikan foto bukti transfer sudah jelas dan benar sebelum dikirim.',
+			icon: 'question',
+			showCancelButton: true,
+			confirmButtonText: 'Ya, Kirim Sekarang!',
+			cancelButtonText: 'Cek Lagi',
+			reverseButtons: true,
+			confirmButtonColor: '#2563eb',
+		}).then((result) => {
+			if (result.isConfirmed) {
+				submitBtn.disabled = true;
+				submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Mengunggah...</span>';
+				form.submit();
+			}
+		});
 	});
 
 	// ── COPY TO CLIPBOARD ──

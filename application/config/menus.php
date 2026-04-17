@@ -49,7 +49,8 @@ $config['menus'] = [
 			'icon' => 'package',
 			'children' => [
 				['title' => 'Semua Shipment', 'url' => 'shipment'],
-				['title' => 'Manifest Kargo', 'url' => 'shipment/manifest'], // Tempat Admin Kribo input data pesawat
+				['title' => 'Manifest Pickup', 'url' => 'shipment/manifest_list'],
+				['title' => 'Manifest AWB', 'url' => 'shipment/manifest'],
 				['title' => 'Monitoring Kurir', 'url' => 'shipment/pickup_list'],
 			]
 		],
@@ -87,7 +88,7 @@ $config['menus'] = [
 			'icon' => 'box',
 			'children' => [
 				['title' => 'List Kiriman', 'url' => 'shipment', 'segment' => 'shipment', 'icon' => 'list'],
-				['title' => 'Buat Booking', 'url' => 'shipment/create', 'segment' => 'shipment', 'icon' => 'plus']
+				['title' => 'Manifest Pickup', 'url' => 'shipment/manifest_list'],
 			]
 		],
 		['title' => 'Manajemen Staff', 'url' => 'users',           'segment' => 'users',       'icon' => 'users'],
@@ -103,7 +104,8 @@ $config['menus'] = [
 			'icon' => 'box',
 			'children' => [
 				['title' => 'List Kiriman', 'url' => 'shipment', 'segment' => 'shipment', 'icon' => 'list'],
-				['title' => 'Buat Booking', 'url' => 'shipment/create', 'segment' => 'shipment', 'icon' => 'plus']
+				['title' => 'Buat Booking', 'url' => 'shipment/create', 'segment' => 'shipment', 'icon' => 'plus'],
+				['title' => 'Manifest Pickup', 'url' => 'shipment/manifest_list'],
 			]
 		],
 	],

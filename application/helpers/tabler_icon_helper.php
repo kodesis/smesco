@@ -179,7 +179,11 @@ if (! function_exists('tabler_icon')) {
 
 			'xbox-x' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M12 21a9 9 0 0 0 9 -9a9 9 0 0 0 -9 -9a9 9 0 0 0 -9 9a9 9 0 0 0 9 9" /><path d="M9 8l6 8" /><path d="M15 8l-6 8" />',
 
-			'message-check' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 9h8" /><path d="M8 13h6" /><path d="M10.99 19.206l-2.99 1.794v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6" /><path d="M15 19l2 2l4 -4" />'
+			'message-check' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M8 9h8" /><path d="M8 13h6" /><path d="M10.99 19.206l-2.99 1.794v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v6" /><path d="M15 19l2 2l4 -4" />',
+
+			'file-export' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M11.5 21h-4.5a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v5m-5 6h7m-3 -3l3 3l-3 3" />',
+
+			'truck-loading' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M2 3h1a2 2 0 0 1 2 2v10a2 2 0 0 0 2 2h15" /><path d="M9 9a3 3 0 0 1 3 -3h4a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-4a3 3 0 0 1 -3 -3l0 -2" /><path d="M7 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M16 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />'
 		];
 
 		// Fallback kalau icon tidak ditemukan

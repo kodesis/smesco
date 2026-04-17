@@ -87,11 +87,11 @@
 									<?php if ($log['note']): ?>
 										<div class="t-desc"><?= $log['note'] ?></div>
 									<?php endif; ?>
-									<?php if ($log['location']): ?>
+									<!-- <?php if ($log['location']): ?>
 										<div class="t-location">
 											<i class="bi bi-geo-alt me-1"></i><?= $log['location'] ?>
 										</div>
-									<?php endif; ?>
+									<?php endif; ?> -->
 								</li>
 							<?php endforeach; ?>
 						</ul>

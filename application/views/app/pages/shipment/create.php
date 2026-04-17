@@ -55,6 +55,96 @@
 						</div>
 					</div>
 
+
+					<div class="col-12">
+						<div class="card">
+							<div class="card-header">
+								<h3 class="card-title">Detail Barang & Pembayaran</h3>
+							</div>
+							<div class="card-body">
+								<div class="row">
+									<div class="col-md-6 mb-3">
+										<label class="form-label required">Kategori Komoditi (IATA)</label>
+										<select name="commodity_id" class="form-select select2" required>
+											<option value="">- Pilih Kategori -</option>
+											<?php foreach ($commodities as $cmd): ?>
+												<option value="<?= $cmd->id ?>">[<?= $cmd->code ?>] <?= $cmd->name ?></option>
+											<?php endforeach; ?>
+										</select>
+										<small class="text-muted">Pilih kategori besar untuk menentukan penanganan kargo.</small>
+									</div>
+
+									<div class="col-md-6 mb-3">
+										<label class="form-label required">Isi Barang (Keterangan Spesifik)</label>
+										<input type="text" name="commodity_detail" class="form-control" placeholder="Contoh: IKAN TUNA SEGAR, SPAREPART MOTOR, dll" oninput="this.value = this.value.toUpperCase()" required>
+										<small class="text-muted">Ketik detail barang yang akan tertera di resi.</small>
+									</div>
+
+									<div class="col-md-6">
+										<div class="p-3 border rounded h-100">
+											<div class="form-check mb-2">
+												<input class="form-check-input" type="checkbox" name="is_valuable" id="is_valuable" value="1" disabled>
+												<label class="form-check-label text-danger fw-bold" for="is_valuable">
+													<?= tabler_icon('shield-check') ?> Proteksi Barang Berharga (Valuable Goods)
+													<small class="text-muted">Hanya untuk barang dengan nilai tinggi atau mudah rusak. Aktifkan jika diperlukan untuk perlindungan ekstra. (Coming soon)</small>
+												</label>
+											</div>
+											<div class="d-none" id="wrap_goods_value">
+												<label class="form-label text-danger">Estimasi Nilai Barang (Rp)</label>
+												<div class="input-group">
+													<span class="input-group-text">Rp</span>
+													<input type="text" name="goods_value" id="goods_value" class="form-control border-danger indo-format" placeholder="0">
+												</div>
+											</div>
+										</div>
+									</div>
+
+									<div class="col-md-6 mb-3">
+										<label class="form-label required">Metode Pembayaran</label>
+										<select name="payment_type" class="form-select" required>
+											<option value="TRANSFER">TRANSFER (PREPAID)</option>
+											<option value="CASH">TUNAI (CASH)</option>
+										</select>
+									</div>
+									<div class="col-12 mt-1">
+										<hr class="my-2">
+										<label class="form-label required">Foto Barang</label>
+										<input type="file" name="shipment_photo" id="shipment_photo" class="form-control" accept="image/jpeg, image/png, image/jpg" required>
+										<small class="form-hint">Format: JPG, JPEG, PNG. Maks. 2MB.</small>
+										<div class="mt-2 d-none" id="preview-container">
+											<img id="photo-preview" src="" alt="Preview Foto Barang" class="img-fluid rounded border" style="max-height: 200px;">
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="card mt-3 border-primary border-2">
+							<div class="card-body">
+								<label class="form-check form-switch">
+									<input class="form-check-input" type="checkbox" name="use_pickup" id="use_pickup" value="1">
+									<span class="form-check-label fw-bold">Request Pickup Barang Customer (Penjemputan)</span>
+								</label>
+
+								<div id="pickup_detail" class="mt-3 d-none">
+									<label class="form-label required">Area Penjemputan</label>
+									<select name="pickup_rate_id" id="pickup_rate_id" class="form-select trigger-price">
+										<option value="">- Pilih Area -</option>
+										<?php
+										$rates = $this->db->get_where('master_pickup_rates', ['is_active' => 1])->result();
+										foreach ($rates as $r):
+										?>
+											<option value="<?= $r->id ?>" data-price="<?= $r->price_smesco ?>">
+												<?= $r->area_name ?> (Rp <?= number_format($r->price_smesco) ?>)
+											</option>
+										<?php endforeach; ?>
+									</select>
+									<small class="text-danger">* Minimal penjemputan adalah 50 Kg.</small>
+								</div>
+							</div>
+						</div>
+					</div>
+
 					<div class="col-md-6">
 						<div class="card">
 							<div class="card-header">
@@ -62,12 +152,19 @@
 							</div>
 							<div class="card-body">
 								<div class="mb-3">
+									<label class="form-label required">No. WhatsApp</label>
+									<input type="text" name="sender_phone" id="telepon_pengirim" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: 081234567890" required>
+								</div>
+								<div class="mb-3">
 									<label class="form-label required">Nama Pengirim</label>
 									<input type="text" name="sender_name" id="nama_pengirim" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Budi Santoso / PT. Maju Jaya" required>
 								</div>
 								<div class="mb-3">
-									<label class="form-label required">No. WhatsApp</label>
-									<input type="text" name="sender_phone" id="telepon_pengirim" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: 081234567890" required>
+									<label class="form-label">NIK (Nomor KTP)</label>
+									<input type="text" name="sender_nik" id="nik_pengirim" class="form-control"
+										maxlength="16" placeholder="16 digit nomor KTP"
+										oninput="this.value = this.value.replace(/\D/g, '')">
+									<small class="text-muted">Opsional. Diperlukan untuk barang berharga.</small>
 								</div>
 								<div class="mb-3">
 									<label class="form-label required">Provinsi</label>
@@ -154,98 +251,57 @@
 						</div>
 					</div>
 
-					<div class="col-12">
-						<div class="card">
-							<div class="card-header">
-								<h3 class="card-title">Detail Barang & Pembayaran</h3>
+					<div class="col-12 mt-3">
+						<div class="card border-info">
+							<div class="card-header bg-info-lt">
+								<h3 class="card-title text-info"><?= tabler_icon('box') ?> Layanan Tambahan (Opsional)</h3>
 							</div>
 							<div class="card-body">
-								<div class="row">
-									<div class="col-md-6 mb-3">
-										<label class="form-label required">Kategori Komoditi (IATA)</label>
-										<select name="commodity_id" class="form-select select2" required>
-											<option value="">- Pilih Kategori -</option>
-											<?php foreach ($commodities as $cmd): ?>
-												<option value="<?= $cmd->id ?>">[<?= $cmd->code ?>] <?= $cmd->name ?></option>
-											<?php endforeach; ?>
-										</select>
-										<small class="text-muted">Pilih kategori besar untuk menentukan penanganan kargo.</small>
-									</div>
-
-									<div class="col-md-6 mb-3">
-										<label class="form-label required">Isi Barang (Keterangan Spesifik)</label>
-										<input type="text" name="commodity_detail" class="form-control" placeholder="Contoh: IKAN TUNA SEGAR, SPAREPART MOTOR, dll" oninput="this.value = this.value.toUpperCase()" required>
-										<small class="text-muted">Ketik detail barang yang akan tertera di resi.</small>
-									</div>
-
-									<div class="col-md-6">
-										<div class="p-3 border rounded">
-											<div class="form-check mb-2">
-												<input class="form-check-input" type="checkbox" name="is_valuable" id="is_valuable" value="1" disabled>
-												<label class="form-check-label text-danger fw-bold" for="is_valuable">
-													<?= tabler_icon('shield-check') ?> Proteksi Barang Berharga (Valuable Goods) 
-													<small class="text-muted">Hanya untuk barang dengan nilai tinggi atau mudah rusak. Aktifkan jika diperlukan untuk perlindungan ekstra. (Coming soon)</small>
-												</label>
-											</div>
-											<div class="d-none" id="wrap_goods_value">
-												<label class="form-label text-danger">Estimasi Nilai Barang (Rp)</label>
-												<div class="input-group">
-													<span class="input-group-text">Rp</span>
-													<input type="text" name="goods_value" id="goods_value" class="form-control border-danger indo-format" placeholder="0">
-												</div>
-											</div>
-										</div>
-									</div>
-
-									<div class="col-md-6 mb-3">
-										<label class="form-label required">Metode Pembayaran</label>
-										<select name="payment_type" class="form-select" required>
-											<option value="TRANSFER">TRANSFER (PREPAID)</option>
-											<option value="CASH">TUNAI (CASH)</option>
-										</select>
-									</div>
-								</div>
-							</div>
-						</div>
-
-						<div class="card mt-3">
-							<div class="card-header">
-								<h3 class="card-title">Bukti Fisik Barang</h3>
-							</div>
-							<div class="card-body">
-								<div class="mb-3">
-									<label class="form-label required">Upload Foto Barang</label>
-									<input type="file" name="shipment_photo" id="shipment_photo" class="form-control" accept="image/jpeg, image/png, image/jpg" required>
-									<small class="form-hint">Format yang diizinkan: JPG, JPEG, PNG. Maksimal ukuran 2MB.</small>
-								</div>
-
-								<div class="mt-2 d-none" id="preview-container">
-									<img id="photo-preview" src="" alt="Preview Foto Barang" class="img-fluid rounded border" style="max-height: 200px;">
-								</div>
-							</div>
-						</div>
-
-						<div class="card mt-3 border-primary">
-							<div class="card-body">
-								<label class="form-check form-switch">
-									<input class="form-check-input" type="checkbox" name="use_pickup" id="use_pickup" value="1">
-									<span class="form-check-label fw-bold">Request Pickup Barang Customer (Penjemputan)</span>
-								</label>
-
-								<div id="pickup_detail" class="mt-3 d-none">
-									<label class="form-label required">Area Penjemputan</label>
-									<select name="pickup_rate_id" id="pickup_rate_id" class="form-select trigger-price">
-										<option value="">- Pilih Area -</option>
+								<div class="row g-3">
+									<?php foreach ($addons as $addon): ?>
 										<?php
-										$rates = $this->db->get_where('master_pickup_rates', ['is_active' => 1])->result();
-										foreach ($rates as $r):
+										// Sesuaikan icon dan deskripsi visual berdasarkan tipe Add-on
+										$icon = 'plus';
+										$desc = '';
+										$color = 'blue';
+
+										if ($addon->code == 'REPACK') {
+											$icon = 'package';
+											$color = 'blue';
+											$desc = 'P x L x T x ' . $addon->base_factor . ' per koli';
+										} elseif ($addon->code == 'KAYU') {
+											$icon = 'box';
+											$color = 'brown';
+											$desc = 'Ekstra aman (P+10 x L+10 x T+10)';
+										} elseif ($addon->code == 'BUBBLE') {
+											$icon = 'circles';
+											$color = 'teal';
+											$desc = 'Flat Rp ' . number_format($addon->base_factor, 0, ',', '.') . ' / Koli';
+										}
 										?>
-											<option value="<?= $r->id ?>" data-price="<?= $r->price_smesco ?>">
-												<?= $r->area_name ?> (Rp <?= number_format($r->price_smesco) ?>)
-											</option>
-										<?php endforeach; ?>
-									</select>
-									<small class="text-danger">* Minimal penjemputan adalah 50 Kg.</small>
+										<div class="col-md-4">
+											<label class="form-selectgroup-item flex-fill h-100">
+												<input type="checkbox" name="addons[]" value="<?= $addon->code ?>"
+													class="form-selectgroup-input chk-addon"
+													data-method="<?= $addon->calc_method ?>"
+													data-factor="<?= $addon->base_factor ?>"
+													data-name="<?= html_escape($addon->name) ?>">
+
+												<div class="form-selectgroup-label d-flex align-items-center p-3 h-100">
+													<div class="me-3">
+														<span class="form-selectgroup-check"></span>
+													</div>
+													<div class="form-selectgroup-label-content d-flex align-items-center">
+														<span class="bg-<?= $color ?>-lt avatar me-3"><?= tabler_icon($icon) ?></span>
+														<div class="text-start">
+															<div class="fw-bold mb-1"><?= html_escape($addon->name) ?></div>
+															<div class="text-muted small"><?= $desc ?></div>
+														</div>
+													</div>
+												</div>
+											</label>
+										</div>
+									<?php endforeach; ?>
 								</div>
 							</div>
 						</div>
@@ -322,17 +378,35 @@
 
 				<div class="card bg-primary-lt">
 					<div class="card-body">
-						<div class="d-flex justify-content-between align-items-center mb-2">
+						<div class="d-flex justify-content-between align-items-center mb-3">
 							<span class="text-muted">Harga / Kg</span>
 							<div class="text-end">
 								<span id="badge-tiered" class="badge bg-purple-lt d-none mb-1">
 									<?= tabler_icon('layers-difference', 'icon-sm me-1') ?> Tiered Pricing Active
 								</span>
 								<br>
-								<span class="font-weight-bold h4 mb-0" id="lbl_price">Rp 0</span>
+								<span class="font-weight-bold h3 mb-0" id="lbl_price">Rp 0</span>
 							</div>
 						</div>
-						<hr class="my-2">
+
+						<hr class="my-3 border-secondary opacity-25">
+
+						<div class="text-muted fw-bold mb-2 small text-uppercase tracking-wide">Rincian Tagihan</div>
+
+						<div class="d-flex justify-content-between align-items-center mb-2">
+							<span class="text-dark small">Biaya Pengiriman</span>
+							<span class="fw-bold text-dark small" id="lbl_shipping_cost">Rp 0</span>
+						</div>
+
+						<div class="d-flex justify-content-between align-items-center mb-2 d-none" id="row_pickup_cost">
+							<span class="text-dark small">Biaya Penjemputan</span>
+							<span class="fw-bold text-dark small" id="lbl_pickup_cost">Rp 0</span>
+						</div>
+
+						<div id="addon_summary_container"></div>
+
+						<hr class="my-3 border-secondary opacity-25">
+
 						<div class="d-flex justify-content-between align-items-center">
 							<span class="h3 mb-0">Total Biaya</span>
 							<span class="h1 mb-0 text-primary" id="lbl_total">Rp 0</span>
@@ -437,7 +511,10 @@
 			let actual = parseIndoNumber(inputActual.value);
 			let totalVolume = 0;
 			let totalKoli = 0;
+			let totalAddonFee = 0;
+			let activeAddons = []; // Buat nampung rincian addon yang terpilih
 
+			// 1. Hitung Volume & Koli Dasar Dulu
 			document.querySelectorAll('.dim-row').forEach(row => {
 				let p = parseIndoNumber(row.querySelector('.dim-p').value);
 				let l = parseIndoNumber(row.querySelector('.dim-l').value);
@@ -450,6 +527,43 @@
 				}
 			});
 
+			// 2. Hitung Rincian Add-on (FULL DYNAMIC)
+			document.querySelectorAll('.chk-addon:checked').forEach(chk => {
+				let method = chk.dataset.method; // Ambil metode hitungnya dari DB
+				let factor = parseFloat(chk.dataset.factor);
+				let name = chk.dataset.name;
+				let feePerItem = 0;
+
+				// Looping dimensi khusus buat ngitung addon ini
+				document.querySelectorAll('.dim-row').forEach(row => {
+					let p = parseIndoNumber(row.querySelector('.dim-p').value);
+					let l = parseIndoNumber(row.querySelector('.dim-l').value);
+					let t = parseIndoNumber(row.querySelector('.dim-t').value);
+					let q = parseIndoNumber(row.querySelector('.dim-qty').value);
+
+					if (q > 0) {
+						// Logic perhitungannya dikendalikan oleh calc_method dari Database
+						if (method === 'VOLUME') {
+							feePerItem += (p * l * t * factor) * q;
+						} else if (method === 'VOLUME_PLUS') {
+							// Asumsi Packing Kayu nambah 10cm tiap sisi
+							feePerItem += ((p + 10) * (l + 10) * (t + 10) * factor) * q;
+						} else if (method === 'PER_KOLI') {
+							feePerItem += (factor * q);
+						}
+					}
+				});
+
+				if (feePerItem > 0) {
+					totalAddonFee += feePerItem;
+					activeAddons.push({
+						name: name,
+						fee: feePerItem
+					});
+				}
+			});
+
+			// 3. Render Ringkasan (UI)
 			totalKoliDisplay.value = totalKoli > 0 ? totalKoli : 1;
 			lblVolume.innerText = formatIndoNumber(totalVolume.toFixed(2));
 
@@ -458,18 +572,55 @@
 			chargeable = Math.ceil(chargeable);
 			lblChargeable.innerText = formatIndoNumber(chargeable);
 
+			// --- 1. HITUNG & TAMPILKAN BIAYA KIRIM ---
+			let shippingCost = chargeable * currentPricePerKg;
+			document.getElementById('lbl_shipping_cost').innerText = formatRp(shippingCost);
+
+			// --- 2. HITUNG & TAMPILKAN BIAYA PICKUP ---
 			let pickupFee = 0;
+			const rowPickup = document.getElementById('row_pickup_cost');
+
 			if (usePickupCheck.checked && pickupSelect.value !== "") {
 				const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
 				pickupFee = parseFloat(selectedOption.dataset.price || 0);
+
+				// Tampilkan baris pickup dan set angkanya
+				document.getElementById('lbl_pickup_cost').innerText = formatRp(pickupFee);
+				rowPickup.classList.remove('d-none');
+			} else {
+				// Sembunyikan kalau tidak pakai pickup
+				rowPickup.classList.add('d-none');
 			}
 
-			let shippingCost = chargeable * currentPricePerKg;
-			let grandTotal = shippingCost + pickupFee;
+			// --- 3. RENDER LAYANAN TAMBAHAN (ADD-ONS) ---
+			const addonContainer = document.getElementById('addon_summary_container');
+			addonContainer.innerHTML = ''; // Bersihkan kontainer
+
+			if (activeAddons.length > 0) {
+				let htmlList = `<div class="mt-2 mb-1 text-muted fw-bold small">Layanan Tambahan:</div>`;
+
+				activeAddons.forEach(item => {
+					htmlList += `
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                     <span class="text-muted small ps-2">&bull; ${item.name}</span>
+                     <span class="fw-bold text-warning small">+ ${formatRp(item.fee)}</span>
+                  </div>
+               `;
+				});
+				addonContainer.innerHTML = htmlList;
+			}
+
+			// --- 4. GRAND TOTAL ---
+			let grandTotal = shippingCost + pickupFee + totalAddonFee;
 
 			lblTotal.innerText = formatRp(grandTotal);
 			btnSubmit.disabled = (shippingCost <= 0);
 		}
+
+		// Jangan lupa pasang event listener buat checkbox Add-on biar kalau diklik, harganya langsung update
+		document.querySelectorAll('.chk-addon').forEach(chk => {
+			chk.addEventListener('change', calculateAll);
+		});
 
 		// ==========================================
 		// AJAX: CEK HARGA
@@ -517,32 +668,83 @@
 			}
 		}
 
+		// ── Autocomplete Customer (by Phone) ──
+		function initCustomerAutocomplete() {
+			$('#telepon_pengirim').autocomplete({
+				source: function(request, response) {
+					$.ajax({
+						url: "<?= site_url('shipment/autocomplete_customer') ?>",
+						type: "GET",
+						dataType: "json",
+						data: {
+							term: request.term
+						},
+						success: function(data) {
+							response($.map(data, function(item) {
+								return {
+									label: item.phone + ' — ' + item.name,
+									value: item.phone,
+									data: item
+								};
+							}));
+						}
+					});
+				},
+				minLength: 3,
+				select: function(event, ui) {
+					event.preventDefault();
+					const c = ui.item.data;
 
+					// Fill field dasar
+					$('#telepon_pengirim').val(c.phone);
+					$('#nama_pengirim').val(c.name);
+					$('#nik_pengirim').val(c.nik || '');
+					$('#alamat_pengirim').val(c.address_detail || '');
 
-		// --- Autocomplete Logic (Tetap Sama) ---
-		// if (jQuery().autocomplete) {
-		// 	$("#nama_pengirim, #nama_penerima").autocomplete({
-		// 		source: function(request, response) {
-		// 			$.ajax({
-		// 				url: "<?= site_url('shipment/autocompleteCustomer') ?>",
-		// 				dataType: "json",
-		// 				data: {
-		// 					term: request.term
-		// 				},
-		// 				success: function(data) {
-		// 					response(data);
-		// 				}
-		// 			});
-		// 		},
-		// 		minLength: 2,
-		// 		select: function(event, ui) {
-		// 			const prefix = event.target.id === 'nama_pengirim' ? 'pengirim' : 'penerima';
-		// 			$(`#nama_${prefix}`).val(ui.item.nama_customer);
-		// 			$(`#telepon_${prefix}`).val(ui.item.telepon_customer);
-		// 			$(`#alamat_${prefix}`).val(ui.item.alamat_customer);
-		// 		}
-		// 	});
-		// }
+					// Auto-fill cascade wilayah
+					if (c.provinsi_id) {
+						fillWilayah('sender', c);
+					}
+				}
+			});
+		}
+
+		// Helper: auto-fill cascade wilayah sender dari data customer
+		function fillWilayah(type, c) {
+			const selProv = $(`#${type}_provinsi`);
+			const selKota = $(`#${type}_kota`);
+			const selKec = $(`#${type}_kecamatan`);
+			const selKel = $(`#${type}_kelurahan`);
+
+			// 1. Set & trigger provinsi
+			selProv.val(c.provinsi_id).trigger('change');
+
+			// 2. Tunggu kota selesai load, lalu set
+			const waitKota = setInterval(function() {
+				if (selKota.find(`option[value="${c.kota_id}"]`).length) {
+					clearInterval(waitKota);
+					selKota.val(c.kota_id).trigger('change');
+
+					// 3. Tunggu kecamatan selesai load
+					const waitKec = setInterval(function() {
+						if (selKec.find(`option[value="${c.kecamatan_id}"]`).length) {
+							clearInterval(waitKec);
+							selKec.val(c.kecamatan_id).trigger('change');
+
+							// 4. Tunggu kelurahan selesai load
+							const waitKel = setInterval(function() {
+								if (selKel.find(`option[value="${c.kelurahan_id}"]`).length) {
+									clearInterval(waitKel);
+									selKel.val(c.kelurahan_id).trigger('change');
+								}
+							}, 100);
+						}
+					}, 100);
+				}
+			}, 100);
+		}
+
+		initCustomerAutocomplete();
 
 		// ==========================================
 		// EVENT LISTENERS
