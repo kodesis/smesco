@@ -480,7 +480,11 @@ class Master extends Authenticated_Controller
 				]
 			]);
 		} else {
-			echo json_encode(['status' => false, 'message' => 'Harga tidak ditemukan.']);
+			echo json_encode(['status' => false, 'message' => 'Harga tidak ditemukan.',
+				'origin'          => $origin,
+				'destination'     => $destination,
+				'service_type_id' => $service_type_id,
+				'is_active'       => 1]);
 		}
 	}
 

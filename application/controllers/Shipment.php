@@ -361,6 +361,7 @@ class Shipment extends Authenticated_Controller
 				'shipment_photo' 			  => $photo_path,
 				'payment_expired_at'  	  => $payment_expired_at,
 				'status'            		  => 'BOOKED',
+				'is_lartas_agreed'  => $this->input->post('is_lartas_agreed') ?? 1,
 				'created_by'        		  => $sess['id']
 			];
 
@@ -453,12 +454,174 @@ class Shipment extends Authenticated_Controller
 		// Tampilan Form
 		$data = [
 			'title'       => 'Buat Booking',
-			'cities'      => $this->M_Pricelist->get_cities(),
-			'services'    => $this->M_Pricelist->get_services(),
+			'cities'      => $this->db->select('destination')->where('category', 'DOMESTIC')->group_by('destination')->get('pricelist')->result(),
+			'services'    => $this->M_Pricelist->get_services('DOMESTIC'),
 			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
 			'addons'      => $this->db->get_where('master_addons', ['is_active' => 1])->result()
 		];
 		$this->render('app/pages/shipment/create', $data);
+	}
+
+	public function create_intl()
+	{
+		$this->_check_access();
+
+		// Nanti lu butuh master data negara untuk dropdown tujuan internasional
+		$data = [
+			'title'     => 'Buat Booking (Internasional)',
+			'cities'    => $this->M_Pricelist->get_cities(), // Asal (Origin)
+			'countries' => $this->db->select('destination')->where('category', 'INTERNATIONAL')->get('pricelist')->result(), // Tujuan (Destination)
+			'services'  => $this->M_Pricelist->get_services('INTERNATIONAL'),
+			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
+			'addons'    => $this->db->get_where('master_addons', ['is_active' => 1])->result()
+		];
+
+		$this->render('app/pages/shipment/create_intl', $data);
+	}
+
+	public function save_intl()
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		// 1. Upload Foto Barang Dulu
+		$config['upload_path']   = FCPATH . 'uploads/shipments/';
+		$config['allowed_types'] = 'jpg|jpeg|png';
+		$config['max_size']      = 2048; // 2MB
+		$config['encrypt_name']  = TRUE;
+
+		$this->load->library('upload', $config);
+
+		if (!$this->upload->do_upload('shipment_photo')) {
+			$this->session->set_flashdata('error', $this->upload->display_errors('', ''));
+			redirect('shipment/create_intl');
+		}
+
+		$photo_data = $this->upload->data();
+
+		$this->db->trans_start(); // Mulai Transaksi
+
+		// Generate Resi Internasional (Contoh: SXP-INTL-2604001)
+		$no_resi = 'SXP-INTL-' . date('ymd') . strtoupper(substr(md5(time()), 0, 4));
+
+		// 2. Simpan Data Utama (Parent)
+		$data_shipment = [
+			'no_resi'             => $no_resi,
+			'agent_id'            => $sess['agent_id'] ?? NULL,
+			'category'            => 'INTERNATIONAL', // Penanda rute luar negeri
+			'origin'              => $this->input->post('origin', TRUE),
+			'destination'         => $this->input->post('destination_country', TRUE),
+			'service_type_id'     => $this->input->post('service_type_id', TRUE),
+
+			// Barang & Bea Cukai
+			'commodity_id'        => $this->input->post('commodity_id', TRUE),
+			'commodity_detail'    => $this->input->post('commodity_detail', TRUE),
+			'commodity_detail_en' => $this->input->post('commodity_detail_en', TRUE),
+			'customs_value_usd'   => str_replace(',', '.', $this->input->post('customs_value_usd', TRUE)), // Format desimal
+			'payment_type'        => $this->input->post('payment_type', TRUE),
+			'photo_path'          => 'uploads/shipments/' . $photo_data['file_name'],
+
+			// Pengirim
+			'sender_phone'        => $this->input->post('sender_phone', TRUE),
+			'sender_name'         => $this->input->post('sender_name', TRUE),
+			'sender_nik'          => $this->input->post('sender_nik', TRUE),
+			'sender_provinsi'     => $this->input->post('sender_provinsi', TRUE),
+			'sender_kota'         => $this->input->post('sender_kota', TRUE),
+			'sender_kecamatan'    => $this->input->post('sender_kecamatan', TRUE),
+			'sender_kelurahan'    => $this->input->post('sender_kelurahan', TRUE),
+			'sender_address_detail' => $this->input->post('sender_address_detail', TRUE),
+
+			// Penerima Internasional
+			'receiver_name'       => $this->input->post('receiver_name', TRUE),
+			'receiver_phone'      => $this->input->post('receiver_phone', TRUE),
+			'receiver_kota'       => $this->input->post('receiver_city', TRUE), // Disimpan sbg teks
+			'receiver_zipcode'    => $this->input->post('receiver_zipcode', TRUE),
+			'receiver_address_detail' => $this->input->post('receiver_address_detail', TRUE),
+
+			// Data Berat
+			'actual_weight'       => str_replace(',', '.', $this->input->post('actual_weight', TRUE)),
+
+			// Status Awal
+			'status'              => 'READY_TO_PICKUP',
+			'is_lartas_agreed'  => $this->input->post('is_lartas_agreed') ?? 1,
+			'created_by'          => $sess['id'],
+			'created_at'          => date('Y-m-d H:i:s')
+		];
+
+		// Insert ke tabel shipments
+		$this->db->insert('shipments', $data_shipment);
+		$shipment_id = $this->db->insert_id();
+
+		// 3. Simpan Dimensi Koli (Array Input)
+		$dim_length = $this->input->post('dim_length');
+		$dim_width  = $this->input->post('dim_width');
+		$dim_height = $this->input->post('dim_height');
+		$dim_qty    = $this->input->post('dim_qty');
+
+		if (!empty($dim_qty)) {
+			$data_dims = [];
+			foreach ($dim_qty as $key => $qty) {
+				if ($qty > 0) {
+					$data_dims[] = [
+						'shipment_id' => $shipment_id,
+						'length'      => str_replace(',', '.', $dim_length[$key]),
+						'width'       => str_replace(',', '.', $dim_width[$key]),
+						'height'      => str_replace(',', '.', $dim_height[$key]),
+						'qty'         => $qty
+					];
+				}
+			}
+			if (count($data_dims) > 0) {
+				$this->db->insert_batch('shipment_dimensions', $data_dims);
+			}
+		}
+
+		// 4. Simpan Layanan Tambahan (Addons)
+		$addons = $this->input->post('addons'); // Checkbox array
+		if (!empty($addons)) {
+			$data_addons = [];
+			foreach ($addons as $addon_code) {
+				$data_addons[] = [
+					'shipment_id' => $shipment_id,
+					'addon_code'  => $addon_code
+				];
+			}
+			$this->db->insert_batch('shipment_addons', $data_addons);
+		}
+
+		$this->db->trans_complete(); // Akhiri Transaksi
+
+		if ($this->db->trans_status() === FALSE) {
+			// Kalau gagal, hapus foto yang udah terlanjur ke-upload
+			unlink($config['upload_path'] . $photo_data['file_name']);
+			$this->session->set_flashdata('error', 'Gagal menyimpan data booking!');
+			redirect('shipment/create_intl');
+		} else {
+			if ($payment_type === 'TRANSFER') {
+				$url = base_url('home/confirm_payment/' . $no_resi);
+				$total_rp = number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.');
+
+				$pesan_user = "*SMESCO EXPRESS*\n\n" .
+					"*RESERVASI BERHASIL*\n" .
+					"---------------------\n\n" .
+					"No. Resi: *$no_resi*\n" .
+					"Atas Nama: *$sender_name*\n" .
+					"Rute: $origin - $destination\n" .
+					"Total Pembayaran: *Rp $total_rp*\n\n" .
+					"📤 *Upload bukti transfer dalam 10 menit:*\n" .
+					"$url\n\n" .
+					"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
+					"_Terima kasih telah memilih Smesco Express_";
+
+				try {
+					$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+				} catch (Exception $e) {
+					log_message('error', 'WA Notif Error: ' . $e->getMessage());
+				}
+			}
+			$this->session->set_flashdata('success', 'Booking Internasional berhasil dibuat! No Resi: ' . $no_resi);
+			redirect('shipment'); // Arahin ke halaman list shipment
+		}
 	}
 
 	public function detail($id)

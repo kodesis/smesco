@@ -53,9 +53,15 @@ class M_Pricelist extends MY_Model
 		return $this->db->select('id, code, name, is_active')->from('cities')->where('is_active', 1)->order_by('name')->get()->result();
 	}
 
-	public function get_services()
+	public function get_services($category = NULL)
 	{
-		return $this->db->select('id, code, name, description, is_active')->from('service_types')->where('is_active', 1)->order_by('name')->get()->result();
+		$this->db->select('id, code, name, description, is_active')->from('service_types')->where('is_active', 1);
+
+		if ($category) {
+			$this->db->where('category', $category);
+		}
+		
+		return $this->db->order_by('name')->get()->result();
 	}
 
 	public function get_detail($id)

@@ -9,21 +9,22 @@
 
 <div class="page-body">
 	<div class="container-xl">
+
 		<div class="mb-4">
 			<ul class="nav nav-tabs" data-bs-toggle="tabs">
 				<li class="nav-item">
-					<a href="<?= site_url('shipment/create') ?>" class="nav-link active fw-bold text-primary">
+					<a href="<?= site_url('shipment/create') ?>" class="nav-link text-muted">
 						<?= tabler_icon('truck', 'me-1') ?> Pengiriman Domestik
 					</a>
 				</li>
 				<li class="nav-item">
-					<a href="<?= site_url('shipment/create_intl') ?>" class="nav-link text-muted">
+					<a href="<?= site_url('shipment/create_intl') ?>" class="nav-link active fw-bold text-primary">
 						<?= tabler_icon('plane-departure', 'me-1') ?> Pengiriman Internasional
 					</a>
 				</li>
 			</ul>
 		</div>
-		<?= form_open_multipart('shipment/create', ['id' => 'form-booking']) ?>
+		<?= form_open_multipart('shipment/create_intl', ['id' => 'form-booking-intl']) ?>
 
 		<div class="row row-cards">
 			<div class="col-lg-8">
@@ -40,24 +41,20 @@
 									<select name="origin" id="origin" class="form-select trigger-price select2" required>
 										<option value="">- Pilih Asal -</option>
 										<option value="JAKARTA">JAKARTA</option>
-										<!-- <?php foreach ($cities as $c):
-													if ($c->destination == 'ALOR') : ?>
-											<?php
-													endif ?>
-										<?php endforeach; ?> -->
 									</select>
 								</div>
 								<div class="col-md-4 mb-3">
-									<label class="form-label required">Kota Tujuan</label>
-									<select name="destination" id="destination" class="form-select trigger-price select2" required>
-										<option value="">- Pilih Tujuan -</option>
-										<?php foreach ($cities as $c): ?>
-											<option value="<?= $c->destination ?>"><?= $c->destination ?></option>
-										<?php endforeach; ?>
+									<label class="form-label required">Negara Tujuan</label>
+									<select name="destination_country" id="destination" class="form-select trigger-price select2" required>
+										<option value="">- Pilih Negara -</option>
+										<?php if (isset($countries)): foreach ($countries as $ctr): ?>
+												<option value="<?= $ctr->destination ?>"><?= $ctr->destination ?></option>
+										<?php endforeach;
+										endif; ?>
 									</select>
 								</div>
 								<div class="col-md-4 mb-3">
-									<label class="form-label required">Layanan</label>
+									<label class="form-label required">Layanan (Ekspor)</label>
 									<select name="service_type_id" id="service_type_id" class="form-select trigger-price select2" required>
 										<option value="">- Pilih Layanan -</option>
 										<?php foreach ($services as $s): ?>
@@ -94,7 +91,17 @@
 										<small class="text-muted">Ketik detail barang yang akan tertera di resi.</small>
 									</div>
 
-									<div class="col-md-6">
+
+
+									<div class="col-md-6 mb-3">
+										<label class="form-label required">Metode Pembayaran</label>
+										<select name="payment_type" class="form-select" required>
+											<option value="TRANSFER">TRANSFER (PREPAID)</option>
+											<option value="CASH">TUNAI (CASH)</option>
+										</select>
+									</div>
+
+									<div class="col-md-6 mb-3">
 										<div class="p-3 border rounded h-100">
 											<div class="form-check mb-2">
 												<input class="form-check-input" type="checkbox" name="is_valuable" id="is_valuable" value="1" disabled>
@@ -114,12 +121,19 @@
 									</div>
 
 									<div class="col-md-6 mb-3">
-										<label class="form-label required">Metode Pembayaran</label>
-										<select name="payment_type" class="form-select" required>
-											<option value="TRANSFER">TRANSFER (PREPAID)</option>
-											<option value="CASH">TUNAI (CASH)</option>
-										</select>
+										<label class="form-label required">Isi Barang (English Description)</label>
+										<input type="text" name="commodity_detail_en" class="form-control" placeholder="e.g. CASSAVA CHIPS, COTTON T-SHIRT" oninput="this.value = this.value.toUpperCase()" required>
+										<small class="text-muted">Wajib bahasa Inggris untuk keperluan Bea Cukai tujuan.</small>
 									</div>
+									<div class="col-md-6 mb-3">
+										<label class="form-label required">Nilai Barang (Customs Value - USD)</label>
+										<div class="input-group">
+											<span class="input-group-text">US$</span>
+											<input type="text" name="customs_value_usd" class="form-control indo-format" placeholder="0,00" required>
+										</div>
+										<small class="text-muted">Estimasi harga barang untuk pajak masuk.</small>
+									</div>
+
 									<div class="col-12 mt-1">
 										<hr class="my-2">
 										<label class="form-label required">Foto Barang</label>
@@ -219,47 +233,33 @@
 
 					<div class="col-md-6">
 						<div class="card">
-							<div class="card-header">
-								<h3 class="card-title">Data Penerima</h3>
+							<div class="card-header bg-success-lt">
+								<h3 class="card-title text-success"><?= tabler_icon('user-check') ?> Data Penerima (Consignee)</h3>
 							</div>
 							<div class="card-body">
 								<div class="mb-3">
-									<label class="form-label required">Nama Penerima</label>
-									<input type="text" name="receiver_name" id="nama_penerima" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Ahmad Dahlan / CV. Lintas Nusantara" required>
+									<label class="form-label required">Nama Penerima / Perusahaan</label>
+									<input type="text" name="receiver_name" id="nama_penerima" class="form-control" oninput="this.value = this.value.toUpperCase()" required>
 								</div>
 								<div class="mb-3">
-									<label class="form-label required">No. WhatsApp</label>
-									<input type="text" name="receiver_phone" id="telepon_penerima" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: 081234567890" required>
+									<label class="form-label required">No. Telepon / WhatsApp (Gunakan Kode Negara)</label>
+									<input type="text" name="receiver_phone" id="telepon_penerima" class="form-control" placeholder="Contoh: +60123456789" required>
 								</div>
-								<div class="mb-3">
-									<label class="form-label required">Provinsi</label>
-									<select name="receiver_provinsi" id="receiver_provinsi" class="form-select" required>
-										<option value="">- Pilih Provinsi -</option>
-									</select>
-								</div>
+
 								<div class="row g-2 mb-3">
-									<div class="col-6">
-										<label class="form-label required">Kota/Kabupaten</label>
-										<select name="receiver_kota" id="receiver_kota" class="form-select" required disabled>
-											<option value="">- Pilih Kota -</option>
-										</select>
+									<div class="col-8">
+										<label class="form-label required">Kota / State / Province</label>
+										<input type="text" name="receiver_city" class="form-control" oninput="this.value = this.value.toUpperCase()" placeholder="e.g. KUALA LUMPUR / CALIFORNIA" required>
 									</div>
-									<div class="col-6">
-										<label class="form-label required">Kecamatan</label>
-										<select name="receiver_kecamatan" id="receiver_kecamatan" class="form-select" required disabled>
-											<option value="">- Pilih Kecamatan -</option>
-										</select>
+									<div class="col-4">
+										<label class="form-label required">Zip/Postal Code</label>
+										<input type="text" name="receiver_zipcode" class="form-control" placeholder="e.g. 50450" required>
 									</div>
 								</div>
+
 								<div class="mb-3">
-									<label class="form-label required">Kelurahan / Desa</label>
-									<select name="receiver_kelurahan" id="receiver_kelurahan" class="form-select" required disabled>
-										<option value="">- Pilih Kelurahan -</option>
-									</select>
-								</div>
-								<div class="mb-3">
-									<label class="form-label required">Detail Jalan / Gedung / RT RW</label>
-									<textarea name="receiver_address_detail" id="alamat_penerima" class="form-control" rows="2" oninput="this.value = this.value.toUpperCase()" placeholder="Contoh: Jl. Merdeka No. 45, Blok B, RT 03/RW 05" required></textarea>
+									<label class="form-label required">Full Address (Jalan, Blok, Unit)</label>
+									<textarea name="receiver_address_detail" id="alamat_penerima" class="form-control" rows="3" oninput="this.value = this.value.toUpperCase()" required></textarea>
 								</div>
 							</div>
 						</div>
@@ -869,7 +869,7 @@
 			}
 		});
 
-		const form = document.getElementById('form-booking');
+		const form = document.getElementById('form-booking-intl');
 		form.addEventListener('submit', function(e) {
 			e.preventDefault();
 			if (!form.checkValidity()) {
@@ -1007,7 +1007,7 @@
 	// Di ready: JANGAN init select2-wilayah di sini
 	$(document).ready(function() {
 		initWilayah('sender');
-		initWilayah('receiver');
+		// initWilayah('receiver');
 	});
 
 	// Tambahkan di dalam blok <script> lu
