@@ -442,20 +442,156 @@
 							<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
 								<div class="modal-content">
 									<div class="modal-header bg-red-lt">
-										<h5 class="modal-title text-danger"><?= tabler_icon('alert-triangle') ?> Daftar Barang Larangan & Terbatas</h5>
+										<h5 class="modal-title text-danger fw-bold"><?= tabler_icon('alert-triangle', 'me-1') ?> Daftar Barang Larangan & Terbatas (LARTAS)</h5>
 										<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
 									</div>
 									<div class="modal-body text-dark">
-										<p>Sesuai dengan peraturan perundang-undangan di Indonesia (UU Penerbangan, Kepabeanan, dll), barang-barang berikut dilarang untuk dikirimkan melalui Smesco Express:</p>
-										<ol class="small">
-											<li><strong>Narkotika & Obat Terlarang:</strong> Segala jenis narkoba, psikotropika, dan obat tanpa izin BPOM.</li>
-											<li><strong>Barang Berbahaya (Dangerous Goods):</strong> Bahan mudah meledak (kembang api, amunisi), bahan mudah terbakar (aerosol, alkohol murni), bahan kimia beracun, korosif, dan radioaktif.</li>
-											<li><strong>Senjata:</strong> Senjata api, senjata tajam, airsoft gun, dan replika senjata.</li>
-											<li><strong>Biologis & Makhluk Hidup:</strong> Hewan hidup, spesimen biologi, tanaman langka, dan barang berbau tajam (durian tanpa pengemasan khusus).</li>
-											<li><strong>Barang Ilegal:</strong> Uang palsu, dokumen rahasia negara, barang pornografi, dan barang curian.</li>
-										</ol>
-										<div class="alert alert-danger mt-3 mb-0 small">
-											<strong>Sanksi Hukum:</strong> Pengirim yang dengan sengaja mengirimkan barang terlarang akan dilaporkan ke pihak berwajib dan menanggung seluruh denda atau kerugian yang timbul.
+										<p class="mb-3">Sesuai dengan regulasi Keselamatan Penerbangan, Kepabeanan, dan <strong>Permendag No. 20 Tahun 2024</strong>, barang-barang berikut dilarang keras untuk diekspor / dikirimkan melalui Smesco Express:</p>
+
+										<h6 class="fw-bold text-danger mb-2">A. Kategori Komoditas Ekspor Terlarang (Permendag)</h6>
+										<div class="list-group list-group-flush list-group-hoverable mb-4">
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('tree') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Barang Bidang Kehutanan</div>
+														<div class="text-muted small" style="line-height: 1.4;">Meliputi kayu bulat, bahan baku kayu serpih, dan produk kehutanan mentah lainnya untuk menjaga kelestarian alam.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('seeding') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Barang Bidang Pertanian</div>
+														<div class="text-muted small" style="line-height: 1.4;">Meliputi rotan mentah, karet alam kualitas tertentu, dan bibit unggul untuk mengamankan bahan baku industri lokal.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('plant-2') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Pupuk Bersubsidi</div>
+														<div class="text-muted small" style="line-height: 1.4;">Segala jenis pupuk yang mendapatkan subsidi harga dari pemerintah, dikhususkan murni untuk ketahanan pangan dalam negeri.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('diamond') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Barang Bidang Pertambangan</div>
+														<div class="text-muted small" style="line-height: 1.4;">Bijih mineral dan hasil tambang yang belum melalui proses pemurnian (smelter). Dilarang diekspor mentah.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('building-monument') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Barang Cagar Budaya</div>
+														<div class="text-muted small" style="line-height: 1.4;">Benda bersejarah, artefak, dan warisan budaya nasional dilarang keras dikeluarkan dari wilayah Indonesia.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('settings') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Sisa dan Skrap Logam</div>
+														<div class="text-muted small" style="line-height: 1.4;">Limbah atau potongan logam rongsokan dilarang dikirim ke luar negeri untuk mencegah kelangkaan bahan baku daur ulang lokal.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('ripple') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Hasil Sedimentasi di Laut</div>
+														<div class="text-muted small" style="line-height: 1.4;">Meliputi pasir laut dan hasil pengerukan laut. Dilarang untuk mencegah kerusakan ekosistem biota laut.</div>
+													</div>
+												</div>
+											</div>
+
+										</div>
+
+										<h6 class="fw-bold text-danger mb-2 mt-4">B. Keamanan Penerbangan & Kargo (Dangerous Goods)</h6>
+										<div class="list-group list-group-flush list-group-hoverable mb-4">
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('pill') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Narkotika & Barang Ilegal</div>
+														<div class="text-muted small" style="line-height: 1.4;">Segala jenis narkoba, psikotropika, obat-obatan tanpa izin edar BPOM, serta barang ilegal seperti uang palsu.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('flame') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Barang Berbahaya (Dangerous Goods)</div>
+														<div class="text-muted small" style="line-height: 1.4;">Bahan mudah meledak (amunisi), gas bertekanan (aerosol), cairan mudah terbakar (alkohol murni, tiner), zat beracun, korosif, dan radioaktif.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('swords') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Senjata & Benda Tajam</div>
+														<div class="text-muted small" style="line-height: 1.4;">Senjata api, senjata tajam tempur, airsoft gun, dan segala jenis replika senjata tanpa kelengkapan surat izin kepolisian.</div>
+													</div>
+												</div>
+											</div>
+
+											<div class="list-group-item px-0 py-2">
+												<div class="d-flex align-items-start">
+													<span class="text-danger bg-red-lt p-1 rounded me-3 mt-1">
+														<?= tabler_icon('paw') ?>
+													</span>
+													<div>
+														<div class="fw-bold text-dark">Biologis & Makhluk Hidup</div>
+														<div class="text-muted small" style="line-height: 1.4;">Segala jenis hewan hidup, spesimen medis/biologi, dan tanaman langka yang dilarang oleh otoritas karantina bandara.</div>
+													</div>
+												</div>
+											</div>
+
+										</div>
+
+										<div class="alert alert-danger mt-4 mb-0 small">
+											<strong>Peringatan Hukum:</strong> Pengirim yang dengan sengaja mengirimkan barang terlarang akan dilaporkan ke pihak berwajib dan menanggung seluruh denda atau sanksi pidana yang timbul.
 										</div>
 									</div>
 									<div class="modal-footer">
