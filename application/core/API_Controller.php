@@ -41,7 +41,7 @@ abstract class API_Controller extends CI_Controller
 			$this->_respond(['status' => false, 'message' => 'IP ' . $ip . ' tidak diizinkan.'], 403);
 		}
 
-		if ($auth === 'LIMIT_EXCEEDED') {
+		if ($client === 'LIMIT_EXCEEDED') {
 			$this->_respond(['status' => false, 'message' => 'Batas request harian tercapai.'], 429);
 		}
 
