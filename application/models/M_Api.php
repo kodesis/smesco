@@ -77,4 +77,39 @@ class M_Api extends MY_Model
 			'user_agent'      => $ua
 		]);
 	}
+
+	// Cek berapa kali client hit API hari ini
+	public function count_hits_today($client_id)
+	{
+		return $this->db
+			->where('api_client_id', $client_id)
+			->where('DATE(created_at)', date('Y-m-d'))
+			->count_all_results('api_logs');
+	}
+
+	// Catat log request
+	public function write_log($data)
+	{
+		return $this->db->insert('api_logs', $data);
+	}
+
+	// Update validate_access: IP whitelist opsional
+	// public function validate_access($key, $ip)
+	// {
+	// 	$client = $this->db
+	// 		->where('api_key', $key)
+	// 		->where('is_active', 1)
+	// 		->get('api_clients')
+	// 		->row();
+
+	// 	if (!$client) return false;
+
+	// 	// Skip IP check kalau whitelist kosong
+	// 	if (!empty($client->ip_whitelist)) {
+	// 		$allowed_ips = array_map('trim', explode(',', $client->ip_whitelist));
+	// 		if (!in_array($ip, $allowed_ips)) return 'IP_BLOCKED';
+	// 	}
+
+	// 	return $client;
+	// }
 }

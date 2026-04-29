@@ -24,7 +24,7 @@
 				</li>
 			</ul>
 		</div>
-		<?= form_open_multipart('shipment/create_intl', ['id' => 'form-booking-intl']) ?>
+		<?= form_open_multipart('shipment/save_intl', ['id' => 'form-booking-intl']) ?>
 
 		<div class="row row-cards">
 			<div class="col-lg-8">

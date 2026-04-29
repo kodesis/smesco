@@ -52,3 +52,7 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 $route['default_controller'] = 'home';
 $route['404_override'] = 'Custom404';
 $route['translate_uri_dashes'] = FALSE;
+
+// ── Public API v1
+$route['api/v1/shipping/calculate']  = 'api/v1/shipping/calculate';
+$route['api/v1/tracking/(:any)']     = 'api/v1/tracking/get/$1';
