@@ -81,10 +81,10 @@ class Shipment extends Authenticated_Controller
 
 		if ($this->input->server('REQUEST_METHOD') === 'POST') {
 
-			echo '<pre>';
-			print_r($_POST);
-			echo '</pre>';
-			exit;
+			// echo '<pre>';
+			// print_r($_POST);
+			// echo '</pre>';
+			// exit;
 			// 1. Dapatkan Input Dasar
 			$origin      = $this->input->post('origin', TRUE);
 			$destination = $this->input->post('destination', TRUE);
@@ -210,12 +210,25 @@ class Shipment extends Authenticated_Controller
 							$t = $dim['height'];
 							$q = $dim['qty'];
 
+							// if ($addon->calc_method === 'VOLUME') {
+							// 	$fee += ($p * $l * $t * $addon->base_factor) * $q;
+							// } elseif ($addon->calc_method === 'VOLUME_PLUS') {
+							// 	$fee += (($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor) * $q;
+							// } elseif ($addon->calc_method === 'PER_KOLI') {
+							// 	$fee += $addon->base_factor * $q;
+							// }
+
+							$min = $addon->min_charge;
+
 							if ($addon->calc_method === 'VOLUME') {
-								$fee += ($p * $l * $t * $addon->base_factor) * $q;
+								$fee_per_koli = $p * $l * $t * $addon->base_factor;
+								$fee += max($fee_per_koli, $min) * $q;
 							} elseif ($addon->calc_method === 'VOLUME_PLUS') {
-								$fee += (($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor) * $q;
+								$fee_per_koli = ($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor;
+								$fee += max($fee_per_koli, $min) * $q;
 							} elseif ($addon->calc_method === 'PER_KOLI') {
-								$fee += $addon->base_factor * $q;
+								$fee_per_koli = $addon->base_factor;
+								$fee += max($fee_per_koli, $min) * $q;
 							}
 						}
 					} else {

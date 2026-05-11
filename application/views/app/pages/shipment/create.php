@@ -299,6 +299,7 @@
 													class="form-selectgroup-input chk-addon"
 													data-method="<?= $addon->calc_method ?>"
 													data-factor="<?= $addon->base_factor ?>"
+													data-min="<?= $addon->min_charge ?>"
 													data-name="<?= html_escape($addon->name) ?>">
 
 												<div class="form-selectgroup-label d-flex align-items-center p-3 h-100">
@@ -718,6 +719,7 @@
 				let factor = parseFloat(chk.dataset.factor);
 				let name = chk.dataset.name;
 				let feePerItem = 0;
+				const min = parseFloat(chk.dataset.min || 0);
 
 				// Looping dimensi khusus buat ngitung addon ini
 				document.querySelectorAll('.dim-row').forEach(row => {
@@ -727,15 +729,17 @@
 					let q = parseIndoNumber(row.querySelector('.dim-qty').value);
 
 					if (q > 0) {
+						let feeKoli = 0;
 						// Logic perhitungannya dikendalikan oleh calc_method dari Database
 						if (method === 'VOLUME') {
-							feePerItem += (p * l * t * factor) * q;
+							feeKoli = p * l * t * factor;
 						} else if (method === 'VOLUME_PLUS') {
-							// Asumsi Packing Kayu nambah 10cm tiap sisi
-							feePerItem += ((p + 10) * (l + 10) * (t + 10) * factor) * q;
+							feeKoli = (p + 10) * (l + 10) * (t + 10) * factor;
 						} else if (method === 'PER_KOLI') {
-							feePerItem += (factor * q);
+							feeKoli = factor;
 						}
+
+						feePerItem += Math.max(feeKoli, min) * q;
 					}
 				});
 
