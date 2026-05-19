@@ -467,7 +467,8 @@ class Shipment extends Authenticated_Controller
 		// Tampilan Form
 		$data = [
 			'title'       => 'Buat Booking',
-			'cities'      => $this->db->select('destination')->where('category', 'DOMESTIC')->group_by('destination')->get('pricelist')->result(),
+			'origins'	  => $this->db->select('origin')->where('category', 'DOMESTIC')->group_by('origin')->get('pricelist')->result(),
+			// 'cities'      => $this->db->select('destination')->where('category', 'DOMESTIC')->group_by('destination')->get('pricelist')->result(),
 			'services'    => $this->M_Pricelist->get_services('DOMESTIC'),
 			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
 			'addons'      => $this->db->get_where('master_addons', ['is_active' => 1])->result()
@@ -482,6 +483,7 @@ class Shipment extends Authenticated_Controller
 		// Nanti lu butuh master data negara untuk dropdown tujuan internasional
 		$data = [
 			'title'     => 'Buat Booking (Internasional)',
+			'origins'	  => $this->db->select('origin')->where('category', 'INTERNATIONAL')->group_by('origin')->get('pricelist')->result(),
 			'cities'    => $this->M_Pricelist->get_cities(), // Asal (Origin)
 			'countries' => $this->db->select('destination')->where('category', 'INTERNATIONAL')->get('pricelist')->result(), // Tujuan (Destination)
 			'services'  => $this->M_Pricelist->get_services('INTERNATIONAL'),

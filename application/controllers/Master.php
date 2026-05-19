@@ -344,6 +344,11 @@ class Master extends Authenticated_Controller
 		$this->_check_access();
 		$groups = $this->session->userdata('temp_import_pricelist');
 
+		// echo '<pre>';
+		// print_r($groups);
+		// echo '</pre>';
+		// exit;
+
 		if (empty($groups)) redirect('master/pricelist');
 
 		$this->db->trans_start();
@@ -365,8 +370,8 @@ class Master extends Authenticated_Controller
 				'min_weight_kg'   => $g['min_weight_kg'],
 				'is_active'       => 1,
 				// Jika DOMESTIC, ambil harga dari baris pertama tiers
-				'price_kribo'     => ($g['is_tiered'] == 0) ? $g['tiers']['price_kribo'] : 0,
-				'price_smesco'    => ($g['is_tiered'] == 0) ? $g['tiers']['price_smesco'] : 0,
+				'price_kribo'     => ($g['is_tiered'] == 0 && isset($g['tiers'][0])) ? $g['tiers'][0]['price_kribo'] : 0,
+				'price_smesco'    => ($g['is_tiered'] == 0 && isset($g['tiers'][0])) ? $g['tiers'][0]['price_smesco'] : 0,
 			];
 
 			if ($existing) {
@@ -658,7 +663,49 @@ class Master extends Authenticated_Controller
 			->get('mt_kelurahan')->result();
 		echo json_encode($kelurahan);
 	}
-	
+
+	public function ajax_get_domestic_destination_by_origin()
+	{
+		$origin = $this->input->get('origin', TRUE);
+		if (!$origin) {
+			echo json_encode([]);
+			return;
+		}
+
+		$destinations = $this->db
+			->select('destination')
+			->where('category', 'DOMESTIC')
+			->where('origin', $origin)
+			->where('is_active', 1)
+			->group_by('destination')
+			->order_by('destination', 'ASC')
+			->get('pricelist')
+			->result();
+
+		echo json_encode($destinations);
+	}
+
+	public function ajax_get_international_destination_by_origin()
+	{
+		$origin = $this->input->get('origin', TRUE);
+		if (!$origin) {
+			echo json_encode([]);
+			return;
+		}
+
+		$destinations = $this->db
+			->select('destination')
+			->where('category', 'INTERNATIONAL')
+			->where('origin', $origin)
+			->where('is_active', 1)
+			->group_by('destination')
+			->order_by('destination', 'ASC')
+			->get('pricelist')
+			->result();
+
+		echo json_encode($destinations);
+	}
+
 	// Fungsi helper internal untuk membersihkan format angka Indonesia
 	private function _parse_indo_number($str)
 	{

@@ -39,21 +39,20 @@
 									<label class="form-label required">Kota Asal</label>
 									<select name="origin" id="origin" class="form-select trigger-price select2" required>
 										<option value="">- Pilih Asal -</option>
-										<option value="JAKARTA">JAKARTA</option>
-										<!-- <?php foreach ($cities as $c):
-													if ($c->destination == 'ALOR') : ?>
-											<?php
-													endif ?>
-										<?php endforeach; ?> -->
+										<?php
+										foreach ($origins as $c): ?>
+											<option value="<?= $c->origin ?>"><?= $c->origin ?></option>
+										<?php
+										endforeach; ?>
 									</select>
 								</div>
 								<div class="col-md-4 mb-3">
 									<label class="form-label required">Kota Tujuan</label>
 									<select name="destination" id="destination" class="form-select trigger-price select2" required>
 										<option value="">- Pilih Tujuan -</option>
-										<?php foreach ($cities as $c): ?>
+										<!-- <?php foreach ($cities as $c): ?>
 											<option value="<?= $c->destination ?>"><?= $c->destination ?></option>
-										<?php endforeach; ?>
+										<?php endforeach; ?> -->
 									</select>
 								</div>
 								<div class="col-md-4 mb-3">
@@ -627,6 +626,41 @@
 				checkPrice();
 			});
 		}
+
+		// Destination cascade by origin
+		$('#origin').on('change', function() {
+			const origin = $(this).val();
+			const destSelect = $('#destination');
+
+			// Reset destination
+			destSelect.html('<option value="">- Pilih Tujuan -').trigger('change');
+
+			if (!origin) return;
+
+			$.ajax({
+				url: "<?= site_url('master/ajax_get_domestic_destination_by_origin') ?>",
+				type: "GET",
+				dataType: "json",
+				data: {
+					origin: origin
+				},
+				success: function(res) {
+					let html = '<option value="">- Pilih Tujuan -</option>';
+					res.forEach(function(item) {
+						html += `<option value="${item.destination}">${item.destination}</option>`;
+					});
+					destSelect.html(html);
+
+					// Reinit Select2 setelah data masuk
+					if (destSelect.hasClass('select2-hidden-accessible')) {
+						destSelect.select2('destroy');
+					}
+					destSelect.select2({
+						width: '100%'
+					});
+				}
+			});
+		});
 
 		// --- DOM Elements ---
 		const inputActual = document.getElementById('actual_weight');
