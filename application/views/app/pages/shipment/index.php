@@ -108,6 +108,8 @@
 									'READY_TO_PICKUP',
 									'PICKED_UP',
 									'RECEIVED_ORIGIN',
+									'OFFLOADED',
+									'CONSOLIDATED',
 									'MANIFESTED',
 									'DEPARTED',
 									'ARRIVED',

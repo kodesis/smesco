@@ -62,6 +62,7 @@
 </div>
 
 <div class="modal modal-blur fade" id="modal-scanner" tabindex="-1" role="dialog" aria-hidden="true">
+	<input type="file" id="camera_input" accept="image/*" capture="environment" class="d-none">
 	<div class="modal-dialog modal-dialog-centered" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -95,16 +96,15 @@
 			}
 		};
 
-		// --- LOGIC KAMERA ---
+		// --- LOGIC KAMERA QR READER ---
 		document.getElementById('btn-camera').addEventListener('click', function() {
 			html5QrCode.start({
 				facingMode: "environment"
 			}, qrConfig, (decodedText) => {
-				// Beep & Stop Kamera
 				document.getElementById('beep_success').play();
 				html5QrCode.stop().then(() => {
 					$('#modal-scanner').modal('hide');
-					processInbound(decodedText); // Kirim ke fungsi AJAX lu
+					processInbound(decodedText);
 				});
 			}).catch(err => {
 				console.error(err);
@@ -112,9 +112,7 @@
 			});
 		});
 
-		// Matikan kamera kalau modal ditutup manual
 		$('#modal-scanner').on('hide.bs.modal', function() {
-			// Pindah fokus DULU sebelum modal benar-benar tertutup
 			hidInput.focus();
 		});
 
@@ -124,7 +122,7 @@
 			}
 		});
 
-		// --- LOGIC INPUT MANUAL (Keyboard/Scanner Gun) ---
+		// --- LOGIC INPUT MANUAL / SCANNER GUN ---
 		hidInput.addEventListener('keypress', function(e) {
 			if (e.key === 'Enter') {
 				processInbound(this.value);
@@ -132,42 +130,122 @@
 			}
 		});
 
-		// --- FUNGSI PROSES AJAX (Tetap Sama) ---
+		let tempBarcode = ''; // Variabel penampung
+
+		// --- FUNGSI TRIGGER SCAN & BUKA KAMERA NATIVE ---
 		function processInbound(scannedVal) {
-			$.post("<?= site_url('shipment/ajax_process_inbound') ?>", {
-				no_resi: scannedVal
-			}, function(res) {
-				if (res.status) {
-					document.getElementById('beep_success').play();
-					const item = document.getElementById('item-' + res.data.no_resi);
-					if (item) {
-						let total = parseInt(item.getAttribute('data-total'));
-						let received = res.data.received;
+			tempBarcode = scannedVal;
+			document.getElementById('beep_success').play();
 
-						item.setAttribute('data-received', received);
-						item.querySelector('.counter-label').innerText = received + ' / ' + total;
-						item.querySelector('.progress-bar').style.width = (received / total * 100) + '%';
-
-						if (res.is_complete) {
-							moveToSuccess(item);
-						}
-					}
-
-					// Toast notif biar keren
-					Swal.fire({
-						toast: true,
-						position: 'top-end',
-						icon: 'success',
-						title: 'Diterima: ' + scannedVal,
-						showConfirmButton: false,
-						timer: 1500
-					});
-				} else {
-					Swal.fire('Gagal', res.message, 'error');
-				}
-			}, 'json');
+			if ($('#modal-scanner').is(':visible')) {
+				html5QrCode.stop().then(() => {
+					$('#modal-scanner').modal('hide');
+					$('#camera_input').click();
+				});
+			} else {
+				$('#camera_input').click();
+			}
 		}
 
-		// Fungsi moveToSuccess & updateBadge lu tetep pake yang lama bro...
+		// --- KETIKA SELESAI FOTO & PROSES AJAX ---
+		$('#camera_input').on('change', function() {
+			let file = this.files; // FIX: Wajib pakai index
+			if (!file) return;
+
+			Swal.fire({
+				title: 'Mengupload...',
+				text: 'Menyimpan data dan bukti foto',
+				allowOutsideClick: false,
+				didOpen: () => {
+					Swal.showLoading();
+				}
+			});
+
+			let formData = new FormData();
+			formData.append('no_resi', tempBarcode);
+			formData.append('photo', file);
+
+			$.ajax({
+				url: "<?= site_url('shipment/ajax_process_inbound') ?>",
+				type: "POST",
+				data: formData,
+				processData: false,
+				contentType: false,
+				dataType: "json",
+				success: function(res) {
+					$('#camera_input').val(''); // Reset input file
+
+					if (res.status) {
+						Swal.fire({
+							toast: true,
+							position: 'top-end',
+							icon: 'success',
+							title: res.message,
+							showConfirmButton: false,
+							timer: 1500
+						});
+
+						if (res.is_koli) {
+							// Jika yang discan adalah Karung Induk, reload agar list resi mutakhir
+							setTimeout(() => {
+								location.reload();
+							}, 1500);
+						} else {
+							// Jika yang discan adalah Resi Fisik, update progress bar
+							const item = document.getElementById('item-' + res.data.no_resi);
+							if (item) {
+								let total = parseInt(item.getAttribute('data-total'));
+								let received = res.data.received;
+
+								item.setAttribute('data-received', received);
+								item.querySelector('.counter-label').innerText = received + ' / ' + total;
+								item.querySelector('.progress-bar').style.width = (received / total * 100) + '%';
+
+								if (res.is_complete) {
+									moveToSuccess(item);
+								}
+							}
+						}
+						hidInput.focus();
+					} else {
+						Swal.fire('Gagal', res.message, 'error');
+					}
+				},
+				error: function() {
+					$('#camera_input').val('');
+					Swal.fire('Error', 'Koneksi ke server terputus saat upload foto.', 'error');
+				}
+			});
+		});
+
+		// --- FUNGSI UI MINDAN CARD KE LIST SUKSES ---
+		function moveToSuccess(itemNode) {
+			const successContainer = document.getElementById('success-container');
+			const emptySuccess = document.getElementById('empty-success');
+
+			if (emptySuccess) emptySuccess.remove();
+
+			// Ubah style card jadi hijau (Sukses)
+			itemNode.querySelector('.progress-bar').classList.remove('bg-primary');
+			itemNode.querySelector('.progress-bar').classList.add('bg-success');
+			itemNode.classList.add('border-success');
+			itemNode.classList.remove('border');
+
+			// Pindah elemen HTML ke div sebelah kanan
+			successContainer.prepend(itemNode);
+
+			updateBadge();
+		}
+
+		// --- FUNGSI UPDATE ANGKA BADGE ANTREAN ---
+		function updateBadge() {
+			const pendingCount = document.querySelectorAll('#list-container .shipment-item').length;
+			document.getElementById('count_badge').innerText = pendingCount + ' Antrean';
+
+			if (pendingCount === 0) {
+				document.getElementById('list-container').innerHTML = '<div class="text-center py-5 text-muted small border rounded bg-light" id="empty-pending">Semua barang telah diterima.</div>';
+			}
+		}
+
 	});
 </script>

@@ -81,16 +81,12 @@ class Shipment extends Authenticated_Controller
 
 		if ($this->input->server('REQUEST_METHOD') === 'POST') {
 
-			// echo '<pre>';
-			// print_r($_POST);
-			// echo '</pre>';
-			// exit;
 			// 1. Dapatkan Input Dasar
 			$origin      = $this->input->post('origin', TRUE);
 			$destination = $this->input->post('destination', TRUE);
 			$service_id  = $this->input->post('service_type_id', TRUE);
-			$sender_name  = $this->input->post('sender_name', TRUE);  // <-- TAMBAH INI
-			$sender_phone = $this->input->post('sender_phone', TRUE);  // <-- TAMBAH INI
+			$sender_name  = $this->input->post('sender_name', TRUE);
+			$sender_phone = $this->input->post('sender_phone', TRUE);
 			$payment_type = $this->input->post('payment_type', TRUE);
 
 			// 2. Validasi Master Pricelist
@@ -106,36 +102,52 @@ class Shipment extends Authenticated_Controller
 				redirect('shipment/create');
 			}
 
-			// 3. Hitung Berat (Actual vs Volume)
-			$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
-			$dim_qtys      = $this->input->post('dim_qty');
-			$dim_lengths   = $this->input->post('dim_length');
-			$dim_widths    = $this->input->post('dim_width');
-			$dim_heights   = $this->input->post('dim_height');
+			// echo '<pre>';
+			// print_r($_POST);
+			// echo '</pre>';
+			// exit;
 
+			// 3. Hitung Berat (Actual vs Volume) & Siapkan Data Dimensi Fisik Per Dus
+			$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
+			$dim_length = $this->input->post('dim_length');
+			$dim_width  = $this->input->post('dim_width');
+			$dim_height = $this->input->post('dim_height');
+			$dim_qty    = $this->input->post('dim_qty');
+
+			$no_resi = $this->M_Shipment->generate_no_resi();
+
+			$insert_dimensions = [];
 			$total_volume_weight = 0;
 			$total_koli = 0;
-			$insert_dimensions = [];
+			$koli_counter = 1; // Pemicu nomor urut kardus fisik (e.g. -01, -02)
 
-			if (!empty($dim_qtys)) {
-				foreach ($dim_qtys as $i => $qty_val) {
-					$q = intval($this->_parse_indo_number($qty_val));
-					$p = $this->_parse_indo_number($dim_lengths[$i]);
-					$l = $this->_parse_indo_number($dim_widths[$i]);
-					$t = $this->_parse_indo_number($dim_heights[$i]);
+			if (!empty($dim_qty)) {
+				foreach ($dim_qty as $key => $qty) {
+					if ($qty > 0) {
+						$total_koli += $qty;
 
-					if ($q > 0) {
-						$total_koli += $q;
-						$row_vol = (($p * $l * $t) / 5000) * $q;
-						$total_volume_weight += $row_vol;
+						// Hitung volume weight untuk kelompok dimensi ini
+						$p = str_replace(',', '.', $dim_length[$key]);
+						$l = str_replace(',', '.', $dim_width[$key]);
+						$t = str_replace(',', '.', $dim_height[$key]);
 
-						if ($p > 0 || $l > 0 || $t > 0) {
+						// Rumus volume standard udara (P x L x T / 5000) dikali jumlah qty koli tersebut
+						$vol_weight_per_item = ($p * $l * $t) / 5000;
+						$total_volume_weight += ($vol_weight_per_item * $qty);
+
+						// PECAH DATA PER KOLI FISIK (Opsi B untuk kebutuhan Console AWB scan per dus)
+						for ($i = 0; $i < $qty; $i++) {
+							$barcode_koli = $no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
+
 							$insert_dimensions[] = [
-								'qty'    => $q,
-								'length' => $p,
-								'width'  => $l,
-								'height' => $t,
+								'shipment_id'  => NULL, // Sementara NULL, di-inject setelah dapat insert_id()
+								'barcode_koli' => $barcode_koli,
+								'qty'          => 1, // Dikunci 1 per baris fisik
+								'length'       => $p,
+								'width'        => $l,
+								'height'       => $t
 							];
+							$koli_counter++;
 						}
 					}
 				}
@@ -187,7 +199,7 @@ class Shipment extends Authenticated_Controller
 				}
 			}
 
-			// 7. Kalkulasi Final & Persiapan Data
+			// 7. Kalkulasi Final & Persiapan Data Surcharge Addons
 			$sess         = $this->session->userdata('user');
 			$is_valuable  = $this->input->post('is_valuable') ? 1 : 0;
 			$addon_codes      = $this->input->post('addons') ?: [];
@@ -195,28 +207,18 @@ class Shipment extends Authenticated_Controller
 			$insert_addons    = [];
 
 			if (!empty($addon_codes)) {
-				// Ambil semua addon yang dipilih sekaligus (1 query)
 				$this->db->where_in('code', $addon_codes)->where('is_active', 1);
 				$selected_addons = $this->db->get('master_addons')->result();
 
 				foreach ($selected_addons as $addon) {
 					$fee = 0;
 
-					// Hitung fee per addon berdasarkan calc_method — mirror logic JS
 					if (!empty($insert_dimensions)) {
 						foreach ($insert_dimensions as $dim) {
 							$p = $dim['length'];
 							$l = $dim['width'];
 							$t = $dim['height'];
 							$q = $dim['qty'];
-
-							// if ($addon->calc_method === 'VOLUME') {
-							// 	$fee += ($p * $l * $t * $addon->base_factor) * $q;
-							// } elseif ($addon->calc_method === 'VOLUME_PLUS') {
-							// 	$fee += (($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor) * $q;
-							// } elseif ($addon->calc_method === 'PER_KOLI') {
-							// 	$fee += $addon->base_factor * $q;
-							// }
 
 							$min = $addon->min_charge;
 
@@ -232,7 +234,6 @@ class Shipment extends Authenticated_Controller
 							}
 						}
 					} else {
-						// Fallback: tidak ada dimensi, pakai total_koli
 						if ($addon->calc_method === 'PER_KOLI') {
 							$fee = $addon->base_factor * ($total_koli ?: 1);
 						}
@@ -241,17 +242,17 @@ class Shipment extends Authenticated_Controller
 					if ($fee > 0) {
 						$total_addon_fee += $fee;
 						$insert_addons[] = [
+							'shipment_id'  => NULL, // Di-inject nanti
 							'addon_id'     => $addon->id,
 							'addon_amount' => $fee,
-							// shipment_id akan di-inject setelah insert
 						];
 					}
 				}
 			}
 
-			$total_margin = $shipping_margin; // margin mitra hanya dari biaya pengiriman
+			$total_margin = $shipping_margin;
 
-			// Helper: ambil nama wilayah dari ID
+			// Helper Nama Alamat
 			$sender_prov_name  = $this->db->get_where('mt_provinsi',   ['id' => $this->input->post('sender_provinsi')])->row();
 			$sender_kota_name  = $this->db->get_where('mt_kota',       ['id' => $this->input->post('sender_kota')])->row();
 			$sender_kec_name   = $this->db->get_where('mt_kecamatan',  ['id' => $this->input->post('sender_kecamatan')])->row();
@@ -278,7 +279,7 @@ class Shipment extends Authenticated_Controller
 				$receiver_prov_name ? $receiver_prov_name->nama_provinsi  : '',
 			]));
 
-			// ── Upload Foto Barang ──
+			// File Upload Management
 			$photo_path = NULL;
 			$pending_upload = [];
 
@@ -296,20 +297,14 @@ class Shipment extends Authenticated_Controller
 					redirect('shipment/create');
 				}
 
-				// Simpan dulu tmp_name-nya, upload setelah no_resi di-generate
 				$pending_upload = [
 					'tmp_name' => $file['tmp_name'],
 					'ext'      => strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)),
 				];
 			}
 
-			// ← Generate no_resi di SINI, setelah semua validasi lewat
-			$no_resi = $this->M_Shipment->generate_no_resi();
-
-			// ← Baru eksekusi move file-nya kalau ada pending upload
 			if (!empty($pending_upload)) {
 				$upload_dir = FCPATH . 'uploads/shipments/' . date('Y') . '/' . date('m') . '/';
-
 				if (!is_dir($upload_dir)) {
 					mkdir($upload_dir, 0755, TRUE);
 				}
@@ -325,64 +320,66 @@ class Shipment extends Authenticated_Controller
 				$photo_path = 'uploads/shipments/' . date('Y') . '/' . date('m') . '/' . $file_name;
 			}
 
-			// Tentukan Expired Date (Hanya jika tipe pembayaran TRANSFER)
 			$payment_expired_at = NULL;
 			if ($payment_type === 'TRANSFER') {
-				// Set batas waktu 10 menit dari sekarang
 				$payment_expired_at = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 			}
 
+			// Map Data Objek Induk Shipments
 			$insert_shipment = [
-				'no_resi'           		  => $no_resi,
-				'agent_id'          		  => $sess['agent_id'] ?? NULL,
-				'origin'            		  => $origin,
-				'destination'       		  => $destination,
-				'service_type_id'   		  => $service_id,
-				'category'          		  => $pricelist->category,
+				'no_resi'                 => $no_resi,
+				'agent_id'                => $sess['agent_id'] ?? NULL,
+				'origin'                  => $origin,
+				'destination'             => $destination,
+				'service_type_id'         => $service_id,
+				'category'                => $pricelist->category,
 				'sender_name'             => $this->input->post('sender_name', TRUE),
 				'sender_phone'            => $this->input->post('sender_phone', TRUE),
-				'sender_provinsi'   		  => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
-				'sender_kota'       		  => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
-				'sender_kecamatan'  		  => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
-				'sender_kelurahan'  		  => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
+				'sender_provinsi'         => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
+				'sender_kota'             => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
+				'sender_kecamatan'        => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
+				'sender_kelurahan'        => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
 				'sender_address_detail'   => $this->input->post('sender_address_detail', TRUE),
 				'sender_address'          => $full_sender_address,
 				'receiver_name'           => $this->input->post('receiver_name', TRUE),
 				'receiver_phone'          => $this->input->post('receiver_phone', TRUE),
-				'receiver_provinsi'  	  => $receiver_prov_name  ? $receiver_prov_name->nama_provinsi  : NULL,
-				'receiver_kota'      	  => $receiver_kota_name  ? $receiver_kota_name->nama_kota      : NULL,
-				'receiver_kecamatan' 	  => $receiver_kec_name   ? $receiver_kec_name->nama_kecamatan  : NULL,
-				'receiver_kelurahan' 	  => $receiver_kel_name   ? $receiver_kel_name->nama_kelurahan  : NULL,
+				'receiver_provinsi'       => $receiver_prov_name  ? $receiver_prov_name->nama_provinsi  : NULL,
+				'receiver_kota'           => $receiver_kota_name  ? $receiver_kota_name->nama_kota      : NULL,
+				'receiver_kecamatan'      => $receiver_kec_name   ? $receiver_kec_name->nama_kecamatan  : NULL,
+				'receiver_kelurahan'      => $receiver_kel_name   ? $receiver_kel_name->nama_kelurahan  : NULL,
 				'receiver_address_detail' => $this->input->post('receiver_address_detail', TRUE),
 				'receiver_address'        => $full_receiver_address,
-				'commodity_id'      		  => $this->input->post('commodity_id', TRUE),
-				'commodity_detail'  		  => $this->input->post('commodity_detail', TRUE),
-				'is_valuable'       		  => $is_valuable,
-				'goods_value'       		  => $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0,
-				'payment_type'      		  => $payment_type,
-				'koli'              		  => $total_koli ?: 1,
-				'actual_weight'     		  => $actual_weight,
-				'volume_weight'     		  => $total_volume_weight,
-				'chargeable_weight' 		  => $chargeable,
-				'cost_price'        		  => $cost_per_kg,
-				'sell_price'        		  => $sell_per_kg,
-				'pickup_rate_id'    		  => $pickup_id,
-				'pickup_fee'        		  => $pickup_fee,
-				'total_addon_fee'   		  => $total_addon_fee,
-				'total_amount'      		  => $shipping_total + $pickup_fee + $total_addon_fee,
-				'margin_amount'     		  => $total_margin,
-				'shipment_photo' 			  => $photo_path,
-				'payment_expired_at'  	  => $payment_expired_at,
-				'status'            		  => 'BOOKED',
-				'is_lartas_agreed'  => $this->input->post('is_lartas_agreed') ?? 1,
-				'created_by'        		  => $sess['id']
+				'commodity_id'            => $this->input->post('commodity_id', TRUE),
+				'commodity_detail'        => $this->input->post('commodity_detail', TRUE),
+				'is_valuable'             => $is_valuable,
+				'goods_value'             => $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0,
+				'payment_type'            => $payment_type,
+				'koli'                    => $total_koli ?: 1,
+				'actual_weight'           => $actual_weight,
+				'volume_weight'           => $total_volume_weight,
+				'chargeable_weight'       => $chargeable,
+				'cost_price'              => $cost_per_kg,
+				'sell_price'              => $sell_per_kg,
+				'pickup_rate_id'          => $pickup_id,
+				'pickup_fee'              => $pickup_fee,
+				'total_addon_fee'         => $total_addon_fee,
+				'total_amount'            => $shipping_total + $pickup_fee + $total_addon_fee,
+				'margin_amount'           => $total_margin,
+				'shipment_photo'          => $photo_path,
+				'payment_expired_at'      => $payment_expired_at,
+				'status'                  => 'BOOKED',
+				'is_lartas_agreed'        => $this->input->post('is_lartas_agreed') ?? 1,
+				'created_by'              => $sess['id']
 			];
 
-			// 8. Database Transaction
+			// 8. Database Transaction START
 			$this->db->trans_start();
-			$this->db->insert('shipments', $insert_shipment);
-			$shipment_id = $this->db->insert_id();
 
+			// Insert Induk Shipments Terlebih Dahulu
+			$this->db->insert('shipments', $insert_shipment);
+			$shipment_id = $this->db->insert_id(); // <--- SEKARANG ID NYA SUDAH LAHIR DI SINI!
+
+			// Inject shipment_id yang baru lahir ke dalam array Dimensi
 			if (!empty($insert_dimensions)) {
 				foreach ($insert_dimensions as &$dim) {
 					$dim['shipment_id'] = $shipment_id;
@@ -390,6 +387,7 @@ class Shipment extends Authenticated_Controller
 				$this->db->insert_batch('shipment_dimensions', $insert_dimensions);
 			}
 
+			// Inject shipment_id yang baru lahir ke dalam array Addons
 			if (!empty($insert_addons)) {
 				foreach ($insert_addons as &$addon_row) {
 					$addon_row['shipment_id'] = $shipment_id;
@@ -397,6 +395,7 @@ class Shipment extends Authenticated_Controller
 				$this->db->insert_batch('shipment_addons', $insert_addons);
 			}
 
+			// Buat Tracking Log Awal
 			$this->db->insert('shipment_tracking', [
 				'shipment_id' => $shipment_id,
 				'status'      => 'BOOKED',
@@ -404,7 +403,9 @@ class Shipment extends Authenticated_Controller
 				'note'        => 'Shipment berhasil dibuat.',
 				'created_by'  => $sess['id']
 			]);
+
 			$this->db->trans_complete();
+			// Database Transaction END
 
 			// ── Upsert Master Customer ──
 			$customer_data = [
@@ -437,7 +438,7 @@ class Shipment extends Authenticated_Controller
 			} else {
 				if ($payment_type === 'TRANSFER') {
 					$url = base_url('home/confirm_payment/' . $no_resi);
-					$total_rp = number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.');
+					$total_rp = number_format($insert_shipment['total_amount'], 0, ',', '.');
 
 					$pesan_user = "*SMESCO EXPRESS*\n\n" .
 						"*RESERVASI BERHASIL*\n" .
@@ -464,11 +465,10 @@ class Shipment extends Authenticated_Controller
 			return;
 		}
 
-		// Tampilan Form
+		// Tampilan Form (GET)
 		$data = [
 			'title'       => 'Buat Booking',
-			'origins'	  => $this->db->select('origin')->where('category', 'DOMESTIC')->group_by('origin')->get('pricelist')->result(),
-			// 'cities'      => $this->db->select('destination')->where('category', 'DOMESTIC')->group_by('destination')->get('pricelist')->result(),
+			'origins'     => $this->db->select('origin')->where('category', 'DOMESTIC')->group_by('origin')->get('pricelist')->result(),
 			'services'    => $this->M_Pricelist->get_services('DOMESTIC'),
 			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
 			'addons'      => $this->db->get_where('master_addons', ['is_active' => 1])->result()
@@ -521,36 +521,37 @@ class Shipment extends Authenticated_Controller
 
 		// ── 2. Hitung Berat ──
 		$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
-		$dim_qtys      = $this->input->post('dim_qty');
-		$dim_lengths   = $this->input->post('dim_length');
-		$dim_widths    = $this->input->post('dim_width');
-		$dim_heights   = $this->input->post('dim_height');
+		$dim_length = $this->input->post('dim_length');
+		$dim_width  = $this->input->post('dim_width');
+		$dim_height = $this->input->post('dim_height');
+		$dim_qty    = $this->input->post('dim_qty');
 
-		$total_volume_weight = 0;
-		$total_koli          = 0;
-		$insert_dimensions   = [];
+		if (!empty($dim_qty)) {
+			$data_dims = [];
+			$koli_counter = 1; // Pemicu nomor urut kardus fisik
 
-		if (!empty($dim_qtys)) {
-			foreach ($dim_qtys as $i => $qty_val) {
-				$q = intval($this->_parse_indo_number($qty_val));
-				$p = $this->_parse_indo_number($dim_lengths[$i]);
-				$l = $this->_parse_indo_number($dim_widths[$i]);
-				$t = $this->_parse_indo_number($dim_heights[$i]);
+			foreach ($dim_qty as $key => $qty) {
+				if ($qty > 0) {
+					// Daripada simpan Qty langsung, kita looping sebanyak Qty-nya
+					// Jadi kalau qty = 3, di DB akan ke-insert 3 baris terpisah (akurat per dus fisik!)
+					for ($i = 0; $i < $qty; $i++) {
+						// Generate format barcode: NORESI-01, NORESI-02, dst
+						$barcode_koli = $no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
 
-				if ($q > 0) {
-					$total_koli += $q;
-					$row_vol     = (($p * $l * $t) / 5000) * $q;
-					$total_volume_weight += $row_vol;
-
-					if ($p > 0 || $l > 0 || $t > 0) {
-						$insert_dimensions[] = [
-							'qty'    => $q,
-							'length' => $p,
-							'width'  => $l,
-							'height' => $t,
+						$data_dims[] = [
+							'shipment_id'  => $shipment_id,
+							'barcode_koli' => $barcode_koli,
+							'qty'          => 1, // Dikunci di angka 1 per baris fisik
+							'length'       => str_replace(',', '.', $dim_length[$key]),
+							'width'        => str_replace(',', '.', $dim_width[$key]),
+							'height'       => str_replace(',', '.', $dim_height[$key])
 						];
+						$koli_counter++;
 					}
 				}
+			}
+			if (count($data_dims) > 0) {
+				$this->db->insert_batch('shipment_dimensions', $data_dims);
 			}
 		}
 
@@ -888,6 +889,655 @@ class Shipment extends Authenticated_Controller
 		}
 	}
 
+	// ============================================================
+	// EDIT DOMESTIK
+	// ============================================================
+	public function edit($id)
+	{
+		$this->_check_access();
+
+		$shipment = $this->db->get_where('shipments', ['id' => $id])->row();
+
+		if (!$shipment) {
+			$this->session->set_flashdata('error', 'Shipment tidak ditemukan!');
+			redirect('shipment');
+		}
+
+		if ($shipment->status !== 'BOOKED') {
+			$this->session->set_flashdata('error', 'Shipment tidak bisa diedit karena statusnya sudah ' . $shipment->status);
+			redirect('shipment/detail/' . $id);
+		}
+
+		// Load dimensi & addons yang sudah ada
+		$dimensions = $this->db->get_where('shipment_dimensions', ['shipment_id' => $id])->result();
+		$addons     = $this->db->get_where('shipment_addons', ['shipment_id' => $id])->result_array();
+		$addon_ids  = array_column($addons, 'addon_id');
+
+		$data = [
+			'title'       => 'Edit Shipment #' . $shipment->no_resi,
+			'shipment'    => $shipment,
+			'dimensions'  => $dimensions,
+			'addon_ids'   => $addon_ids,
+			'origins'     => $this->db->select('origin')->where('category', 'DOMESTIC')->group_by('origin')->get('pricelist')->result(),
+			'services'    => $this->M_Pricelist->get_services('DOMESTIC'),
+			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
+			'addons'      => $this->db->get_where('master_addons', ['is_active' => 1])->result(),
+		];
+
+		$this->render('app/pages/shipment/edit', $data);
+	}
+
+	public function save_edit($id)
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$shipment = $this->db->get_where('shipments', ['id' => $id])->row();
+
+		if (!$shipment || $shipment->status !== 'BOOKED') {
+			$this->session->set_flashdata('error', 'Shipment tidak valid atau tidak bisa diedit!');
+			redirect('shipment');
+		}
+
+		// ── 1. Input Dasar ──
+		$origin      = $this->input->post('origin', TRUE);
+		$destination = $this->input->post('destination', TRUE);
+		$service_id  = $this->input->post('service_type_id', TRUE);
+		$sender_name  = $this->input->post('sender_name', TRUE);
+		$sender_phone = $this->input->post('sender_phone', TRUE);
+		$payment_type = $this->input->post('payment_type', TRUE);
+
+		// ── 2. Validasi Pricelist ──
+		$pricelist = $this->db->get_where('pricelist', [
+			'origin'          => $origin,
+			'destination'     => $destination,
+			'service_type_id' => $service_id,
+			'is_active'       => 1
+		])->row();
+
+		if (!$pricelist) {
+			$this->session->set_flashdata('error', 'Rute atau layanan tidak tersedia!');
+			redirect('shipment/edit/' . $id);
+		}
+
+		// ── 3. Hitung Berat & Dimensi ──
+		$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
+		$dim_length    = $this->input->post('dim_length');
+		$dim_width     = $this->input->post('dim_width');
+		$dim_height    = $this->input->post('dim_height');
+		$dim_qty       = $this->input->post('dim_qty');
+
+		$insert_dimensions   = [];
+		$total_volume_weight = 0;
+		$total_koli          = 0;
+		$koli_counter        = 1;
+
+		if (!empty($dim_qty)) {
+			foreach ($dim_qty as $key => $qty) {
+				if ($qty > 0) {
+					$total_koli += $qty;
+					$p = str_replace(',', '.', $dim_length[$key]);
+					$l = str_replace(',', '.', $dim_width[$key]);
+					$t = str_replace(',', '.', $dim_height[$key]);
+
+					$vol_weight_per_item = ($p * $l * $t) / 5000;
+					$total_volume_weight += ($vol_weight_per_item * $qty);
+
+					for ($i = 0; $i < $qty; $i++) {
+						$barcode_koli = $shipment->no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
+						$insert_dimensions[] = [
+							'shipment_id'  => $id,
+							'barcode_koli' => $barcode_koli,
+							'qty'          => 1,
+							'length'       => $p,
+							'width'        => $l,
+							'height'       => $t,
+						];
+						$koli_counter++;
+					}
+				}
+			}
+		}
+
+		// ── 4. Chargeable Weight ──
+		$chargeable = max($actual_weight, $total_volume_weight);
+		if ($chargeable < $pricelist->min_weight_kg) {
+			$chargeable = $pricelist->min_weight_kg;
+		}
+		$chargeable = ceil($chargeable);
+
+		// ── 5. Harga & Tiered ──
+		$cost_per_kg = $pricelist->price_kribo;
+		$sell_per_kg = $pricelist->price_smesco;
+
+		if ($pricelist->is_tiered == 1) {
+			$tier = $this->db->where('pricelist_id', $pricelist->id)
+				->where('min_weight <=', $chargeable)
+				->where('max_weight >=', $chargeable)
+				->get('pricelist_tiers')->row();
+			if ($tier) {
+				$cost_per_kg = $tier->price_kribo;
+				$sell_per_kg = $tier->price_smesco;
+			} else {
+				$last_tier = $this->db->where('pricelist_id', $pricelist->id)
+					->order_by('max_weight', 'DESC')->limit(1)->get('pricelist_tiers')->row();
+				if ($last_tier) {
+					$cost_per_kg = $last_tier->price_kribo;
+					$sell_per_kg = $last_tier->price_smesco;
+				}
+			}
+		}
+
+		$shipping_total  = $chargeable * $sell_per_kg;
+		$shipping_margin = ($sell_per_kg - $cost_per_kg) * $chargeable;
+
+		// ── 6. Pickup ──
+		$pickup_fee = 0;
+		$pickup_id  = NULL;
+
+		if ($this->input->post('use_pickup') == 1) {
+			$p_id    = $this->input->post('pickup_rate_id');
+			$rate_db = $this->db->get_where('master_pickup_rates', ['id' => $p_id])->row();
+			if ($rate_db && $chargeable >= $rate_db->min_weight) {
+				$pickup_id  = $p_id;
+				$pickup_fee = $rate_db->price_smesco;
+			}
+		}
+
+		// ── 7. Addons ──
+		$addon_codes     = $this->input->post('addons') ?: [];
+		$total_addon_fee = 0;
+		$insert_addons   = [];
+
+		if (!empty($addon_codes)) {
+			$this->db->where_in('code', $addon_codes)->where('is_active', 1);
+			$selected_addons = $this->db->get('master_addons')->result();
+
+			foreach ($selected_addons as $addon) {
+				$fee = 0;
+				if (!empty($insert_dimensions)) {
+					foreach ($insert_dimensions as $dim) {
+						$p   = $dim['length'];
+						$l   = $dim['width'];
+						$t   = $dim['height'];
+						$q   = $dim['qty'];
+						$min = $addon->min_charge;
+
+						if ($addon->calc_method === 'VOLUME') {
+							$fee += max($p * $l * $t * $addon->base_factor, $min) * $q;
+						} elseif ($addon->calc_method === 'VOLUME_PLUS') {
+							$fee += max(($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor, $min) * $q;
+						} elseif ($addon->calc_method === 'PER_KOLI') {
+							$fee += max($addon->base_factor, $min) * $q;
+						}
+					}
+				} else {
+					if ($addon->calc_method === 'PER_KOLI') {
+						$fee = $addon->base_factor * ($total_koli ?: 1);
+					}
+				}
+
+				if ($fee > 0) {
+					$total_addon_fee += $fee;
+					$insert_addons[] = [
+						'shipment_id'  => $id,
+						'addon_id'     => $addon->id,
+						'addon_amount' => $fee,
+					];
+				}
+			}
+		}
+
+		// ── 8. Resolve Nama Wilayah ──
+		$sender_prov_name  = $this->db->get_where('mt_provinsi',  ['id' => $this->input->post('sender_provinsi')])->row();
+		$sender_kota_name  = $this->db->get_where('mt_kota',      ['id' => $this->input->post('sender_kota')])->row();
+		$sender_kec_name   = $this->db->get_where('mt_kecamatan', ['id' => $this->input->post('sender_kecamatan')])->row();
+		$sender_kel_name   = $this->db->get_where('mt_kelurahan', ['id' => $this->input->post('sender_kelurahan')])->row();
+
+		$receiver_prov_name = $this->db->get_where('mt_provinsi',  ['id' => $this->input->post('receiver_provinsi')])->row();
+		$receiver_kota_name = $this->db->get_where('mt_kota',      ['id' => $this->input->post('receiver_kota')])->row();
+		$receiver_kec_name  = $this->db->get_where('mt_kecamatan', ['id' => $this->input->post('receiver_kecamatan')])->row();
+		$receiver_kel_name  = $this->db->get_where('mt_kelurahan', ['id' => $this->input->post('receiver_kelurahan')])->row();
+
+		$full_sender_address = implode(', ', array_filter([
+			$this->input->post('sender_address_detail', TRUE),
+			$sender_kel_name  ? $sender_kel_name->nama_kelurahan                 : '',
+			$sender_kec_name  ? 'Kec. '     . $sender_kec_name->nama_kecamatan  : '',
+			$sender_kota_name ? 'Kab/Kota ' . $sender_kota_name->nama_kota      : '',
+			$sender_prov_name ? $sender_prov_name->nama_provinsi                 : '',
+		]));
+
+		$full_receiver_address = implode(', ', array_filter([
+			$this->input->post('receiver_address_detail', TRUE),
+			$receiver_kel_name  ? $receiver_kel_name->nama_kelurahan                   : '',
+			$receiver_kec_name  ? 'Kec. '     . $receiver_kec_name->nama_kecamatan    : '',
+			$receiver_kota_name ? 'Kab/Kota ' . $receiver_kota_name->nama_kota        : '',
+			$receiver_prov_name ? $receiver_prov_name->nama_provinsi                   : '',
+		]));
+
+		// ── 9. Upload Foto (opsional, kalau tidak diupload pakai yang lama) ──
+		$photo_path = $shipment->shipment_photo; // default: foto lama
+
+		if (isset($_FILES['shipment_photo']) && $_FILES['shipment_photo']['error'] === UPLOAD_ERR_OK) {
+			$file    = $_FILES['shipment_photo'];
+			$allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+
+			if (!in_array($file['type'], $allowed)) {
+				$this->session->set_flashdata('error', 'Format foto tidak valid.');
+				redirect('shipment/edit/' . $id);
+			}
+			if ($file['size'] > 2 * 1024 * 1024) {
+				$this->session->set_flashdata('error', 'Ukuran foto maksimal 2MB.');
+				redirect('shipment/edit/' . $id);
+			}
+
+			$upload_dir = FCPATH . 'uploads/shipments/' . date('Y/m/');
+			if (!is_dir($upload_dir)) {
+				mkdir($upload_dir, 0755, TRUE);
+			}
+
+			$ext       = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+			$file_name = $shipment->no_resi . '_photo_' . time() . '.' . $ext;
+			$full_path = $upload_dir . $file_name;
+
+			if (move_uploaded_file($file['tmp_name'], $full_path)) {
+				// Hapus foto lama kalau ada
+				if ($shipment->shipment_photo && file_exists(FCPATH . $shipment->shipment_photo)) {
+					unlink(FCPATH . $shipment->shipment_photo);
+				}
+				$photo_path = 'uploads/shipments/' . date('Y/m/') . $file_name;
+			}
+		}
+
+		// ── 10. Payment Expired (reset kalau payment_type berubah ke TRANSFER) ──
+		$payment_expired_at = $shipment->payment_expired_at;
+		if ($payment_type === 'TRANSFER' && $shipment->payment_type !== 'TRANSFER') {
+			$payment_expired_at = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+		} elseif ($payment_type === 'CASH') {
+			$payment_expired_at = NULL;
+		}
+
+		// ── 11. Susun Data Update ──
+		$is_valuable = $this->input->post('is_valuable') ? 1 : 0;
+
+		$update_shipment = [
+			'origin'                  => $origin,
+			'destination'             => $destination,
+			'service_type_id'         => $service_id,
+			'category'                => $pricelist->category,
+			'sender_name'             => $sender_name,
+			'sender_phone'            => $sender_phone,
+			'sender_provinsi'         => $sender_prov_name  ? $sender_prov_name->nama_provinsi  : NULL,
+			'sender_kota'             => $sender_kota_name  ? $sender_kota_name->nama_kota      : NULL,
+			'sender_kecamatan'        => $sender_kec_name   ? $sender_kec_name->nama_kecamatan  : NULL,
+			'sender_kelurahan'        => $sender_kel_name   ? $sender_kel_name->nama_kelurahan  : NULL,
+			'sender_address_detail'   => $this->input->post('sender_address_detail', TRUE),
+			'sender_address'          => $full_sender_address,
+			'receiver_name'           => $this->input->post('receiver_name', TRUE),
+			'receiver_phone'          => $this->input->post('receiver_phone', TRUE),
+			'receiver_provinsi'       => $receiver_prov_name ? $receiver_prov_name->nama_provinsi : NULL,
+			'receiver_kota'           => $receiver_kota_name ? $receiver_kota_name->nama_kota     : NULL,
+			'receiver_kecamatan'      => $receiver_kec_name  ? $receiver_kec_name->nama_kecamatan : NULL,
+			'receiver_kelurahan'      => $receiver_kel_name  ? $receiver_kel_name->nama_kelurahan : NULL,
+			'receiver_address_detail' => $this->input->post('receiver_address_detail', TRUE),
+			'receiver_address'        => $full_receiver_address,
+			'commodity_id'            => $this->input->post('commodity_id', TRUE),
+			'commodity_detail'        => $this->input->post('commodity_detail', TRUE),
+			'is_valuable'             => $is_valuable,
+			'goods_value'             => $is_valuable ? $this->_parse_indo_number($this->input->post('goods_value')) : 0,
+			'payment_type'            => $payment_type,
+			'koli'                    => $total_koli ?: 1,
+			'actual_weight'           => $actual_weight,
+			'volume_weight'           => $total_volume_weight,
+			'chargeable_weight'       => $chargeable,
+			'cost_price'              => $cost_per_kg,
+			'sell_price'              => $sell_per_kg,
+			'pickup_rate_id'          => $pickup_id,
+			'pickup_fee'              => $pickup_fee,
+			'total_addon_fee'         => $total_addon_fee,
+			'total_amount'            => $shipping_total + $pickup_fee + $total_addon_fee,
+			'margin_amount'           => $shipping_margin,
+			'shipment_photo'          => $photo_path,
+			'payment_expired_at'      => $payment_expired_at,
+			'updated_by'              => $sess['id'],
+			'updated_at'              => date('Y-m-d H:i:s'),
+		];
+
+		// ── 12. Transaction ──
+		$this->db->trans_start();
+
+		$this->db->where('id', $id)->update('shipments', $update_shipment);
+
+		// Replace dimensi lama dengan yang baru
+		$this->db->where('shipment_id', $id)->delete('shipment_dimensions');
+		if (!empty($insert_dimensions)) {
+			$this->db->insert_batch('shipment_dimensions', $insert_dimensions);
+		}
+
+		// Replace addons lama dengan yang baru
+		$this->db->where('shipment_id', $id)->delete('shipment_addons');
+		if (!empty($insert_addons)) {
+			$this->db->insert_batch('shipment_addons', $insert_addons);
+		}
+
+		// Tracking log perubahan
+		$this->db->insert('shipment_tracking', [
+			'shipment_id' => $id,
+			'status'      => 'BOOKED',
+			'location'    => $origin,
+			'note'        => 'Data shipment diperbarui oleh petugas. Total: Rp ' . number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.'),
+			'created_by'  => $sess['id'],
+		]);
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			$this->session->set_flashdata('error', 'Gagal menyimpan perubahan!');
+			redirect('shipment/edit/' . $id);
+		} else {
+			$this->session->set_flashdata('success', 'Shipment <b>' . $shipment->no_resi . '</b> berhasil diperbarui!');
+			redirect('shipment/detail/' . $id);
+		}
+	}
+
+	// ============================================================
+	// EDIT INTERNASIONAL
+	// ============================================================
+	public function edit_intl($id)
+	{
+		$this->_check_access();
+
+		$shipment = $this->db->get_where('shipments', ['id' => $id, 'category' => 'INTERNATIONAL'])->row();
+
+		if (!$shipment) {
+			$this->session->set_flashdata('error', 'Shipment tidak ditemukan!');
+			redirect('shipment');
+		}
+
+		if ($shipment->status !== 'BOOKED') {
+			$this->session->set_flashdata('error', 'Shipment tidak bisa diedit karena statusnya sudah ' . $shipment->status);
+			redirect('shipment/detail/' . $id);
+		}
+
+		$dimensions = $this->db->get_where('shipment_dimensions', ['shipment_id' => $id])->result();
+		$addons     = $this->db->get_where('shipment_addons', ['shipment_id' => $id])->result_array();
+		$addon_ids  = array_column($addons, 'addon_id');
+
+		$data = [
+			'title'       => 'Edit Shipment Internasional #' . $shipment->no_resi,
+			'shipment'    => $shipment,
+			'dimensions'  => $dimensions,
+			'addon_ids'   => $addon_ids,
+			'origins'     => $this->db->select('origin')->where('category', 'INTERNATIONAL')->group_by('origin')->get('pricelist')->result(),
+			'services'    => $this->M_Pricelist->get_services('INTERNATIONAL'),
+			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
+			'addons'      => $this->db->get_where('master_addons', ['is_active' => 1])->result(),
+			'countries'   => $this->db->select('destination')->where('category', 'INTERNATIONAL')->get('pricelist')->result(),
+		];
+
+		$this->render('app/pages/shipment/edit_intl', $data);
+	}
+
+	public function save_edit_intl($id)
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$shipment = $this->db->get_where('shipments', ['id' => $id, 'category' => 'INTERNATIONAL'])->row();
+
+		if (!$shipment || $shipment->status !== 'BOOKED') {
+			$this->session->set_flashdata('error', 'Shipment tidak valid atau tidak bisa diedit!');
+			redirect('shipment');
+		}
+
+		$origin      = $this->input->post('origin', TRUE);
+		$destination = $this->input->post('destination_country', TRUE);
+		$service_id  = $this->input->post('service_type_id', TRUE);
+		$sender_name  = $this->input->post('sender_name', TRUE);
+		$sender_phone = $this->input->post('sender_phone', TRUE);
+		$payment_type = $this->input->post('payment_type', TRUE);
+
+		$pricelist = $this->db->get_where('pricelist', [
+			'origin'          => $origin,
+			'destination'     => $destination,
+			'service_type_id' => $service_id,
+			'is_active'       => 1
+		])->row();
+
+		if (!$pricelist) {
+			$this->session->set_flashdata('error', 'Rute atau layanan tidak tersedia!');
+			redirect('shipment/edit_intl/' . $id);
+		}
+
+		$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
+		$dim_length    = $this->input->post('dim_length');
+		$dim_width     = $this->input->post('dim_width');
+		$dim_height    = $this->input->post('dim_height');
+		$dim_qty       = $this->input->post('dim_qty');
+
+		$insert_dimensions   = [];
+		$total_volume_weight = 0;
+		$total_koli          = 0;
+		$koli_counter        = 1;
+
+		if (!empty($dim_qty)) {
+			foreach ($dim_qty as $key => $qty) {
+				if ($qty > 0) {
+					$total_koli += $qty;
+					$p = str_replace(',', '.', $dim_length[$key]);
+					$l = str_replace(',', '.', $dim_width[$key]);
+					$t = str_replace(',', '.', $dim_height[$key]);
+
+					$total_volume_weight += (($p * $l * $t) / 5000) * $qty;
+
+					for ($i = 0; $i < $qty; $i++) {
+						$barcode_koli = $shipment->no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
+						$insert_dimensions[] = [
+							'shipment_id'  => $id,
+							'barcode_koli' => $barcode_koli,
+							'qty'          => 1,
+							'length'       => $p,
+							'width'        => $l,
+							'height'       => $t,
+						];
+						$koli_counter++;
+					}
+				}
+			}
+		}
+
+		$chargeable = max($actual_weight, $total_volume_weight);
+		if ($chargeable < $pricelist->min_weight_kg) $chargeable = $pricelist->min_weight_kg;
+		$chargeable = ceil($chargeable);
+
+		$cost_per_kg = $pricelist->harga_modal;
+		$sell_per_kg = $pricelist->harga_jual;
+
+		if ($pricelist->is_tiered == 1) {
+			$tier = $this->db->where('pricelist_id', $pricelist->id)
+				->where('min_weight <=', $chargeable)
+				->where('max_weight >=', $chargeable)
+				->get('pricelist_tiers')->row();
+			if ($tier) {
+				$cost_per_kg = $tier->harga_modal;
+				$sell_per_kg = $tier->harga_jual;
+			} else {
+				$last_tier = $this->db->where('pricelist_id', $pricelist->id)
+					->order_by('max_weight', 'DESC')->limit(1)->get('pricelist_tiers')->row();
+				if ($last_tier) {
+					$cost_per_kg = $last_tier->harga_modal;
+					$sell_per_kg = $last_tier->harga_jual;
+				}
+			}
+		}
+
+		$shipping_total  = $chargeable * $sell_per_kg;
+		$shipping_margin = ($sell_per_kg - $cost_per_kg) * $chargeable;
+
+		$pickup_fee = 0;
+		$pickup_id  = NULL;
+		if ($this->input->post('use_pickup') == 1) {
+			$p_id    = $this->input->post('pickup_rate_id');
+			$rate_db = $this->db->get_where('master_pickup_rates', ['id' => $p_id])->row();
+			if ($rate_db && $chargeable >= $rate_db->min_weight) {
+				$pickup_id  = $p_id;
+				$pickup_fee = $rate_db->harga_jual;
+			}
+		}
+
+		$addon_codes     = $this->input->post('addons') ?: [];
+		$total_addon_fee = 0;
+		$insert_addons   = [];
+
+		if (!empty($addon_codes)) {
+			$this->db->where_in('code', $addon_codes)->where('is_active', 1);
+			$selected_addons = $this->db->get('master_addons')->result();
+
+			foreach ($selected_addons as $addon) {
+				$fee = 0;
+				if (!empty($insert_dimensions)) {
+					foreach ($insert_dimensions as $dim) {
+						$p = $dim['length'];
+						$l = $dim['width'];
+						$t = $dim['height'];
+						$q = $dim['qty'];
+						if ($addon->calc_method === 'VOLUME')       $fee += ($p * $l * $t * $addon->base_factor) * $q;
+						elseif ($addon->calc_method === 'VOLUME_PLUS') $fee += (($p + 10) * ($l + 10) * ($t + 10) * $addon->base_factor) * $q;
+						elseif ($addon->calc_method === 'PER_KOLI')  $fee += $addon->base_factor * $q;
+					}
+				} elseif ($addon->calc_method === 'PER_KOLI') {
+					$fee = $addon->base_factor * ($total_koli ?: 1);
+				}
+
+				if ($fee > 0) {
+					$total_addon_fee += $fee;
+					$insert_addons[] = ['shipment_id' => $id, 'addon_id' => $addon->id, 'addon_amount' => $fee];
+				}
+			}
+		}
+
+		$sender_prov_name = $this->db->get_where('mt_provinsi',  ['id' => $this->input->post('sender_provinsi')])->row();
+		$sender_kota_name = $this->db->get_where('mt_kota',      ['id' => $this->input->post('sender_kota')])->row();
+		$sender_kec_name  = $this->db->get_where('mt_kecamatan', ['id' => $this->input->post('sender_kecamatan')])->row();
+		$sender_kel_name  = $this->db->get_where('mt_kelurahan', ['id' => $this->input->post('sender_kelurahan')])->row();
+
+		$full_sender_address = implode(', ', array_filter([
+			$this->input->post('sender_address_detail', TRUE),
+			$sender_kel_name  ? $sender_kel_name->nama_kelurahan                 : '',
+			$sender_kec_name  ? 'Kec. '     . $sender_kec_name->nama_kecamatan  : '',
+			$sender_kota_name ? 'Kab/Kota ' . $sender_kota_name->nama_kota      : '',
+			$sender_prov_name ? $sender_prov_name->nama_provinsi                 : '',
+		]));
+
+		$full_receiver_address = implode(', ', array_filter([
+			$this->input->post('receiver_address_detail', TRUE),
+			$this->input->post('receiver_city', TRUE),
+			$this->input->post('receiver_zipcode', TRUE),
+			$destination,
+		]));
+
+		// Foto — pakai lama kalau tidak diupload baru
+		$photo_path = $shipment->shipment_photo;
+		if (isset($_FILES['shipment_photo']) && $_FILES['shipment_photo']['error'] === UPLOAD_ERR_OK) {
+			$file    = $_FILES['shipment_photo'];
+			$allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+			if (!in_array($file['type'], $allowed)) {
+				$this->session->set_flashdata('error', 'Format foto tidak valid.');
+				redirect('shipment/edit_intl/' . $id);
+			}
+			if ($file['size'] > 2 * 1024 * 1024) {
+				$this->session->set_flashdata('error', 'Ukuran foto maksimal 2MB.');
+				redirect('shipment/edit_intl/' . $id);
+			}
+			$upload_dir = FCPATH . 'uploads/shipments/' . date('Y/m/');
+			if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, TRUE);
+			$ext       = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+			$file_name = $shipment->no_resi . '_photo_' . time() . '.' . $ext;
+			if (move_uploaded_file($file['tmp_name'], $upload_dir . $file_name)) {
+				if ($shipment->shipment_photo && file_exists(FCPATH . $shipment->shipment_photo)) {
+					unlink(FCPATH . $shipment->shipment_photo);
+				}
+				$photo_path = 'uploads/shipments/' . date('Y/m/') . $file_name;
+			}
+		}
+
+		$payment_expired_at = $shipment->payment_expired_at;
+		if ($payment_type === 'TRANSFER' && $shipment->payment_type !== 'TRANSFER') {
+			$payment_expired_at = date('Y-m-d H:i:s', strtotime('+10 minutes'));
+		} elseif ($payment_type === 'CASH') {
+			$payment_expired_at = NULL;
+		}
+
+		$update_shipment = [
+			'origin'                  => $origin,
+			'destination'             => $destination,
+			'service_type_id'         => $service_id,
+			'commodity_id'            => $this->input->post('commodity_id', TRUE),
+			'commodity_detail'        => $this->input->post('commodity_detail', TRUE),
+			'commodity_detail_en'     => $this->input->post('commodity_detail_en', TRUE),
+			'customs_value_usd'       => $this->_parse_indo_number($this->input->post('customs_value_usd')),
+			'sender_name'             => $sender_name,
+			'sender_phone'            => $sender_phone,
+			'sender_nik'              => $this->input->post('sender_nik', TRUE),
+			'sender_provinsi'         => $sender_prov_name ? $sender_prov_name->nama_provinsi : NULL,
+			'sender_kota'             => $sender_kota_name ? $sender_kota_name->nama_kota     : NULL,
+			'sender_kecamatan'        => $sender_kec_name  ? $sender_kec_name->nama_kecamatan : NULL,
+			'sender_kelurahan'        => $sender_kel_name  ? $sender_kel_name->nama_kelurahan : NULL,
+			'sender_address_detail'   => $this->input->post('sender_address_detail', TRUE),
+			'sender_address'          => $full_sender_address,
+			'receiver_name'           => $this->input->post('receiver_name', TRUE),
+			'receiver_phone'          => $this->input->post('receiver_phone', TRUE),
+			'receiver_kota'           => $this->input->post('receiver_city', TRUE),
+			'receiver_zipcode'        => $this->input->post('receiver_zipcode', TRUE),
+			'receiver_address_detail' => $this->input->post('receiver_address_detail', TRUE),
+			'receiver_address'        => $full_receiver_address,
+			'payment_type'            => $payment_type,
+			'koli'                    => $total_koli ?: 1,
+			'actual_weight'           => $actual_weight,
+			'volume_weight'           => $total_volume_weight,
+			'chargeable_weight'       => $chargeable,
+			'cost_price'              => $cost_per_kg,
+			'sell_price'              => $sell_per_kg,
+			'pickup_rate_id'          => $pickup_id,
+			'pickup_fee'              => $pickup_fee,
+			'total_addon_fee'         => $total_addon_fee,
+			'total_amount'            => $shipping_total + $pickup_fee + $total_addon_fee,
+			'margin_amount'           => $shipping_margin,
+			'shipment_photo'          => $photo_path,
+			'payment_expired_at'      => $payment_expired_at,
+			'updated_by'              => $sess['id'],
+			'updated_at'              => date('Y-m-d H:i:s'),
+		];
+
+		$this->db->trans_start();
+
+		$this->db->where('id', $id)->update('shipments', $update_shipment);
+
+		$this->db->where('shipment_id', $id)->delete('shipment_dimensions');
+		if (!empty($insert_dimensions)) $this->db->insert_batch('shipment_dimensions', $insert_dimensions);
+
+		$this->db->where('shipment_id', $id)->delete('shipment_addons');
+		if (!empty($insert_addons)) $this->db->insert_batch('shipment_addons', $insert_addons);
+
+		$this->db->insert('shipment_tracking', [
+			'shipment_id' => $id,
+			'status'      => 'BOOKED',
+			'location'    => $origin,
+			'note'        => 'Data shipment internasional diperbarui. Total: Rp ' . number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.'),
+			'created_by'  => $sess['id'],
+		]);
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			$this->session->set_flashdata('error', 'Gagal menyimpan perubahan!');
+			redirect('shipment/edit_intl/' . $id);
+		} else {
+			$this->session->set_flashdata('success', 'Shipment Internasional <b>' . $shipment->no_resi . '</b> berhasil diperbarui!');
+			redirect('shipment/detail/' . $id);
+		}
+	}
+
 	public function detail($id)
 	{
 		$this->_check_access();
@@ -1219,39 +1869,805 @@ class Shipment extends Authenticated_Controller
 		}
 	}
 
+	// public function manifest()
+	// {
+	// 	$this->_check_access();
+
+	// 	$filters = [
+	// 		'status' => $this->input->get('status', TRUE),
+	// 	];
+
+	// 	$data = [
+	// 		'title'     => 'Manajemen Manifest & Flight',
+	// 		'manifests' => $this->M_Shipment->get_manifest_list($filters),
+	// 		'filters'   => $filters,
+	// 	];
+
+	// 	$this->render('app/pages/shipment/manifest', $data);
+	// }
+
+	// public function create_awb()
+	// {
+
+	// }
+
 	public function manifest()
 	{
 		$this->_check_access();
+		$sess = $this->session->userdata('user');
 
+		// Filter status dari URL GET
 		$filters = [
-			'status' => $this->input->get('status', TRUE),
+			'status'   => $this->input->get('status', TRUE),
+			'agent_id' => $sess['agent_id'] ?? NULL // Filter agent jika bukan pusat
 		];
 
+		// Memanggil data dari query master_awb yang baru
+		$manifests = $this->M_Shipment->get_master_awb_list($filters);
+
 		$data = [
-			'title'     => 'Manajemen Manifest & Flight',
-			'manifests' => $this->M_Shipment->get_manifest_list($filters),
+			'title'     => 'Flight & Manifest Monitoring',
+			'manifests' => $manifests,
 			'filters'   => $filters,
 		];
 
 		$this->render('app/pages/shipment/manifest', $data);
 	}
 
+	public function create_awb()
+	{
+		$this->_check_access();
+
+		$data = [
+			'title'     => 'Buat Master AWB Udara Baru',
+			'airlines'  => $this->db->get_where('airlines', ['is_active' => 1])->result(),
+			'airports'  => $this->db->select('code, name')->get_where('cities', ['is_active' => 1])->result() // Menggunakan data kota/bandara
+		];
+
+		$this->render('app/pages/shipment/create_awb', $data);
+	}
+
+	public function save_awb()
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$data_awb = [
+			'awb_number'     => $this->input->post('awb_number', TRUE),
+			'airline_id'     => $this->input->post('airline_id', TRUE),
+			'flight_number'  => $this->input->post('flight_number', TRUE),
+			'departure_date' => $this->input->post('departure_date', TRUE),
+			'origin'         => $this->input->post('origin', TRUE),
+			'destination'    => $this->input->post('destination', TRUE),
+			'status'         => 'DRAFT',
+			'created_by'     => $sess['id']
+		];
+
+		$insert = $this->db->insert('master_awb', $data_awb);
+		if ($insert) {
+			$awb_id = $this->db->insert_id();
+			// Bawa user ke halaman khusus untuk proses packing/scanning resi ke koli
+			$this->session->set_flashdata('success', 'Master AWB berhasil dibuat. Silakan tambahkan koli karung dan scan resi!');
+			redirect('shipment/awb_console/' . $awb_id);
+		} else {
+			$this->session->set_flashdata('error', 'Gagal membuat Master AWB baru.');
+			redirect('shipment/create_awb');
+		}
+	}
+
+	public function awb_console($awb_id)
+	{
+		$this->_check_access();
+
+		// 1. Ambil data master AWB induknya
+		$this->db->select('ma.*, al.name as airline_name');
+		$this->db->from('master_awb ma');
+		$this->db->join('airlines al', 'al.id = ma.airline_id', 'left');
+		$this->db->where('ma.id', $awb_id);
+		$awb = $this->db->get()->row();
+
+		if (!$awb) {
+			$this->session->set_flashdata('error', 'Data AWB tidak ditemukan bro!');
+			redirect('shipment/manifest');
+		}
+
+		// 2. Ambil daftar koli (karung) yang sudah dibuat di dalam AWB ini
+		$kolis = $this->db->get_where('awb_koli', ['awb_id' => $awb_id])->result();
+
+		// 3. Loop untuk ngambil detail koli fisik (dus) yang ada di dalam masing-masing karung koli
+		foreach ($kolis as $k) {
+			// Kita ambil kode barcode dusnya dari shipment_dimensions beserta data penunjang dari shipments induk
+			$this->db->select('
+                s.id as shipment_id, 
+                sd.barcode_koli as no_resi, 
+                s.destination, 
+                s.commodity_detail,
+                (s.chargeable_weight / s.koli) as chargeable_weight,
+                "1/1" as koli
+            ');
+			$this->db->from('shipment_dimensions sd');
+			$this->db->join('shipments s', 's.id = sd.shipment_id');
+			$this->db->where('sd.awb_koli_id', $k->id);
+			$this->db->order_by('sd.id', 'DESC');
+
+			$k->items = $this->db->get()->result();
+		}
+
+		$data = [
+			'title' => 'Console Packing AWB: ' . $awb->awb_number,
+			'awb'   => $awb,
+			'kolis' => $kolis
+		];
+
+		$this->render('app/pages/shipment/awb_console', $data);
+	}
+
+	// AJAX: Membuat Karung Koli Baru di Dalam AWB
+	public function ajax_create_koli()
+	{
+		$this->_check_access();
+		$awb_id = $this->input->post('awb_id', TRUE);
+
+		// Hitung koli ke berapa yang mau dibuat biar dapet nomor berurutan
+		$this->db->where('awb_id', $awb_id);
+		$total_existing = $this->db->count_all_results('awb_koli');
+		$next_number = str_pad($total_existing + 1, 3, '0', STR_PAD_LEFT);
+
+		$koli_number = 'KOLI-' . $next_number;
+
+		$data_koli = [
+			'awb_id'        => $awb_id,
+			'koli_number'   => $koli_number,
+			'actual_weight' => 0.00
+		];
+
+		if ($this->db->insert('awb_koli', $data_koli)) {
+			echo json_encode(['status' => true, 'message' => 'Karung ' . $koli_number . ' berhasil dibuat!']);
+		} else {
+			echo json_encode(['status' => false, 'message' => 'Gagal membuat karung baru.']);
+		}
+	}
+
+	// AJAX: Tembak Barcode Resi untuk dimasukkan ke Karung Koli
+	public function ajax_bind_resi_to_koli()
+	{
+		$this->_check_access();
+
+		// Petugas menembak barcode per kardus fisik (e.g., SMC2604001-01)
+		$barcode_koli = strtoupper(trim($this->input->post('no_resi', TRUE)));
+		$awb_koli_id  = $this->input->post('awb_koli_id', TRUE);
+
+		// 1. Cek di tabel anak dimensi koli
+		$dimensi = $this->db->get_where('shipment_dimensions', ['barcode_koli' => $barcode_koli])->row();
+
+		if (!$dimensi) {
+			echo json_encode(['status' => false, 'message' => 'Barcode Koli ' . $barcode_koli . ' tidak valid!']);
+			return;
+		}
+
+		if (!empty($dimensi->awb_koli_id)) {
+			$karung = $this->db->get_where('awb_koli', ['id' => $dimensi->awb_koli_id])->row();
+			echo json_encode(['status' => false, 'message' => 'Koli ini sudah di-packing di ' . $karung->koli_number]);
+			return;
+		}
+
+		// Ambil data resi induknya untuk keperluan info display & estimasi berat proporsional
+		$shipment = $this->db->get_where('shipments', ['id' => $dimensi->shipment_id])->row();
+
+		// Hitung estimasi berat per koli (Berat total resi dibagi jumlah koli induk)
+		$berat_per_koli = $shipment->chargeable_weight / $shipment->koli;
+
+		$this->db->trans_start();
+
+		// Update tabel dimensi koli: bind ke karung udara
+		$this->db->where('id', $dimensi->id);
+		$this->db->update('shipment_dimensions', ['awb_koli_id' => $awb_koli_id]);
+
+		// Hitung total berat karung saat ini dari akumulasi koli di dalamnya
+		$this->db->select('sd.shipment_id, s.chargeable_weight, s.koli');
+		$this->db->from('shipment_dimensions sd');
+		$this->db->join('shipments s', 's.id = sd.shipment_id');
+		$this->db->where('sd.awb_koli_id', $awb_koli_id);
+		$packed_items = $this->db->get()->result();
+
+		$total_berat_karung = 0;
+		foreach ($packed_items as $item) {
+			$total_berat_karung += ($item->chargeable_weight / $item->koli);
+		}
+
+		// Update total timbangan karung
+		$this->db->where('id', $awb_koli_id);
+		$this->db->update('awb_koli', ['actual_weight' => $total_berat_karung]);
+
+		// ── 🔥 LOGIKA EVALUASI STATUS RESI INDUK (PROPORSIONAL SINKRON) ──
+		$this->db->where('shipment_id', $shipment->id);
+		$this->db->where('awb_koli_id IS NULL');
+		$sisa_koli = $this->db->count_all_results('shipment_dimensions');
+
+		if ($sisa_koli == 0) {
+			// Skenario A: Semua koli fisik resi ini sudah lengkap masuk karung kargo
+			$this->db->where('id', $shipment->id);
+			$this->db->update('shipments', ['status' => 'CONSOLIDATED']);
+		} else {
+			// Skenario B: Paket baru masuk sebagian ke karung (misal 1 dari 3 koli)
+			$this->db->where('id', $shipment->id);
+			$this->db->update('shipments', ['status' => 'PARTIAL_CONSOLIDATED']);
+		}
+
+		$this->db->trans_complete();
+
+		echo json_encode([
+			'status' => true,
+			'message' => 'Koli ' . $barcode_koli . ' masuk karung!',
+			'data' => [
+				'no_resi'             => $barcode_koli,
+				'destination'         => $shipment->destination,
+				'koli'                => '1/1',
+				'weight'              => number_format($berat_per_koli, 1),
+				'commodity'           => $shipment->commodity_detail,
+				'updated_koli_weight' => number_format($total_berat_karung, 2)
+			]
+		]);
+	}
+
+	public function ajax_finalize_awb()
+	{
+		$this->_check_access();
+		$awb_id = $this->input->post('awb_id', TRUE);
+		$sess   = $this->session->userdata('user');
+
+		// 1. Validasi keberadaan AWB
+		$awb = $this->db->get_where('master_awb', ['id' => $awb_id])->row();
+		if (!$awb) {
+			echo json_encode(['status' => false, 'message' => 'Data AWB tidak ditemukan bro.']);
+			return;
+		}
+
+		// 2. Ambil semua resi unik yang ada di dalam karung-karung AWB ini
+		$this->db->select('sd.shipment_id');
+		$this->db->from('shipment_dimensions sd');
+		$this->db->join('awb_koli ak', 'ak.id = sd.awb_koli_id');
+		$this->db->where('ak.awb_id', $awb_id);
+		$this->db->group_by('sd.shipment_id');
+		$shipments = $this->db->get()->result();
+
+		if (empty($shipments)) {
+			echo json_encode(['status' => false, 'message' => 'Gagal! Kamu belum men-scan resi satu pun ke dalam koli karung.']);
+			return;
+		}
+
+		$this->db->trans_start();
+
+		// 3. Update status Master AWB menjadi MANIFESTED
+		$this->db->where('id', $awb_id);
+		$this->db->update('master_awb', ['status' => 'MANIFESTED']);
+
+		// 4. Update status shipments & inject data manifest udara ke resi induk
+		$shipment_ids = array_column($shipments, 'shipment_id');
+
+		$this->db->where_in('id', $shipment_ids);
+		$this->db->update('shipments', [
+			'status'           => 'MANIFESTED',
+			'smu_number'       => $awb->awb_number,
+			'flight_number'    => $awb->flight_number,
+			'departure_date'   => $awb->departure_date,
+			'origin_warehouse' => 'GUDANG UTAMA LINI 1'
+		]);
+
+		// 5. Insert history tracking untuk semua resi sekaligus (batch)
+		$tracking_batch = [];
+		foreach ($shipment_ids as $s_id) {
+			$tracking_batch[] = [
+				'shipment_id' => $s_id,
+				'status'      => 'MANIFESTED',
+				'location'    => $awb->origin,
+				'note'        => 'Paket telah dimasukkan ke manifest penerbangan ' . $awb->flight_number . ' dengan nomor AWB: ' . $awb->awb_number,
+				'created_by'  => $sess['id']
+			];
+		}
+		$this->db->insert_batch('shipment_tracking', $tracking_batch);
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			echo json_encode(['status' => false, 'message' => 'Gagal finalisasi karena error database.']);
+		} else {
+			echo json_encode(['status' => true, 'message' => 'Console AWB resmi dikunci dan masuk ke manifest aktif!']);
+		}
+	}
+
+	// AJAX: Mengambil daftar karung untuk modal checklist
+	public function ajax_get_koli_by_awb($awb_id)
+	{
+		$this->_check_access();
+		$kolis = $this->db->get_where('awb_koli', ['awb_id' => $awb_id])->result();
+
+		if ($kolis) {
+			echo json_encode(['status' => true, 'data' => $kolis]);
+		} else {
+			echo json_encode(['status' => false, 'message' => 'AWB ini tidak memiliki koli/karung.']);
+		}
+	}
+
+	// AJAX INTI: Eksekusi Split Keberangkatan Penerbangan
+	public function ajax_confirm_split_departure()
+	{
+		$this->_check_access();
+		$awb_id     = $this->input->post('awb_id', TRUE);
+		$karung_fly = $this->input->post('karung_ids', TRUE) ?: []; // ID karung yang dicentang terbang
+		$sess       = $this->session->userdata('user');
+
+		$awb = $this->db->get_where('master_awb', ['id' => $awb_id])->row();
+		if (!$awb) {
+			echo json_encode(['status' => false, 'message' => 'Master AWB tidak valid bro.']);
+			return;
+		}
+
+		// Ambil semua daftar ID karung asli yang terdaftar di AWB ini
+		$all_koli = $this->db->get_where('awb_koli', ['awb_id' => $awb_id])->result_array();
+		$all_koli_ids = array_column($all_koli, 'id');
+
+		// Cari tahu karung mana saja yang ditinggal (Offloaded)
+		$karung_left = array_diff($all_koli_ids, $karung_fly);
+
+		$this->db->trans_start();
+
+		// 1. UPDATE STATUS KOLI/KARUNG
+		// Karung yang dicentang -> DEPARTED
+		if (!empty($karung_fly)) {
+			$this->db->where_in('id', $karung_fly)->update('awb_koli', ['status' => 'DEPARTED']);
+		}
+		// Karung yang ditinggal -> OFFLOADED
+		if (!empty($karung_left)) {
+			$this->db->where_in('id', $karung_left)->update('awb_koli', ['status' => 'OFFLOADED']);
+		}
+
+		// 2. UPDATE STATUS MASTER AWB INDUKNYA MENJADI DEPARTED
+		$this->db->where('id', $awb_id)->update('master_awb', ['status' => 'DEPARTED']);
+
+		// 3. LOGIKA EVALUASI STATUS RESI INDUK (PROPORSIONAL PARAREL)
+		// Ambil semua resi unik yang terikat di dalam seluruh karung AWB ini
+		$this->db->select('sd.shipment_id');
+		$this->db->from('shipment_dimensions sd');
+		$this->db->where_in('sd.awb_koli_id', $all_koli_ids);
+		$this->db->group_by('sd.shipment_id');
+		$shipments = $this->db->get()->result_array();
+
+		$tracking_batch = [];
+
+		foreach ($shipments as $s) {
+			$s_id = $s['shipment_id'];
+
+			// Hitung total koli fisik asli resi ini di DB
+			$total_koli_resi = $this->db->where('shipment_id', $s_id)->count_all_results('shipment_dimensions');
+
+			// Hitung berapa koli fisik resi ini yang ikut terbang (status karungnya DEPARTED)
+			$this->db->from('shipment_dimensions sd');
+			$this->db->join('awb_koli ak', 'ak.id = sd.awb_koli_id');
+			$this->db->where('sd.shipment_id', $s_id);
+			$this->db->where('ak.status', 'DEPARTED');
+			$koli_terbang = $this->db->count_all_results();
+
+			// Penentuan Status Akhir Resi Induk
+			if ($koli_terbang === $total_koli_resi) {
+				// Skenario A: Semua koli ikut terbang lengkap
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'DEPARTED']);
+
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'DEPARTED',
+					'location'    => $awb->origin,
+					'note'        => 'Flight Out! Seluruh koli paket telah diberangkatkan dengan pesawat ' . $awb->flight_number,
+					'created_by'  => $sess['id']
+				];
+			} elseif ($koli_terbang > 0 && $koli_terbang < $total_koli_resi) {
+				// Skenario B: Hanya sebagian koli yang ikut terbang (SPLIT / PARTIAL)
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'PARTIAL_DEPARTED']);
+
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'PARTIAL_DEPARTED',
+					'location'    => $awb->origin,
+					'note'        => 'Partial Flight Out! Baru sebanyak ' . $koli_terbang . '/' . $total_koli_resi . ' koli fisik yang berangkat di pesawat ' . $awb->flight_number . '. Sisa koli tertinggal akan disusulkan kloter berikutnya.',
+					'created_by'  => $sess['id']
+				];
+			} else {
+				// Skenario C: Kebetulan resi ini seluruh dusnya ada di dalam karung yang tertinggal
+				// Status resi induk biarkan tetap MANIFESTED (menunggu re-route pesawat berikutnya)
+			}
+		}
+
+		// Insert log tracking secara massal
+		if (!empty($tracking_batch)) {
+			$this->db->insert_batch('shipment_tracking', $tracking_batch);
+		}
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			echo json_encode(['status' => false, 'message' => 'Gagal konfirmasi terbang karena kendala database transaction.']);
+		} else {
+			echo json_encode(['status' => true, 'message' => 'Status keberangkatan berhasil diproses proporsional!']);
+		}
+	}
+
+	// AJAX: Ambil daftar karung untuk modal check-list sebelum terbang
+	public function ajax_get_awb_bags()
+	{
+		$this->_check_access();
+		$awb_number = $this->input->post('smu_number', TRUE);
+
+		// Cari master AWB
+		$awb = $this->db->get_where('master_awb', ['awb_number' => $awb_number])->row();
+		if (!$awb) {
+			echo json_encode(['status' => false, 'message' => 'Master AWB tidak ditemukan!']);
+			return;
+		}
+
+		// Ambil list karung di dalam AWB ini
+		$this->db->select('ak.id, ak.koli_number, ak.actual_weight, COUNT(sd.id) as total_resi_koli');
+		$this->db->from('awb_koli ak');
+		$this->db->join('shipment_dimensions sd', 'sd.awb_koli_id = ak.id', 'left');
+		$this->db->where('ak.awb_id', $awb->id);
+		$this->db->group_by('ak.id, ak.koli_number, ak.actual_weight');
+		$bags = $this->db->get()->result();
+
+		echo json_encode([
+			'status' => true,
+			'awb'    => $awb,
+			'bags'   => $bags
+		]);
+	}
+
+	// AJAX: Eksekusi Keberangkatan Parsial (Split Flight)
+	public function ajax_confirm_partial_departure()
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$awb_id       = $this->input->post('awb_id', TRUE);
+		$flown_bag_ids = $this->input->post('flown_bags', TRUE) ?: []; // Array ID karung yang dicentang (terbang)
+
+		$awb = $this->db->get_where('master_awb', ['id' => $awb_id])->row();
+		if (!$awb) {
+			echo json_encode(['status' => false, 'message' => 'Data penerbangan tidak valid.']);
+			return;
+		}
+
+		// 1. Ambil semua karung yang terdaftar di AWB ini
+		$all_bags = $this->db->get_where('awb_koli', ['awb_id' => $awb_id])->result();
+		if (empty($all_bags)) {
+			echo json_encode(['status' => false, 'message' => 'AWB ini tidak memiliki koli karung untuk diterbangkan.']);
+			return;
+		}
+
+		$this->db->trans_start();
+
+		$allocated_flown_bags = [];
+		$allocated_offload_bags = [];
+
+		// 2. Update status masing-masing karung (DEPARTED vs OFLOADED)
+		foreach ($all_bags as $bag) {
+			if (in_array($bag->id, $flown_bag_ids)) {
+				// Karung Ikut Terbang
+				$this->db->where('id', $bag->id)->update('awb_koli', ['status' => 'DEPARTED']);
+				$allocated_flown_bags[] = $bag->id;
+			} else {
+				// Karung Ketinggalan (Offload)
+				$this->db->where('id', $bag->id)->update('awb_koli', ['status' => 'OFFLOADED']);
+				$allocated_offload_bags[] = $bag->id;
+			}
+		}
+
+		// 3. Update status Master AWB Induknya
+		// Jika ada karung yang tertinggal, induknya kita set status 'PARTIAL_DEPARTED', jika lengkap 'DEPARTED'
+		$final_awb_status = (count($allocated_offload_bags) > 0) ? 'DEPARTED' : 'DEPARTED';
+		// Catatan: Di master_awb tetap set DEPARTED agar tidak merusak filter luar, tapi log resinya yang kita perketat
+		$this->db->where('id', $awb_id)->update('master_awb', ['status' => 'DEPARTED']);
+
+		// 4. Ambil semua resi unik yang terlibat di seluruh karung AWB ini
+		$this->db->select('shipment_id')->from('shipment_dimensions')->where_in('awb_koli_id', array_column($all_bags, 'id'))->group_by('shipment_id');
+		$involved_shipments = $this->db->get()->result();
+
+		// 5. EVALUASI STATUS RESI INDUK SATU PER SATU (LOGIKA AKUMULASI PARALEL)
+		$tracking_batch = [];
+		foreach ($involved_shipments as $sh) {
+			$s_id = $sh->shipment_id;
+
+			// Hitung total koli fisik resi ini
+			$total_koli_resi = $this->db->where('shipment_id', $s_id)->count_all_results('shipment_dimensions');
+
+			// Hitung berapa koli fisik resi ini yang ikut di karung terbang
+			$this->db->where('shipment_id', $s_id);
+			$this->db->where_in('awb_koli_id', $flown_bag_ids);
+			$flown_koli_resi = $this->db->count_all_results('shipment_dimensions');
+
+			if ($flown_koli_resi === $total_koli_resi) {
+				// Skenario A: Semua koli resi ini ikut terbang lancar
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'DEPARTED']);
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'DEPARTED',
+					'location'    => $awb->origin,
+					'note'        => 'Lengkap! Seluruh koli barang telah terbang dengan pesawat ' . $awb->flight_number,
+					'created_by'  => $sess['id']
+				];
+			} elseif ($flown_koli_resi > 0 && $flown_koli_resi < $total_koli_resi) {
+				// Skenario B: Split Shipment (Hanya sebagian koli yang ikut terbang kloter ini)
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'PARTIAL_DEPARTED']);
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'PARTIAL_DEPARTED',
+					'location'    => $awb->origin,
+					'note'        => "Split Flight! Baru {$flown_koli_resi} dari {$total_koli_resi} koli fisik yang berangkat dengan pesawat {$awb->flight_number}. Sisa koli tertinggal di gudang asal dan akan menyusul.",
+					'created_by'  => $sess['id']
+				];
+			} else {
+				// Skenario C: Kebetulan semua koli dari resi ini numpuk di karung yang tertinggal (offload total)
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'OFFLOADED']);
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'OFFLOADED',
+					'location'    => $awb->origin,
+					'note'        => 'Kargo Offload! Seluruh koli untuk resi ini tertinggal di bandara asal karena kapasitas pesawat penuh.',
+					'created_by'  => $sess['id']
+				];
+			}
+		}
+
+		if (!empty($tracking_batch)) {
+			$this->db->insert_batch('shipment_tracking', $tracking_batch);
+		}
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			echo json_encode(['status' => false, 'message' => 'Gagal memproses keberangkatan karena error database.']);
+		} else {
+			$msg = "Keberangkatan berhasil diproses! " . count($allocated_flown_bags) . " karung terbang, " . count($allocated_offload_bags) . " karung offload.";
+			echo json_encode(['status' => true, 'message' => $msg]);
+		}
+	}
+
+	// AJAX: Mengambil daftar Master AWB yang masih DRAFT untuk target Re-Route
+	public function ajax_get_draft_awb()
+	{
+		$this->_check_access();
+		// Ambil penerbangan yang masih siap menampung koli konsolidasi
+		$this->db->select('id, awb_number, flight_number, origin, destination');
+		$this->db->where('status', 'DRAFT');
+		$this->db->order_by('id', 'DESC');
+		$data = $this->db->get('master_awb')->result();
+
+		if ($data) {
+			echo json_encode(['status' => true, 'data' => $data]);
+		} else {
+			echo json_encode(['status' => false, 'message' => 'Kosong']);
+		}
+	}
+
+	// AJAX INTI: Eksekusi Perpindahan Karung ke Pesawat Baru
+	public function ajax_execute_reroute_koli()
+	{
+		$this->_check_access();
+		$koli_id            = $this->input->post('koli_id', TRUE);
+		$target_awb_id      = $this->input->post('target_awb_id', TRUE);
+		$target_action_koli = $this->input->post('target_action_koli', TRUE); // NEW_KOLI atau ID Karung Eksis
+		$sess               = $this->session->userdata('user');
+
+		// 1. Ambil data Master AWB Target
+		$new_awb = $this->db->get_where('master_awb', ['id' => $target_awb_id])->row();
+		if (!$new_awb) {
+			echo json_encode(['status' => false, 'message' => 'Penerbangan tujuan tidak valid bro!']);
+			return;
+		}
+
+		// Ambil resi-resi di dalam karung asal
+		$this->db->select('shipment_id');
+		$this->db->from('shipment_dimensions');
+		$this->db->where('awb_koli_id', $koli_id);
+		$this->db->group_by('shipment_id');
+		$shipments = $this->db->get()->result_array();
+
+		if (empty($shipments)) {
+			echo json_encode(['status' => false, 'message' => 'Karung asal kosong atau tidak punya isi resi bro.']);
+			return;
+		}
+
+		$this->db->trans_start();
+
+		$final_koli_id = NULL;
+		$final_koli_name = '';
+
+		if ($target_action_koli === 'NEW_KOLI') {
+			// SKENARIO A: Bikin Wadah Karung Baru di Pesawat Baru
+			$this->db->where('awb_id', $target_awb_id);
+			$total_existing = $this->db->count_all_results('awb_koli');
+			$next_number = str_pad($total_existing + 1, 3, '0', STR_PAD_LEFT);
+			$final_koli_name = 'KOLI-' . $next_number;
+
+			// Update wadah karung lamanya biar ga usah insert baru, status ikut DRAFT/mengikuti AWB baru
+			$this->db->where('id', $koli_id)->update('awb_koli', [
+				'awb_id'      => $target_awb_id,
+				'koli_number' => $final_koli_name,
+				'status'      => 'DRAFT'
+			]);
+			$final_koli_id = $koli_id;
+		} else {
+			// SKENARIO B: Dilebur / Dimasukkan ke Karung yang Sudah Eksis di Pesawat Baru
+			$final_koli_id = $target_action_koli;
+			$target_koli_row = $this->db->get_where('awb_koli', ['id' => $final_koli_id])->row();
+			$final_koli_name = $target_koli_row->koli_number;
+
+			// Pindahkan seluruh isi koli fisik di shipment_dimensions ke id karung target
+			$this->db->where('awb_koli_id', $koli_id)->update('shipment_dimensions', [
+				'awb_koli_id' => $final_koli_id
+			]);
+
+			// Karena isinya sudah ditumpahkan ke karung eksis, wadah karung lama yang kosong kita hapus
+			$this->db->where('id', $koli_id)->delete('awb_koli');
+		}
+
+		// ====================================================================
+		// 🔥 FIX LOGIC: PENENTUAN STATUS RESI INDUK MENGIKUTI STATUS AWB TARGET
+		// ====================================================================
+		// Jika AWB barunya masih DRAFT (belum dikunci), status resi diturunkan ke BOOKED
+		// Jika AWB barunya sudah MANIFESTED (dikunci), baru status resi jadi MANIFESTED
+		$new_shipment_status = ($new_awb->status === 'DRAFT') ? 'CONSOLIDATED' : 'MANIFESTED';
+		// ====================================================================
+
+		// 4. Update Informasi Penerbangan Baru & Status Dinamis di Tabel Utama Shipments
+		$shipment_ids = array_column($shipments, 'shipment_id');
+		$this->db->where_in('id', $shipment_ids)->update('shipments', [
+			'status'         => $new_shipment_status, // <--- Sudah dinamis bro!
+			'smu_number'     => $new_awb->awb_number,
+			'flight_number'  => $new_awb->flight_number,
+			'departure_date' => $new_awb->departure_date
+		]);
+
+		// 5. Hitung & Sinkronisasi Ulang Timbangan Total Berat Karung Penerima yang Baru
+		$this->db->select('sd.shipment_id, s.chargeable_weight, s.koli');
+		$this->db->from('shipment_dimensions sd');
+		$this->db->join('shipments s', 's.id = sd.shipment_id');
+		$this->db->where('sd.awb_koli_id', $final_koli_id);
+		$packed_items = $this->db->get()->result();
+
+		$total_berat_baru = 0;
+		foreach ($packed_items as $item) {
+			$total_berat_baru += ($item->chargeable_weight / $item->koli);
+		}
+
+		$this->db->where('id', $final_koli_id)->update('awb_koli', ['actual_weight' => $total_berat_baru]);
+
+		// 6. Log Tracking History dengan pesan yang kontekstual
+		$tracking_batch = [];
+		foreach ($shipment_ids as $s_id) {
+			$note_msg = 'Re-Route! Karung paket dialihkan ke penerbangan baru ' . $new_awb->flight_number . ' dimasukkan ke ' . $final_koli_name . '.';
+			if ($new_shipment_status === 'CONSOLIDATED') {
+				$note_msg .= ' Menunggu proses finalisasi manifest penerbangan baru.';
+			}
+
+			$tracking_batch[] = [
+				'shipment_id' => $s_id,
+				'status'      => $new_shipment_status,
+				'location'    => $new_awb->origin,
+				'note'        => $note_msg,
+				'created_by'  => $sess['id']
+			];
+		}
+		$this->db->insert_batch('shipment_tracking', $tracking_batch);
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			echo json_encode(['status' => false, 'message' => 'Gagal memproses alokasi karung koli.']);
+		} else {
+			echo json_encode(['status' => true, 'message' => 'Paket sukses dialihkan ke ' . $final_koli_name . ' pada flight baru!']);
+		}
+	}
+
 	public function ajax_confirm_arrival()
 	{
 		$this->_check_access();
 		$smu_number = $this->input->post('smu_number', TRUE);
+		$sess       = $this->session->userdata('user');
 
 		if (empty($smu_number)) {
-			echo json_encode(['status' => false, 'message' => 'Nomor SMU tidak valid!']);
+			echo json_encode(['status' => false, 'message' => 'Nomor SMU tidak boleh kosong, bro!']);
 			return;
 		}
 
-		$res = $this->M_Shipment->arrive_by_smu($smu_number);
+		// 1. Ambil data Master AWB berdasarkan nomor SMU yang berstatus terbang (DEPARTED)
+		$awb = $this->db->get_where('master_awb', ['awb_number' => $smu_number, 'status' => 'DEPARTED'])->row();
+		if (!$awb) {
+			echo json_encode(['status' => false, 'message' => 'Data penerbangan aktif tidak ditemukan atau status penerbangan sudah mendarat.']);
+			return;
+		}
 
-		if ($res) {
-			echo json_encode(['status' => true, 'message' => "SMU $smu_number berhasil dikonfirmasi mendarat."]);
+		// 2. Ambil seluruh karung di dalam AWB ini yang statusnya memang ikut terbang (DEPARTED)
+		$this->db->where('awb_id', $awb->id);
+		$this->db->where('status', 'DEPARTED');
+		$kolis = $this->db->get('awb_koli')->result_array();
+
+		if (empty($kolis)) {
+			echo json_encode(['status' => false, 'message' => 'Gagal! Tidak ada karung koli berstatus DEPARTED di dalam penerbangan ini.']);
+			return;
+		}
+
+		$koli_ids = array_column($kolis, 'id');
+
+		// 3. Ambil daftar ID resi unik yang isi koli fisiknya terikat di dalam karung-karung terbang tersebut
+		$this->db->select('shipment_id');
+		$this->db->from('shipment_dimensions');
+		$this->db->where_in('awb_koli_id', $koli_ids);
+		$this->db->group_by('shipment_id');
+		$shipments = $this->db->get()->result_array();
+
+		// Jaga-jaga jika isinya kosong
+		if (empty($shipments)) {
+			echo json_encode(['status' => false, 'message' => 'Tidak ada muatan resi di dalam karung yang terbang.']);
+			return;
+		}
+
+		$this->db->trans_start();
+
+		// 4. Naikkan status dokumen induk Master AWB menjadi ARRIVED
+		$this->db->where('id', $awb->id)->update('master_awb', ['status' => 'ARRIVED']);
+
+		// 5. Ubah status karung-karung yang tadinya terbang (DEPARTED) menjadi ARRIVED
+		$this->db->where_in('id', $koli_ids)->update('awb_koli', ['status' => 'ARRIVED']);
+
+		// 6. 🔥 EVALUASI AKUMULASI KOLI UNTUK TIAP RESI INDUK (PROPORSIONAL SINKRON)
+		$shipment_ids = array_column($shipments, 'shipment_id');
+		$tracking_batch = [];
+
+		foreach ($shipment_ids as $s_id) {
+			// Hitung total koli fisik asli yang terdaftar dari resi ini
+			$total_koli_resi = $this->db->where('shipment_id', $s_id)->count_all_results('shipment_dimensions');
+
+			// Hitung berapa koli fisik resi ini yang karungnya SUDAH BERSTATUS ARRIVED di bandara tujuan
+			$this->db->from('shipment_dimensions sd');
+			$this->db->join('awb_koli ak', 'ak.id = sd.awb_koli_id');
+			$this->db->where('sd.shipment_id', $s_id);
+			$this->db->where('ak.status', 'ARRIVED');
+			$koli_sampai = $this->db->count_all_results();
+
+			if ($koli_sampai === $total_koli_resi) {
+				// Skenario A: Semua dus fisik resi ini sudah lengkap tiba di tujuan
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'ARRIVED']);
+
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'ARRIVED',
+					'location'    => $awb->destination,
+					'note'        => 'Landed! Seluruh koli paket telah mendarat di bandara tujuan ' . $awb->destination . ' dan sedang dalam proses pembongkaran.',
+					'created_by'  => $sess['id']
+				];
+			} else {
+				// Skenario B: Kasus Partial! Dus yang sampai baru sebagian (karena dus lainnya kena split di karung lain kemarin)
+				$this->db->where('id', $s_id)->update('shipments', ['status' => 'PARTIAL_ARRIVED']);
+
+				$tracking_batch[] = [
+					'shipment_id' => $s_id,
+					'status'      => 'PARTIAL_ARRIVED',
+					'location'    => $awb->destination,
+					'note'        => 'Partial Landed! Baru sebanyak ' . $koli_sampai . '/' . $total_koli_resi . ' koli fisik paket yang tiba di ' . $awb->destination . '. Sisa koli terpantau menyusul di kloter pesawat berbeda.',
+					'created_by'  => $sess['id']
+				];
+			}
+		}
+
+		// Suntik data riwayat pelacakan secara massal (batch)
+		if (!empty($tracking_batch)) {
+			$this->db->insert_batch('shipment_tracking', $tracking_batch);
+		}
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			echo json_encode(['status' => false, 'message' => 'Gagal mengonfirmasi mendarat karena kendala transaksi database.']);
 		} else {
-			echo json_encode(['status' => false, 'message' => 'Gagal memproses data kedatangan.']);
+			echo json_encode(['status' => true, 'message' => "SMU $smu_number bersama koli muatannya resmi mendarat di " . $awb->destination]);
 		}
 	}
 
@@ -1283,54 +2699,175 @@ class Shipment extends Authenticated_Controller
 
 	public function ajax_process_inbound()
 	{
-		$input_scan = $this->input->post('no_resi', TRUE); // Contoh: SMC...-01
-		$parts = explode('-', $input_scan);
-		$no_resi = $parts;
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
 
-		$no_resi  = $parts[0];                          // ✅ "SMC2604050001"
-		$piece_no = isset($parts[1]) ? $parts[1] : '01';
+		$input_scan = strtoupper(trim($this->input->post('no_resi', TRUE)));
 
-		$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
-
-		if (!$shipment) {
-			echo json_encode(['status' => false, 'message' => 'Resi tidak terdaftar!']);
+		if (empty($input_scan)) {
+			echo json_encode(['status' => false, 'message' => 'Barcode tidak boleh kosong!']);
 			return;
 		}
 
-		// 1. Cek duplikasi scan koli
-		$check_piece = $this->db->get_where('shipment_tracking', [
-			'shipment_id' => $shipment->id,
-			'status'      => 'PIECE_RECEIVED_DESTINATION',
-			'note LIKE'   => "%$input_scan%"
-		])->num_rows();
+		// ─── 1. PROSES UPLOAD FOTO (PROOF OF CONDITION) DULU ───
+		$photo_path = NULL;
+		if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
+			$upload_dir = FCPATH . 'uploads/inbound/' . date('Y/m/');
+			if (!is_dir($upload_dir)) {
+				mkdir($upload_dir, 0755, TRUE);
+			}
 
-		if ($check_piece > 0) {
-			echo json_encode(['status' => false, 'message' => "Koli $input_scan sudah masuk sistem!"]);
-			return;
+			$ext       = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+			$file_name = 'INB_' . preg_replace('/[^A-Za-z0-9\-]/', '', $input_scan) . '_' . time() . '.' . $ext;
+			$full_path = $upload_dir . $file_name;
+
+			if (move_uploaded_file($_FILES['photo']['tmp_name'], $full_path)) {
+				$photo_path = 'uploads/inbound/' . date('Y/m/') . $file_name;
+			}
 		}
 
-		// 2. Simpan Log Koli
-		$this->M_Shipment->insert_tracking_log($shipment->id, 'PIECE_RECEIVED_DESTINATION', "Box $input_scan diterima di Cabang Tujuan.", "Gudang {$shipment->destination}");
+		// Inisialisasi variabel global biar tidak undefined di response akhir
+		$is_complete    = false;
+		$received_count = 0;
+		$no_resi        = $input_scan;
+		$shipment       = null;
+		$is_koli_master = false;
+		$pesan          = '';
 
-		// 3. Hitung apakah sudah lengkap?
-		$received_count = $this->db->get_where('shipment_tracking', [
-			'shipment_id' => $shipment->id,
-			'status'      => 'PIECE_RECEIVED_DESTINATION'
-		])->num_rows();
+		$this->db->trans_start();
 
-		$is_complete = false;
-		if ($received_count >= $shipment->koli) {
-			// UPDATE STATUS MASTER
-			$this->M_Shipment->update_status($shipment->id, 'RECEIVED_DESTINATION', 'Paket diterima lengkap di kantor tujuan. Siap dikirim.', "Kantor Cabang {$shipment->destination}");
-			$is_complete = true;
+		// ─── 2. LOGIC AUTO-DETECT: APAKAH INI KARUNG ATAU RESI FISIK? ───
+		if (strpos($input_scan, 'KOLI-') === 0) {
+
+			// ========================================================
+			// SKENARIO A: SCAN BARCODE KARUNG KONSOLIDASI (UNBAGGING)
+			// ========================================================
+			$karung = $this->db->get_where('awb_koli', ['koli_number' => $input_scan])->row();
+
+			if (!$karung) {
+				echo json_encode(['status' => false, 'message' => "Karung $input_scan tidak ditemukan di sistem!"]);
+				return;
+			}
+
+			if ($karung->status === 'RECEIVED_AT_HUB') {
+				echo json_encode(['status' => false, 'message' => "Karung $input_scan sudah pernah diterima sebelumnya!"]);
+				return;
+			}
+
+			// Update status karung + Simpan Foto Karung
+			$this->db->where('id', $karung->id)->update('awb_koli', [
+				'status'        => 'RECEIVED_AT_HUB',
+				'photo_inbound' => $photo_path
+			]);
+
+			// Ambil semua resi di dalam karung ini
+			$this->db->select('shipment_id');
+			$this->db->from('shipment_dimensions');
+			$this->db->where('awb_koli_id', $karung->id);
+			$this->db->group_by('shipment_id');
+			$shipments_in_bag = $this->db->get()->result_array();
+
+			if (!empty($shipments_in_bag)) {
+				$s_ids = array_column($shipments_in_bag, 'shipment_id');
+
+				$this->db->where_in('id', $s_ids)->update('shipments', ['status' => 'RECEIVED_AT_HUB']);
+
+				$tracking_batch = [];
+				foreach ($s_ids as $s_id) {
+					$tracking_batch[] = [
+						'shipment_id' => $s_id,
+						'status'      => 'RECEIVED_AT_HUB',
+						'location'    => "Gudang Cabang Tujuan",
+						'note'        => "Karung $input_scan berhasil mendarat di Gudang Cabang. Menunggu proses bongkar koli (Breakdown).",
+						'photo_proof' => $photo_path,
+						'created_by'  => $sess['id']
+					];
+				}
+				$this->db->insert_batch('shipment_tracking', $tracking_batch);
+			}
+
+			$pesan          = "Karung $input_scan beserta isinya berhasil diterima!";
+			$is_koli_master = true;
+		} else {
+
+			// ========================================================
+			// SKENARIO B: SCAN BARCODE KOLI RESI FISIK (BONGKAR KARUNG)
+			// ========================================================
+
+			// FIX: explode dengan benar, ambil index yang tepat
+			$parts    = explode('-', $input_scan);
+			$no_resi  = $parts[0];                             // "SMC2604050001"
+			$piece_no = isset($parts[1]) ? $parts[1] : '01';  // "01"
+
+			$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
+
+			if (!$shipment) {
+				echo json_encode(['status' => false, 'message' => "Resi $no_resi tidak terdaftar!"]);
+				return;
+			}
+
+			// 1. Cek duplikasi scan koli fisik
+			$check_piece = $this->db->get_where('shipment_tracking', [
+				'shipment_id' => $shipment->id,
+				'status'      => 'PIECE_RECEIVED_DESTINATION',
+				'note LIKE'   => "%$input_scan%"
+			])->num_rows();
+
+			if ($check_piece > 0) {
+				echo json_encode(['status' => false, 'message' => "Koli fisik $input_scan sudah masuk sistem!"]);
+				return;
+			}
+
+			// 2. Simpan Log Tracking per Piece + FOTO BUKTI
+			$this->db->insert('shipment_tracking', [
+				'shipment_id' => $shipment->id,
+				'status'      => 'PIECE_RECEIVED_DESTINATION',
+				'location'    => "Gudang {$shipment->destination}",
+				'note'        => "Box fisik $input_scan diterima di Cabang Tujuan dan siap disortir.",
+				'photo_proof' => $photo_path,
+				'created_by'  => $sess['id']
+			]);
+
+			// 3. Hitung apakah semua koli sudah lengkap?
+			$received_count = $this->db->get_where('shipment_tracking', [
+				'shipment_id' => $shipment->id,
+				'status'      => 'PIECE_RECEIVED_DESTINATION'
+			])->num_rows();
+
+			if ($received_count >= $shipment->koli) {
+				$this->db->where('id', $shipment->id)->update('shipments', ['status' => 'RECEIVED_DESTINATION']);
+
+				$this->db->insert('shipment_tracking', [
+					'shipment_id' => $shipment->id,
+					'status'      => 'RECEIVED_DESTINATION',
+					'location'    => "Kantor Cabang {$shipment->destination}",
+					'note'        => 'Paket diterima lengkap seluruhnya di kantor tujuan. Siap dialokasikan ke kurir pengiriman (Delivery).',
+					'created_by'  => $sess['id']
+				]);
+				$is_complete = true;
+			}
+
+			$pesan          = "Koli $piece_no diterima ($received_count/{$shipment->koli})";
+			$is_koli_master = false;
 		}
 
-		echo json_encode([
-			'status'      => true,
-			'is_complete' => $is_complete,
-			'data'        => ['no_resi' => $shipment->no_resi, 'received' => $received_count, 'total' => $shipment->koli],
-			'message' => "Koli $piece_no diterima ($received_count/{$shipment->koli})",
-		]);
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			echo json_encode(['status' => false, 'message' => 'Gagal memproses data ke database.']);
+		} else {
+			echo json_encode([
+				'status'      => true,
+				'is_koli'     => $is_koli_master,
+				'is_complete' => $is_complete,
+				'data'        => [
+					'no_resi'  => $no_resi,
+					'received' => $received_count,
+					'total'    => $shipment->koli ?? 0
+				],
+				'message'     => $pesan,
+			]);
+		}
 	}
 
 	public function ajax_void()

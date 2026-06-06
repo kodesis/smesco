@@ -5,6 +5,10 @@ $is_kribo = in_array($sess['role_slug'], ['superadmin', 'admin-kribo', 'finance-
 
 $no_print_statuses = ['BOOKED', 'CANCELLED'];
 $can_print = !in_array($shipment['status'], $no_print_statuses);
+
+// $can_edit_statuses = ['BOOKED'];
+
+// $can_edit = in_array($shipment['status'])
 ?>
 
 <div class="page-header d-print-none">
@@ -30,13 +34,27 @@ $can_print = !in_array($shipment['status'], $no_print_statuses);
 								<?= tabler_icon('cash', 'me-1') ?> Lunas
 							</button>
 
-						<?php else: ?>
-
-							<span class="btn btn-warning disabled pe-none" style="opacity: 1;">
-								<?= tabler_icon('clock-hour-4', 'me-1') ?> Menunggu Konfirmasi Finance
-							</span>
+							<?php else:
+							if (!$shipment['payment_proof']) {
+								// Belum upload bukti transfer
+							?>
+								<span class="btn btn-warning disabled pe-none" style="opacity: 1;">
+									<?= tabler_icon('clock-hour-4', 'me-1') ?> Menunggu Bukti Transfer
+								</span>
+							<?php
+							} else {
+								// Sudah upload bukti transfer, tinggal tunggu konfirmasi Finance
+							?>
+								<span class="btn btn-info disabled pe-none" style="opacity: 1;">
+									<?= tabler_icon('paw', 'me-1') ?> Menunggu Verifikasi Finance
+								</span>
+							<?php
+							} ?>
 
 						<?php endif; ?>
+						<a href="<?= base_url('shipment/edit/' . $shipment['id']) ?>" class="btn btn-primary">
+							<?= tabler_icon('pencil', 'me-1') ?> Edit
+						</a>
 					<?php endif; ?>
 
 					<?php if ($can_print): ?>

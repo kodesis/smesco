@@ -50,9 +50,6 @@
 									<label class="form-label required">Kota Tujuan</label>
 									<select name="destination" id="destination" class="form-select trigger-price select2" required>
 										<option value="">- Pilih Tujuan -</option>
-										<!-- <?php foreach ($cities as $c): ?>
-											<option value="<?= $c->destination ?>"><?= $c->destination ?></option>
-										<?php endforeach; ?> -->
 									</select>
 								</div>
 								<div class="col-md-4 mb-3">

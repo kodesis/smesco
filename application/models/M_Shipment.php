@@ -357,6 +357,91 @@ class M_Shipment extends CI_Model
 		return $this->db->get()->result();
 	}
 
+	// public function get_master_awb_list($filters = [])
+	// {
+	// 	// Status default jika tidak di-filter dari UI
+	// 	$statuses = !empty($filters['status']) ? [$filters['status']] : ['DRAFT', 'MANIFESTED', 'DEPARTED'];
+
+	// 	$this->db->select("
+   //          ma.id as awb_id,
+   //          ma.awb_number,
+   //          ma.flight_number,
+   //          ma.departure_date,
+   //          ma.origin,
+   //          ma.destination,
+   //          ma.status,
+   //          al.name as airline_name,
+   //          COUNT(DISTINCT ak.id) as total_karung,
+   //          COUNT(s.id) as total_resi,
+   //          SUM(s.koli) as total_koli,
+   //          SUM(s.chargeable_weight) as total_weight
+   //      ");
+	// 	$this->db->from('master_awb ma');
+	// 	$this->db->join('airlines al', 'al.id = ma.airline_id', 'left');
+	// 	// Relasi ke tabel koli (karung konsolidasi)
+	// 	$this->db->join('awb_koli ak', 'ak.awb_id = ma.id', 'left');
+	// 	// Relasi ke shipments melalui awb_koli_id yang baru
+	// 	$this->db->join('shipments s', 's.awb_koli_id = ak.id', 'left');
+
+	// 	$this->db->where_in('ma.status', $statuses);
+
+	// 	// Jika user yang login terikat ke agen/hub tertentu
+	// 	if (!empty($filters['agent_id'])) {
+	// 		// Asumsi AWB dicatat oleh agen pembuat atau menyaring rute asal bandara agen
+	// 		$this->db->where('ma.created_by_agent', $filters['agent_id']);
+	// 	}
+
+	// 	$this->db->group_by('ma.id, ma.awb_number, ma.flight_number, ma.departure_date, ma.origin, ma.destination, ma.status, al.name');
+	// 	$this->db->order_by('ma.departure_date', 'ASC');
+
+	// 	return $this->db->get()->result();
+	// }
+
+	public function get_master_awb_list($filters = [])
+	{
+		// Status default jika tidak di-filter dari UI
+		$statuses = !empty($filters['status']) ? [$filters['status']] : ['DRAFT', 'MANIFESTED', 'DEPARTED'];
+
+		$this->db->select("
+            ma.id as awb_id,
+            ma.awb_number as smu_number,
+            ma.flight_number,
+            ma.departure_date,
+            ma.origin,
+				s.origin_warehouse,
+            ma.destination,
+            ma.status,
+            al.name as airline_name,
+            COUNT(DISTINCT ak.id) as total_karung,
+            COUNT(DISTINCT s.id) as total_resi,
+            COUNT(sd.id) as total_koli,
+            SUM(s.chargeable_weight / s.koli) as total_weight
+        ");
+		$this->db->from('master_awb ma');
+		$this->db->join('airlines al', 'al.id = ma.airline_id', 'left');
+
+		// 1. Relasi ke tabel koli (karung konsolidasi)
+		$this->db->join('awb_koli ak', 'ak.awb_id = ma.id', 'left');
+
+		// 2. JALUR BARU: Hubungkan karung koli ke tabel dimensi (per dus fisik)
+		$this->db->join('shipment_dimensions sd', 'sd.awb_koli_id = ak.id', 'left');
+
+		// 3. Tarik ke tabel induk shipments untuk mendapatkan data no_resi, harga, dll
+		$this->db->join('shipments s', 's.id = sd.shipment_id', 'left');
+
+		$this->db->where_in('ma.status', $statuses);
+
+		// Jika user yang login terikat ke agen/hub tertentu
+		if (!empty($filters['agent_id'])) {
+			$this->db->where('ma.created_by', $filters['agent_id']);
+		}
+
+		$this->db->group_by('ma.id, ma.awb_number, ma.flight_number, ma.departure_date, ma.origin, ma.destination, ma.status, al.name');
+		$this->db->order_by('ma.departure_date', 'ASC');
+
+		return $this->db->get()->result();
+	}
+
 	public function depart_by_smu($smu_number)
 	{
 		$shipments = $this->db->get_where('shipments', ['smu_number' => $smu_number])->result();

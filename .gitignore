@@ -30,3 +30,14 @@ user_guide_src/cilexer/pycilexer.egg-info/*
 *.sublime-project
 /tests/tests/
 /tests/results/
+
+# ------------------------------------------------------------------
+# SMESCO EXPRESS - UPLOADS CONFIGURATION
+# ------------------------------------------------------------------
+# Abaikan semua file dinamis di dalam folder transaksi bertingkat
+uploads/payment_proofs/**
+uploads/shipments/**
+
+# Abaikan semua file csv/sampah di folder temp, tapi sisakan foldernya
+uploads/temp/*
+!uploads/temp/index.html

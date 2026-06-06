@@ -7,6 +7,16 @@
 				<h2 class="page-title text-uppercase ls-1">Flight & Manifest Monitoring</h2>
 				<div class="text-muted small mt-1">Daftar SMU aktif yang menunggu keberangkatan atau konfirmasi landing.</div>
 			</div>
+
+			<div class="col-auto ms-auto d-print-none">
+				<div class="btn-list">
+					<a href="<?= site_url('shipment/create_awb') ?>" class="btn btn-primary">
+						<?= tabler_icon('plus', 'me-1') ?>
+						Buat AWB Baru
+					</a>
+
+				</div>
+			</div>
 		</div>
 	</div>
 </div>
@@ -94,7 +104,7 @@
 										<?php endif; ?>
 									</td>
 									<td class="text-center">
-										<div class="fw-bold"><?= number_format($m->total_weight, 1) ?> KG</div>
+										<div class="fw-bold"><?= ($m->total_weight) ? number_format($m->total_weight, 1) : '0.0' ?> KG</div>
 										<div class="text-muted small"><?= $m->total_resi ?> Resi / <?= $m->total_koli ?> Koli</div>
 									</td>
 									<td>
@@ -113,8 +123,15 @@
 										<span class="badge <?= $badge ?> fw-bold"><?= str_replace('_', ' ', $m->status) ?></span>
 									</td>
 									<td>
-										<?php if ($m->status == 'MANIFESTED'): ?>
-											<button class="btn btn-sm btn-success btn-depart" data-smu="<?= $m->smu_number ?>">
+										<a href="<?= site_url('shipment/awb_console/' . $m->awb_id) ?>" class="btn btn-sm btn-light" title="Detail Console / Karung">
+											<?= tabler_icon('eye', 'me-1') ?> Detail
+										</a>
+										<?php if ($m->status == 'DRAFT'): ?>
+											<a href="<?= site_url('shipment/awb_console/' . $m->awb_id) ?>" class="btn btn-sm btn-warning">
+												<?= tabler_icon('barcode', 'me-1') ?> Pack Items
+											</a>
+										<?php elseif ($m->status == 'MANIFESTED'): ?>
+											<button class="btn btn-sm btn-success btn-depart" data-awb-id="<?= $m->awb_id ?>" data-smu="<?= $m->smu_number ?>">
 												<?= tabler_icon('send', 'me-1') ?> Departed
 											</button>
 										<?php elseif ($m->status == 'DEPARTED'): ?>
@@ -235,29 +252,93 @@
 	</div>
 </div>
 
+<div class="modal modal-blur fade" id="modal-split-depart" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<div class="modal-content">
+			<div class="modal-header bg-success-lt">
+				<h5 class="modal-title text-success fw-bold"><?= tabler_icon('plane-departure', 'me-1') ?> Konfirmasi Karung Terbang (Flight Out)</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<form id="form-split-depart">
+				<input type="hidden" name="awb_id" id="mdl-depart-awb-id">
+				<div class="modal-body text-dark">
+					<p class="mb-2">Silakan centang karung/koli yang **beneran valid** masuk ke dalam lambung pesawat:</p>
+
+					<div class="list-group list-group-flush border rounded mb-3" id="karung-checkbox-list" style="max-height: 200px; overflow-y: auto;">
+					</div>
+
+					<div class="alert alert-warning mb-0 small">
+						<?= tabler_icon('info-circle') ?> Karung yang **tidak dicentang** akan otomatis di-set menjadi status **OFFLOADED** (Tertinggal) dan bisa dialihkan ke penerbangan lain nanti.
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">Batal</button>
+					<button type="submit" class="btn btn-success fw-bold"><?= tabler_icon('send', 'me-1') ?> Konfirmasi Terbang!</button>
+				</div>
+			</form>
+		</div>
+	</div>
+</div>
+
 <script>
+	// Ketika tombol Departed diklik
+	// Ketika tombol Departed diklik
 	$(document).on('click', '.btn-depart', function() {
+		const awbId = $(this).data('awb-id'); // Pastikan di tombol aksi lu ganti data-smu jadi data-awb-id="<?= $m->awb_id ?>"
 		const smu = $(this).data('smu');
-		Swal.fire({
-			title: 'Konfirmasi Keberangkatan?',
-			text: `Pesawat untuk SMU ${smu} dilaporkan sudah Take Off?`,
-			icon: 'question',
-			showCancelButton: true,
-			confirmButtonText: 'Ya, Pesawat Terbang!',
-			confirmButtonColor: '#2fb344'
-		}).then(result => {
-			if (result.isConfirmed) {
-				$.post("<?= site_url('shipment/ajax_confirm_departure') ?>", {
-					smu_number: smu
-				}, function(res) {
-					if (res.status) {
-						Swal.fire('Terbang! ✈️', res.message, 'success').then(() => location.reload());
-					} else {
-						Swal.fire('Gagal', res.message, 'error');
-					}
-				}, 'json');
+
+		$('#mdl-depart-awb-id').val(awbId);
+		$('#karung-checkbox-list').html('<div class="text-center p-3 text-muted">Memuat daftar karung...</div>');
+		$('#modal-split-depart').modal('show');
+
+		// Ambil daftar karung milik AWB ini via AJAX
+		$.get("<?= site_url('shipment/ajax_get_koli_by_awb/') ?>" + awbId, function(res) {
+			if (res.status) {
+				let html = '';
+				res.data.forEach(k => {
+					html += `
+                  <label class="list-group-item d-flex justify-content-between align-items-center py-2 cursor-pointer">
+                     <span class="d-flex align-items-center">
+                        <input class="form-check-input me-3 check-karung-item" type="checkbox" name="karung_ids[]" value="${k.id}" checked>
+                        <div>
+                           <strong class="text-azure">${k.koli_number}</strong>
+                        </div>
+                     </span>
+                  </label>
+               `;
+				});
+				$('#karung-checkbox-list').html(html);
+			} else {
+				$('#karung-checkbox-list').html(`<div class="alert alert-danger m-2 small">${res.message}</div>`);
 			}
-		});
+		}, 'json');
+	});
+
+
+	// <span class = "badge bg-light text-dark font-monospace fw-bold" > $ {k.actual_weight}Kg < /span>
+
+	// Submit Form Split Departed
+	$('#form-split-depart').on('submit', function(e) {
+		e.preventDefault();
+
+		const totalChecked = $('.check-karung-item:checked').length;
+		if (totalChecked === 0) {
+			Swal.fire('Peringatan', 'Minimal harus ada 1 karung yang dicentang terbang bro!', 'warning');
+			return;
+		}
+
+		const btnSubmit = $(this).find('button[type="submit"]');
+		btnSubmit.prop('disabled', true).text('Memproses...');
+
+		$.post("<?= site_url('shipment/ajax_confirm_split_departure') ?>", $(this).serialize(), function(res) {
+			btnSubmit.prop('disabled', false).html('Konfirmasi Terbang!');
+			if (res.status) {
+				$('#modal-split-depart').modal('hide');
+				Swal.fire('Terbang! ✈️', res.message, 'success').then(() => location.reload());
+			} else {
+				Swal.fire('Gagal', res.message, 'error');
+			}
+		}, 'json');
 	});
 
 	$(document).on('click', '.btn-arrive', function() {
