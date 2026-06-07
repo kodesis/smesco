@@ -321,14 +321,60 @@ $can_print = !in_array($shipment['status'], $no_print_statuses);
 											<div class="text-muted small"><?= date('d/m/Y H:i', strtotime($h['created_at'])) ?></div>
 											<div class="fw-bold"><?= shipment_status_badge($h['status']) ?></div>
 											<div class="small text-muted mt-1"><?= $h['note'] ?></div>
-											<!-- <?php if ($h['location']): ?>
-												<div class="mt-1 small"><i class="bi bi-geo-alt me-1"></i><?= $h['location'] ?></div>
-											<?php endif; ?> -->
+
+											<?php if (!empty($h['location'])): ?>
+												<div class="mt-1 small text-muted">
+													<?= tabler_icon('map-pin', 'icon-sm me-1 text-secondary') ?> <strong><?= $h['location'] ?></strong>
+												</div>
+											<?php endif; ?>
+
+											<?php if (!empty($h['photo_proof'])): ?>
+												<?php
+												// Tentukan folder default awal
+												$folder_path = 'uploads/shipments/booking/';
+												$label_text  = 'Foto Fisik Paket (Booking):';
+
+												// Jika statusnya DELIVERED, alihkan ke folder POD
+												if ($h['status'] === 'DELIVERED') {
+													$folder_path = 'uploads/pod/'; // sesuaikan dengan path upload_path pod kamu
+													$label_text  = 'Bukti Foto Penerimaan (POD):';
+												}
+												if ($h['status'] === 'RECEIVED_DESTINATION') {
+													$folder_path = 'uploads/shipments/pod/'; // sesuaikan dengan path upload_path pod kamu
+													$label_text  = 'Bukti Foto Penerimaan (POD):';
+												}
+
+												$full_image_url = base_url($folder_path . $h['photo_proof']);
+												?>
+
+												<div class="mt-2">
+													<div class="text-muted small mb-1" style="font-size: 11px;">
+														<?= tabler_icon('paperclip', 'icon-sm') ?> <?= $label_text ?>
+													</div>
+													<a href="javascript:void(0);" class="btn-view-pod" data-img="<?= $full_image_url ?>">
+														<img src="<?= $full_image_url ?>"
+															alt="Proof Image"
+															class="img-thumbnail rounded shadow-sm"
+															style="max-height: 80px; width: auto; object-fit: cover; cursor: pointer; transition: transform 0.2s;">
+													</a>
+												</div>
+											<?php endif; ?>
 										</div>
 									</div>
 								</li>
 							<?php endforeach; ?>
 						</ul>
+					</div>
+
+					<div class="modal fade" id="modal-preview-pod" tabindex="-1" role="dialog" aria-hidden="true">
+						<div class="modal-dialog modal-dialog-centered" role="document">
+							<div class="modal-content" style="background: transparent; border: none;">
+								<div class="modal-body p-0 text-center position-relative">
+									<button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-2" data-bs-dismiss="modal" aria-label="Close" style="z-index: 999;"></button>
+									<img id="pod-large-preview" src="" class="img-fluid rounded shadow-lg" style="max-height: 85vh; width: auto;">
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 
@@ -379,6 +425,19 @@ $can_print = !in_array($shipment['status'], $no_print_statuses);
 					if (res.status) Swal.fire('Sip!', 'Status berubah jadi Siap Pickup.', 'success').then(() => location.reload());
 				}, 'json');
 			}
+		});
+	});
+
+	$(document).ready(function() {
+		// Ketika thumbnail foto POD diklik
+		$(document).on('click', '.btn-view-pod', function() {
+			var imageUrl = $(this).data('img');
+
+			// Set link gambar ke tag img di dalam modal
+			$('#pod-large-preview').attr('src', imageUrl);
+
+			// Munculkan modal preview-nya
+			$('#modal-preview-pod').modal('show');
 		});
 	});
 </script>

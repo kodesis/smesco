@@ -271,11 +271,11 @@ class M_Shipment extends CI_Model
 			}
 
 			if ($row['status'] === 'DEPARTED') {
-				$row['note'] = 'Pesawat telah berangkat menuju kota tujuan.';
+				$row['note'] = 'Pesawat telah berangkat menuju bandara tujuan.';
 			}
 
 			if ($row['status'] === 'ARRIVED') {
-				$row['note'] = 'Pesawat telah tiba di kota tujuan.';
+				$row['note'] = 'Pesawat telah tiba di bandara tujuan.';
 			}
 		}
 

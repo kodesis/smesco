@@ -211,7 +211,9 @@ if (! function_exists('tabler_icon')) {
 
 			'transfer-in' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 18v3h16v-14l-8 -4l-8 4v3" /><path d="M4 14h9" /><path d="M10 11l3 3l-3 3" />',
 
-			'plane-inflight' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15 11.085h5a2 2 0 1 1 0 4h-15l-3 -6h3l2 2h3l-2 -7h3l4 7" /><path d="M3 21h18" />'
+			'plane-inflight' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15 11.085h5a2 2 0 1 1 0 4h-15l-3 -6h3l2 2h3l-2 -7h3l4 7" /><path d="M3 21h18" />',
+
+			'paperclip' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5" />',
 		];
 
 		// Fallback kalau icon tidak ditemukan

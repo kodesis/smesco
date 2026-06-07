@@ -102,11 +102,6 @@ class Shipment extends Authenticated_Controller
 				redirect('shipment/create');
 			}
 
-			// echo '<pre>';
-			// print_r($_POST);
-			// echo '</pre>';
-			// exit;
-
 			// 3. Hitung Berat (Actual vs Volume) & Siapkan Data Dimensi Fisik Per Dus
 			$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
 			$dim_length = $this->input->post('dim_length');
@@ -119,30 +114,27 @@ class Shipment extends Authenticated_Controller
 			$insert_dimensions = [];
 			$total_volume_weight = 0;
 			$total_koli = 0;
-			$koli_counter = 1; // Pemicu nomor urut kardus fisik (e.g. -01, -02)
+			$koli_counter = 1;
 
 			if (!empty($dim_qty)) {
 				foreach ($dim_qty as $key => $qty) {
 					if ($qty > 0) {
 						$total_koli += $qty;
 
-						// Hitung volume weight untuk kelompok dimensi ini
 						$p = str_replace(',', '.', $dim_length[$key]);
 						$l = str_replace(',', '.', $dim_width[$key]);
 						$t = str_replace(',', '.', $dim_height[$key]);
 
-						// Rumus volume standard udara (P x L x T / 5000) dikali jumlah qty koli tersebut
 						$vol_weight_per_item = ($p * $l * $t) / 5000;
 						$total_volume_weight += ($vol_weight_per_item * $qty);
 
-						// PECAH DATA PER KOLI FISIK (Opsi B untuk kebutuhan Console AWB scan per dus)
 						for ($i = 0; $i < $qty; $i++) {
 							$barcode_koli = $no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
 
 							$insert_dimensions[] = [
-								'shipment_id'  => NULL, // Sementara NULL, di-inject setelah dapat insert_id()
+								'shipment_id'  => NULL,
 								'barcode_koli' => $barcode_koli,
-								'qty'          => 1, // Dikunci 1 per baris fisik
+								'qty'          => 1,
 								'length'       => $p,
 								'width'        => $l,
 								'height'       => $t
@@ -153,7 +145,7 @@ class Shipment extends Authenticated_Controller
 				}
 			}
 
-			// 4. Tentukan Chargeable Weight (Pembulatan ke Atas)
+			// 4. Tentukan Chargeable Weight
 			$chargeable = max($actual_weight, $total_volume_weight);
 			if ($chargeable < $pricelist->min_weight_kg) {
 				$chargeable = $pricelist->min_weight_kg;
@@ -212,14 +204,12 @@ class Shipment extends Authenticated_Controller
 
 				foreach ($selected_addons as $addon) {
 					$fee = 0;
-
 					if (!empty($insert_dimensions)) {
 						foreach ($insert_dimensions as $dim) {
 							$p = $dim['length'];
 							$l = $dim['width'];
 							$t = $dim['height'];
 							$q = $dim['qty'];
-
 							$min = $addon->min_charge;
 
 							if ($addon->calc_method === 'VOLUME') {
@@ -242,7 +232,7 @@ class Shipment extends Authenticated_Controller
 					if ($fee > 0) {
 						$total_addon_fee += $fee;
 						$insert_addons[] = [
-							'shipment_id'  => NULL, // Di-inject nanti
+							'shipment_id'  => NULL,
 							'addon_id'     => $addon->id,
 							'addon_amount' => $fee,
 						];
@@ -259,7 +249,7 @@ class Shipment extends Authenticated_Controller
 			$sender_kel_name   = $this->db->get_where('mt_kelurahan',  ['id' => $this->input->post('sender_kelurahan')])->row();
 
 			$receiver_prov_name = $this->db->get_where('mt_provinsi',  ['id' => $this->input->post('receiver_provinsi')])->row();
-			$receiver_kota_name = $this->db->get_where('mt_kota',      ['id' => $this->input->post('receiver_kota')])->row();
+			$receiver_kota_name = $this->db->get_where('mt_kota',       ['id' => $this->input->post('receiver_kota')])->row();
 			$receiver_kec_name  = $this->db->get_where('mt_kecamatan', ['id' => $this->input->post('receiver_kecamatan')])->row();
 			$receiver_kel_name  = $this->db->get_where('mt_kelurahan', ['id' => $this->input->post('receiver_kelurahan')])->row();
 
@@ -279,8 +269,10 @@ class Shipment extends Authenticated_Controller
 				$receiver_prov_name ? $receiver_prov_name->nama_provinsi  : '',
 			]));
 
-			// File Upload Management
-			$photo_path = NULL;
+			// ============================================================
+			// INSIGHT PENYESUAIAN: FILE UPLOAD MANAGEMENT (FOLDER BARU)
+			// ============================================================
+			$photo_name = NULL;
 			$pending_upload = [];
 
 			if (isset($_FILES['shipment_photo']) && $_FILES['shipment_photo']['error'] === UPLOAD_ERR_OK) {
@@ -303,21 +295,21 @@ class Shipment extends Authenticated_Controller
 				];
 			}
 
+			// Proses upload jika ada file
 			if (!empty($pending_upload)) {
-				$upload_dir = FCPATH . 'uploads/shipments/' . date('Y') . '/' . date('m') . '/';
+				// Diseragamkan masuk folder uploads/shipments/booking/
+				$upload_dir = FCPATH . 'uploads/shipments/booking/';
 				if (!is_dir($upload_dir)) {
 					mkdir($upload_dir, 0755, TRUE);
 				}
 
-				$file_name = $no_resi . '_photo.' . $pending_upload['ext'];
-				$full_path = $upload_dir . $file_name;
+				$photo_name = 'BOOKING_' . $no_resi . '_' . time() . '.' . $pending_upload['ext'];
+				$full_path = $upload_dir . $photo_name;
 
 				if (!move_uploaded_file($pending_upload['tmp_name'], $full_path)) {
-					$this->session->set_flashdata('error', 'Gagal mengupload foto. Coba lagi bro.');
+					$this->session->set_flashdata('error', 'Gagal mengupload foto kargo awal. Coba lagi bro.');
 					redirect('shipment/create');
 				}
-
-				$photo_path = 'uploads/shipments/' . date('Y') . '/' . date('m') . '/' . $file_name;
 			}
 
 			$payment_expired_at = NULL;
@@ -325,7 +317,7 @@ class Shipment extends Authenticated_Controller
 				$payment_expired_at = date('Y-m-d H:i:s', strtotime('+10 minutes'));
 			}
 
-			// Map Data Objek Induk Shipments
+			// Map Data Objek Induk Shipments (Tanpa kolom shipment_photo karena dipindah ke tracking)
 			$insert_shipment = [
 				'no_resi'                 => $no_resi,
 				'agent_id'                => $sess['agent_id'] ?? NULL,
@@ -365,7 +357,6 @@ class Shipment extends Authenticated_Controller
 				'total_addon_fee'         => $total_addon_fee,
 				'total_amount'            => $shipping_total + $pickup_fee + $total_addon_fee,
 				'margin_amount'           => $total_margin,
-				'shipment_photo'          => $photo_path,
 				'payment_expired_at'      => $payment_expired_at,
 				'status'                  => 'BOOKED',
 				'is_lartas_agreed'        => $this->input->post('is_lartas_agreed') ?? 1,
@@ -377,7 +368,7 @@ class Shipment extends Authenticated_Controller
 
 			// Insert Induk Shipments Terlebih Dahulu
 			$this->db->insert('shipments', $insert_shipment);
-			$shipment_id = $this->db->insert_id(); // <--- SEKARANG ID NYA SUDAH LAHIR DI SINI!
+			$shipment_id = $this->db->insert_id();
 
 			// Inject shipment_id yang baru lahir ke dalam array Dimensi
 			if (!empty($insert_dimensions)) {
@@ -395,12 +386,13 @@ class Shipment extends Authenticated_Controller
 				$this->db->insert_batch('shipment_addons', $insert_addons);
 			}
 
-			// Buat Tracking Log Awal
+			// INSIGHT PENYESUAIAN: Simpan Foto Awal Masuk ke tabel shipment_tracking (photo_proof)
 			$this->db->insert('shipment_tracking', [
 				'shipment_id' => $shipment_id,
 				'status'      => 'BOOKED',
 				'location'    => $origin,
 				'note'        => 'Shipment berhasil dibuat.',
+				'photo_proof' => $photo_name, // Foto nempel di log BOOKED sekarang, bro!
 				'created_by'  => $sess['id']
 			]);
 
@@ -433,6 +425,10 @@ class Shipment extends Authenticated_Controller
 			}
 
 			if ($this->db->trans_status() === FALSE) {
+				// Cleanup file jika db transaction gagal
+				if ($photo_name && file_exists(FCPATH . 'uploads/shipments/booking/' . $photo_name)) {
+					unlink(FCPATH . 'uploads/shipments/booking/' . $photo_name);
+				}
 				$this->session->set_flashdata('error', 'Gagal menyimpan data.');
 				redirect('shipment/create');
 			} else {
@@ -2040,6 +2036,8 @@ class Shipment extends Authenticated_Controller
 		// 1. Cek di tabel anak dimensi koli
 		$dimensi = $this->db->get_where('shipment_dimensions', ['barcode_koli' => $barcode_koli])->row();
 
+		// echo json_encode(['dimensi' => $dimensi]);return;
+
 		if (!$dimensi) {
 			echo json_encode(['status' => false, 'message' => 'Barcode Koli ' . $barcode_koli . ' tidak valid!']);
 			return;
@@ -2712,7 +2710,9 @@ class Shipment extends Authenticated_Controller
 		// ─── 1. PROSES UPLOAD FOTO (PROOF OF CONDITION) DULU ───
 		$photo_path = NULL;
 		if (isset($_FILES['photo']) && $_FILES['photo']['error'] === UPLOAD_ERR_OK) {
-			$upload_dir = FCPATH . 'uploads/inbound/' . date('Y/m/');
+
+			// KITA PERBAIKI FOLDERNYA DI SINI, BRO! DISERAGAMKAN KE FOLDER /shipments/pod/
+			$upload_dir = FCPATH . 'uploads/shipments/pod/';
 			if (!is_dir($upload_dir)) {
 				mkdir($upload_dir, 0755, TRUE);
 			}
@@ -2722,11 +2722,11 @@ class Shipment extends Authenticated_Controller
 			$full_path = $upload_dir . $file_name;
 
 			if (move_uploaded_file($_FILES['photo']['tmp_name'], $full_path)) {
-				$photo_path = 'uploads/inbound/' . date('Y/m/') . $file_name;
+				// Hanya simpan NAMA FILENYA saja (bukan path folder), agar klop dengan fungsi view tracking log
+				$photo_path = $file_name;
 			}
 		}
 
-		// Inisialisasi variabel global biar tidak undefined di response akhir
 		$is_complete    = false;
 		$received_count = 0;
 		$no_resi        = $input_scan;
@@ -2734,27 +2734,27 @@ class Shipment extends Authenticated_Controller
 		$is_koli_master = false;
 		$pesan          = '';
 
-		$this->db->trans_start();
+		// GUNAKAN STRUKTUR TRANS_BEGIN AGAR LEBIH KOKOH
+		$this->db->trans_begin();
 
 		// ─── 2. LOGIC AUTO-DETECT: APAKAH INI KARUNG ATAU RESI FISIK? ───
 		if (strpos($input_scan, 'KOLI-') === 0) {
 
-			// ========================================================
-			// SKENARIO A: SCAN BARCODE KARUNG KONSOLIDASI (UNBAGGING)
-			// ========================================================
 			$karung = $this->db->get_where('awb_koli', ['koli_number' => $input_scan])->row();
 
 			if (!$karung) {
+				$this->db->trans_rollback(); // Amankan state DB sebelum return
 				echo json_encode(['status' => false, 'message' => "Karung $input_scan tidak ditemukan di sistem!"]);
 				return;
 			}
 
 			if ($karung->status === 'RECEIVED_AT_HUB') {
+				$this->db->trans_rollback(); // Amankan state DB sebelum return
 				echo json_encode(['status' => false, 'message' => "Karung $input_scan sudah pernah diterima sebelumnya!"]);
 				return;
 			}
 
-			// Update status karung + Simpan Foto Karung
+			// Update status karung
 			$this->db->where('id', $karung->id)->update('awb_koli', [
 				'status'        => 'RECEIVED_AT_HUB',
 				'photo_inbound' => $photo_path
@@ -2769,7 +2769,6 @@ class Shipment extends Authenticated_Controller
 
 			if (!empty($shipments_in_bag)) {
 				$s_ids = array_column($shipments_in_bag, 'shipment_id');
-
 				$this->db->where_in('id', $s_ids)->update('shipments', ['status' => 'RECEIVED_AT_HUB']);
 
 				$tracking_batch = [];
@@ -2779,7 +2778,7 @@ class Shipment extends Authenticated_Controller
 						'status'      => 'RECEIVED_AT_HUB',
 						'location'    => "Gudang Cabang Tujuan",
 						'note'        => "Karung $input_scan berhasil mendarat di Gudang Cabang. Menunggu proses bongkar koli (Breakdown).",
-						'photo_proof' => $photo_path,
+						'photo_proof' => $photo_path, // Masuk ke photo_proof shipment_tracking
 						'created_by'  => $sess['id']
 					];
 				}
@@ -2790,18 +2789,14 @@ class Shipment extends Authenticated_Controller
 			$is_koli_master = true;
 		} else {
 
-			// ========================================================
-			// SKENARIO B: SCAN BARCODE KOLI RESI FISIK (BONGKAR KARUNG)
-			// ========================================================
-
-			// FIX: explode dengan benar, ambil index yang tepat
 			$parts    = explode('-', $input_scan);
-			$no_resi  = $parts[0];                             // "SMC2604050001"
-			$piece_no = isset($parts[1]) ? $parts[1] : '01';  // "01"
+			$no_resi  = $parts[0];
+			$piece_no = isset($parts[1]) ? $parts[1] : '01';
 
 			$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
 
 			if (!$shipment) {
+				$this->db->trans_rollback();
 				echo json_encode(['status' => false, 'message' => "Resi $no_resi tidak terdaftar!"]);
 				return;
 			}
@@ -2814,6 +2809,7 @@ class Shipment extends Authenticated_Controller
 			])->num_rows();
 
 			if ($check_piece > 0) {
+				$this->db->trans_rollback();
 				echo json_encode(['status' => false, 'message' => "Koli fisik $input_scan sudah masuk sistem!"]);
 				return;
 			}
@@ -2824,7 +2820,7 @@ class Shipment extends Authenticated_Controller
 				'status'      => 'PIECE_RECEIVED_DESTINATION',
 				'location'    => "Gudang {$shipment->destination}",
 				'note'        => "Box fisik $input_scan diterima di Cabang Tujuan dan siap disortir.",
-				'photo_proof' => $photo_path,
+				'photo_proof' => $photo_path, // Disimpan ke log piece juga biar kurir bisa cek fisik per koli
 				'created_by'  => $sess['id']
 			]);
 
@@ -2842,6 +2838,7 @@ class Shipment extends Authenticated_Controller
 					'status'      => 'RECEIVED_DESTINATION',
 					'location'    => "Kantor Cabang {$shipment->destination}",
 					'note'        => 'Paket diterima lengkap seluruhnya di kantor tujuan. Siap dialokasikan ke kurir pengiriman (Delivery).',
+					'photo_proof' => $photo_path, // Di-save ke log induk RECEIVED_DESTINATION juga, bro!
 					'created_by'  => $sess['id']
 				]);
 				$is_complete = true;
@@ -2851,11 +2848,17 @@ class Shipment extends Authenticated_Controller
 			$is_koli_master = false;
 		}
 
-		$this->db->trans_complete();
-
+		// CEK STATUS TRANSAKSI AKHIR DATABASE
 		if ($this->db->trans_status() === FALSE) {
+			$this->db->trans_rollback();
+
+			// Cleanup file jika query database crash/gagal
+			if ($photo_path && file_exists(FCPATH . 'uploads/shipments/pod/' . $photo_path)) {
+				unlink(FCPATH . 'uploads/shipments/pod/' . $photo_path);
+			}
 			echo json_encode(['status' => false, 'message' => 'Gagal memproses data ke database.']);
 		} else {
+			$this->db->trans_commit(); // Kunci data secara permanen
 			echo json_encode([
 				'status'      => true,
 				'is_koli'     => $is_koli_master,
@@ -3210,5 +3213,94 @@ class Shipment extends Authenticated_Controller
 		$writer = new Xlsx($spreadsheet);
 		$writer->save('php://output');
 		exit;
+	}
+
+	public function update_to_delivered()
+	{
+		// Validasi request AJAX
+		if (!$this->input->is_ajax_request()) {
+			show_404();
+		}
+
+		$shipment_id = $this->input->post('shipment_id');
+		$sess = $this->session->userdata('user'); // Mengambil ID dari session pemicu (sesuaikan key session kamu, misal $sess['id'])
+
+		if (empty($shipment_id)) {
+			echo json_encode(['status' => 'error', 'message' => 'ID Transaksi tidak valid.']);
+			exit;
+		}
+
+		// Ambil rute destination resi ini untuk dijadikan 'location' di tracking log
+		$shipment = $this->db->get_where('shipments', ['id' => $shipment_id])->row();
+		$location = $shipment ? $shipment->destination : 'DESTINATION';
+
+		// Tentukan path folder tujuan
+		$upload_path = './uploads/pod/';
+
+		// JIKA FOLDER BELUM ADA, CREATE OTOMATIS
+		if (!is_dir($upload_path)) {
+			if (!mkdir($upload_path, 0755, true)) {
+				echo json_encode(['status' => 'error', 'message' => 'Gagal membuat folder penyimpanan di server. Hubungi tim IT.']);
+				exit;
+			}
+		}
+
+		// Konfigurasi Upload Gambar ke Folder server
+		$config['upload_path']   = $upload_path;
+		$config['allowed_types'] = 'jpg|jpeg|png';
+		$config['max_size']      = 3072; // Maksimal ukuran 3MB
+		$config['file_name']     = 'POD_' . $shipment_id . '_' . time();
+
+		$this->load->library('upload', $config);
+
+		if (!$this->upload->do_upload('pod_image')) {
+			// Jika gagal upload gambar
+			$error = $this->upload->display_errors('', '');
+			echo json_encode(['status' => 'error', 'message' => 'Gagal mengunggah foto: ' . $error]);
+			exit;
+		} else {
+			// Jika sukses upload, dapatkan nama filenya
+			$upload_data = $this->upload->data();
+			$file_name   = $upload_data['file_name'];
+
+			// Mulai database transaction agar jika salah satu query gagal, data aman tidak corupt
+			$this->db->trans_begin();
+
+			// 1. Update tabel utama 'shipments' (hanya status dan waktu diperbarui)
+			$update_data = [
+				'status'     => 'DELIVERED',
+				'updated_at' => date('Y-m-d H:i:s')
+			];
+			$this->db->where('id', $shipment_id);
+			$this->db->update('shipments', $update_data);
+
+			// 2. Insert riwayat tracking log ke tabel 'shipment_tracking' beserta foto bukti (photo_proof)
+			$tracking_data = [
+				'shipment_id' => $shipment_id,
+				'status'      => 'DELIVERED',
+				'location'    => $location,
+				'note'        => 'Paket telah sukses diterima oleh yang bersangkutan. (DELIVERED)',
+				'photo_proof' => $file_name, // Foto disimpan di tabel tracking sekarang, bro!
+				'created_by'  => $sess['id'],
+				'created_at'  => date('Y-m-d H:i:s')
+			];
+			$this->db->insert('shipment_tracking', $tracking_data);
+
+			// Cek status transaksi database
+			if ($this->db->trans_status() === FALSE) {
+				$this->db->trans_rollback();
+
+				// Hapus file foto yang terupload jika query transaksi database gagal
+				if (file_exists($upload_path . $file_name)) {
+					unlink($upload_path . $file_name);
+				}
+
+				echo json_encode(['status' => 'error', 'message' => 'Gagal memperbarui riwayat status di database.']);
+			} else {
+				$this->db->trans_commit();
+				echo json_encode(['status' => 'success', 'message' => 'Status resi berhasil diubah menjadi DELIVERED dan tracking log telah diperbarui.']);
+			}
+			exit;
+		}
 	}
 }

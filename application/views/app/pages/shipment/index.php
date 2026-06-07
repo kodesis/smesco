@@ -238,6 +238,13 @@
 												<?php endif; ?>
 											<?php endif; ?>
 											<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-icon btn-outline-primary" title="Detail"><?= tabler_icon('eye') ?></a>
+											<?php if ($s->status == 'RECEIVED_DESTINATION'): ?>
+												<button type="button" class="btn btn-sm btn-success btn-trigger-delivery"
+													data-id="<?= $s->id ?>"
+													data-resi="<?= $s->no_resi ?>">
+													<?= tabler_icon('truck-delivery', 'me-1') ?> Kirim
+												</button>
+											<?php endif; ?>
 											<?php if ($s->status !== 'BOOKED' && $s->status !== 'CANCELLED'): ?>
 												<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-icon btn-outline-secondary" title="Cetak Label"><?= tabler_icon('printer') ?></a>
 											<?php endif; ?>
@@ -335,6 +342,13 @@
 									<?php endif; ?>
 								<?php endif; ?>
 								<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-outline-primary"><?= tabler_icon('eye', 'me-1') ?> Detail</a>
+								<?php if ($s->status == 'RECEIVED_DESTINATION'): ?>
+									<button type="button" class="btn btn-sm btn-success btn-trigger-delivery"
+										data-id="<?= $s->id ?>"
+										data-resi="<?= $s->no_resi ?>">
+										<?= tabler_icon('truck-delivery', 'me-1') ?> Kirim
+									</button>
+								<?php endif; ?>
 								<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('printer') ?></a>
 								<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-void-shipment"
 									data-id="<?= $s->id ?>"
@@ -357,6 +371,38 @@
 			<?php $this->load->view('app/layouts/_pagination', compact('total', 'page', 'per_page', 'offset', 'total_pages', 'base_url')); ?>
 		</div>
 
+	</div>
+</div>
+
+<!-- MODAL UPLOAD BUKTI DELIVERED -->
+<div class="modal fade" id="modal-delivery" statistical="false" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title fw-bold">Konfirmasi Pengiriman Selesai</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<form id="form-delivery-submit" enctype="multipart/form-data">
+				<div class="modal-body">
+					<input type="hidden" name="shipment_id" id="delivery-shipment-id">
+
+					<div class="mb-3">
+						<label class="form-label small fw-bold mb-1">No. Resi</label>
+						<input type="text" id="delivery-no-resi" class="form-control bg-light fw-bold text-primary" readonly tabindex="-1">
+					</div>
+
+					<div class="mb-3">
+						<label class="form-label small fw-bold mb-1">Foto Bukti Pengiriman (POD) <span class="text-danger">*</span></label>
+						<input type="file" name="pod_image" id="pod_image" class="form-control" accept="image/*" required>
+						<small class="text-muted mt-1 d-block">*Ambil foto serah terima barang atau tanda terima fisik.</small>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-sm btn-link link-secondary" data-bs-dismiss="modal">Batal</button>
+					<button type="submit" id="btn-save-delivery" class="btn btn-sm btn-success">Konfirmasi & Delivered</button>
+				</div>
+			</form>
+		</div>
 	</div>
 </div>
 
@@ -469,6 +515,65 @@
 					}, function(res) {
 						if (res.status) Swal.fire('Sip!', 'Status berubah jadi Siap Pickup.', 'success').then(() => location.reload());
 					}, 'json');
+				}
+			});
+		});
+	});
+
+	$(document).ready(function() {
+		// Ketika tombol 'Kirim' diklik, munculkan modal dan set data ID & Resi
+		$(document).on('click', '.btn-trigger-delivery', function() {
+			var id = $(this).data('id');
+			var resi = $(this).data('resi');
+
+			$('#delivery-shipment-id').val(id);
+			$('#delivery-no-resi').val(resi);
+			$('#pod_image').val(''); // Reset input file
+
+			$('#modal-delivery').modal('show');
+		});
+
+		// Handle submit form upload via AJAX
+		$('#form-delivery-submit').on('submit', function(e) {
+			e.preventDefault();
+
+			var formData = new FormData(this);
+
+			// Mengubah state tombol menjadi loading
+			$('#btn-save-delivery').attr('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i> Memproses...');
+
+			$.ajax({
+				url: "<?= site_url('shipment/update_to_delivered') ?>",
+				type: "POST",
+				data: formData,
+				contentType: false,
+				processData: false,
+				dataType: "JSON",
+				success: function(response) {
+					if (response.status == 'success') {
+						Swal.fire({
+							title: "Berhasil!",
+							text: response.message,
+							icon: "success"
+						}).then(function() {
+							window.location.reload(); // Reload halaman untuk memperbarui status tabel
+						});
+					} else {
+						Swal.fire({
+							title: "Gagal!",
+							text: response.message,
+							icon: "error"
+						});
+						$('#btn-save-delivery').attr('disabled', false).text('Konfirmasi & Delivered');
+					}
+				},
+				error: function() {
+					Swal.fire({
+						title: "Error!",
+						text: "Terjadi kesalahan sistem pada server.",
+						icon: "error"
+					});
+					$('#btn-save-delivery').attr('disabled', false).text('Konfirmasi & Delivered');
 				}
 			});
 		});

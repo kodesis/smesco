@@ -149,21 +149,27 @@
 
 		// --- KETIKA SELESAI FOTO & PROSES AJAX ---
 		$('#camera_input').on('change', function() {
-			let file = this.files; // FIX: Wajib pakai index
-			if (!file) return;
+			// Memastikan file benar-benar tertangkap dari hardware kamera HP
+			if (!this.files || this.files.length === 0) {
+				return;
+			}
+
+			let fileTarget = this.files;
+			if (!fileTarget) return;
 
 			Swal.fire({
 				title: 'Mengupload...',
-				text: 'Menyimpan data dan bukti foto',
+				text: 'Menyimpan data inbound dan bukti foto',
 				allowOutsideClick: false,
 				didOpen: () => {
 					Swal.showLoading();
 				}
 			});
 
+			// Masukkan ke FormData secara aman
 			let formData = new FormData();
-			formData.append('no_resi', tempBarcode);
-			formData.append('photo', file);
+			formData.append('no_resi', tempBarcode); // tempBarcode berisi nomor resi/karung aktif
+			formData.append('photo', fileTarget[0]); // Menyuntikkan file gambar asli
 
 			$.ajax({
 				url: "<?= site_url('shipment/ajax_process_inbound') ?>",
@@ -173,7 +179,7 @@
 				contentType: false,
 				dataType: "json",
 				success: function(res) {
-					$('#camera_input').val(''); // Reset input file
+					$('#camera_input').val(''); // Reset input kamera agar bisa dipakai scan ulang
 
 					if (res.status) {
 						Swal.fire({
@@ -186,12 +192,10 @@
 						});
 
 						if (res.is_koli) {
-							// Jika yang discan adalah Karung Induk, reload agar list resi mutakhir
 							setTimeout(() => {
 								location.reload();
 							}, 1500);
 						} else {
-							// Jika yang discan adalah Resi Fisik, update progress bar
 							const item = document.getElementById('item-' + res.data.no_resi);
 							if (item) {
 								let total = parseInt(item.getAttribute('data-total'));
