@@ -251,8 +251,8 @@ class Home extends CI_Controller {
 			], ['no_resi' => $no_resi]);
 
 			// Notifikasi WA ke admin
-			$admin_phone = '085240719210'; // ambil dari config/db
-			// $admin_phone = '087777346509'; // ambil dari config/db
+			// $admin_phone = '085240719210'; // ambil dari config/db
+			$admin_phone = '087777346509'; // ambil dari config/db
 			$pesan_admin = "*SMESCO EXPRESS — Bukti Transfer Masuk*\n\n" .
 				"No. Resi: *$no_resi*\n" .
 				"Pengirim: *{$shipment->sender_name}*\n" .

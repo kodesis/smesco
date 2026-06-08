@@ -515,6 +515,9 @@ class Shipment extends Authenticated_Controller
 			redirect('shipment/create_intl');
 		}
 
+		// ── FIX BUG 1: GENERATE NO RESI DI AWAL AGAR BISA DIPAKAI UNTUK DIMENSI & FOTO ──
+		$no_resi = $this->M_Shipment->generate_no_resi();
+
 		// ── 2. Hitung Berat ──
 		$actual_weight = $this->_parse_indo_number($this->input->post('actual_weight'));
 		$dim_length = $this->input->post('dim_length');
@@ -522,32 +525,41 @@ class Shipment extends Authenticated_Controller
 		$dim_height = $this->input->post('dim_height');
 		$dim_qty    = $this->input->post('dim_qty');
 
+		// FIX BUG 2: Inisialisasi awal variabel akumulasi volume kargo
+		$insert_dimensions   = [];
+		$total_volume_weight = 0;
+		$total_koli          = 0;
+
 		if (!empty($dim_qty)) {
-			$data_dims = [];
 			$koli_counter = 1; // Pemicu nomor urut kardus fisik
 
 			foreach ($dim_qty as $key => $qty) {
 				if ($qty > 0) {
-					// Daripada simpan Qty langsung, kita looping sebanyak Qty-nya
-					// Jadi kalau qty = 3, di DB akan ke-insert 3 baris terpisah (akurat per dus fisik!)
+					$total_koli += $qty;
+
+					$p = str_replace(',', '.', $dim_length[$key]);
+					$l = str_replace(',', '.', $dim_width[$key]);
+					$t = str_replace(',', '.', $dim_height[$key]);
+
+					// Rumus volume standard udara (P x L x T / 5000) dikali jumlah qty koli
+					$vol_weight_per_item = ($p * $l * $t) / 5000;
+					$total_volume_weight += ($vol_weight_per_item * $qty);
+
+					// Pecah data per koli fisik untuk kebutuhan barcode scanner
 					for ($i = 0; $i < $qty; $i++) {
-						// Generate format barcode: NORESI-01, NORESI-02, dst
 						$barcode_koli = $no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
 
-						$data_dims[] = [
-							'shipment_id'  => $shipment_id,
+						$insert_dimensions[] = [
+							'shipment_id'  => NULL, // Di-inject nanti setelah dapat insert_id()
 							'barcode_koli' => $barcode_koli,
 							'qty'          => 1, // Dikunci di angka 1 per baris fisik
-							'length'       => str_replace(',', '.', $dim_length[$key]),
-							'width'        => str_replace(',', '.', $dim_width[$key]),
-							'height'       => str_replace(',', '.', $dim_height[$key])
+							'length'       => $p,
+							'width'        => $l,
+							'height'       => $t
 						];
 						$koli_counter++;
 					}
 				}
-			}
-			if (count($data_dims) > 0) {
-				$this->db->insert_batch('shipment_dimensions', $data_dims);
 			}
 		}
 
@@ -636,6 +648,7 @@ class Shipment extends Authenticated_Controller
 				if ($fee > 0) {
 					$total_addon_fee += $fee;
 					$insert_addons[] = [
+						'shipment_id'  => NULL, // Di-inject nanti
 						'addon_id'     => $addon->id,
 						'addon_amount' => $fee,
 					];
@@ -646,8 +659,8 @@ class Shipment extends Authenticated_Controller
 		$total_margin = $shipping_margin;
 
 		// ── 7. Resolve Nama Wilayah Pengirim ──
-		$sender_prov_name = $this->db->get_where('mt_provinsi',  ['id' => $this->input->post('sender_provinsi')])->row();
-		$sender_kota_name = $this->db->get_where('mt_kota',      ['id' => $this->input->post('sender_kota')])->row();
+		$sender_prov_name = $this->db->get_where('mt_provinsi',   ['id' => $this->input->post('sender_provinsi')])->row();
+		$sender_kota_name = $this->db->get_where('mt_kota',       ['id' => $this->input->post('sender_kota')])->row();
 		$sender_kec_name  = $this->db->get_where('mt_kecamatan', ['id' => $this->input->post('sender_kecamatan')])->row();
 		$sender_kel_name  = $this->db->get_where('mt_kelurahan', ['id' => $this->input->post('sender_kelurahan')])->row();
 
@@ -667,8 +680,8 @@ class Shipment extends Authenticated_Controller
 			$destination,
 		]));
 
-		// ── 8. Upload Foto (pakai move_uploaded_file agar nama resi bisa dipakai) ──
-		$photo_path      = NULL;
+		// ── 8. Upload Foto (Standardisasi Lintasan Folder) ──
+		$photo_name      = NULL;
 		$pending_upload  = [];
 
 		if (isset($_FILES['shipment_photo']) && $_FILES['shipment_photo']['error'] === UPLOAD_ERR_OK) {
@@ -690,33 +703,25 @@ class Shipment extends Authenticated_Controller
 				'ext'      => strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)),
 			];
 		} else {
-			// Foto wajib untuk internasional
-			$this->session->set_flashdata('error', 'Foto barang wajib diupload!');
+			$this->session->set_flashdata('error', 'Foto barang wajib diupload untuk pengiriman internasional!');
 			redirect('shipment/create_intl');
 		}
 
-		// ── 9. Generate No Resi ──
-		// $no_resi = 'KRX-INTL-' . date('ymd') . strtoupper(substr(md5(uniqid()), 0, 4));
-
-		$no_resi = $this->M_Shipment->generate_no_resi();
-
-		// ── 10. Eksekusi Upload Foto ──
+		// ── 10. Eksekusi Upload Foto ke Folder /booking/ ──
 		if (!empty($pending_upload)) {
-			$upload_dir = FCPATH . 'uploads/shipments/' . date('Y') . '/' . date('m') . '/';
+			$upload_dir = FCPATH . 'uploads/shipments/booking/';
 
 			if (!is_dir($upload_dir)) {
 				mkdir($upload_dir, 0755, TRUE);
 			}
 
-			$file_name = $no_resi . '_photo.' . $pending_upload['ext'];
-			$full_path = $upload_dir . $file_name;
+			$photo_name = 'BOOKING_' . $no_resi . '_' . time() . '.' . $pending_upload['ext'];
+			$full_path  = $upload_dir . $photo_name;
 
 			if (!move_uploaded_file($pending_upload['tmp_name'], $full_path)) {
-				$this->session->set_flashdata('error', 'Gagal mengupload foto. Coba lagi bro.');
+				$this->session->set_flashdata('error', 'Gagal mengupload foto kargo awal. Coba lagi bro.');
 				redirect('shipment/create_intl');
 			}
-
-			$photo_path = 'uploads/shipments/' . date('Y') . '/' . date('m') . '/' . $file_name;
 		}
 
 		// ── 11. Payment Expired ──
@@ -740,7 +745,6 @@ class Shipment extends Authenticated_Controller
 			'commodity_detail_en'     => $this->input->post('commodity_detail_en', TRUE),
 			'customs_value_usd'       => $this->_parse_indo_number($this->input->post('customs_value_usd')),
 			'payment_type'            => $payment_type,
-			'shipment_photo'          => $photo_path,
 
 			// Pengirim
 			'sender_name'             => $sender_name,
@@ -785,18 +789,13 @@ class Shipment extends Authenticated_Controller
 			'created_at'              => date('Y-m-d H:i:s'),
 		];
 
-		// echo '<pre>';
-		// print_r($insert_shipment);
-		// echo '</pre>';
-		// exit;
-
-		// ── 13. Database Transaction ──
-		$this->db->trans_start();
+		// ── 13. Database Transaction START ──
+		$this->db->trans_begin();
 
 		$this->db->insert('shipments', $insert_shipment);
 		$shipment_id = $this->db->insert_id();
 
-		// Insert Dimensi
+		// Inject ID & Insert Dimensi
 		if (!empty($insert_dimensions)) {
 			foreach ($insert_dimensions as &$dim) {
 				$dim['shipment_id'] = $shipment_id;
@@ -804,7 +803,7 @@ class Shipment extends Authenticated_Controller
 			$this->db->insert_batch('shipment_dimensions', $insert_dimensions);
 		}
 
-		// Insert Addon
+		// Inject ID & Insert Addon
 		if (!empty($insert_addons)) {
 			foreach ($insert_addons as &$addon_row) {
 				$addon_row['shipment_id'] = $shipment_id;
@@ -812,16 +811,15 @@ class Shipment extends Authenticated_Controller
 			$this->db->insert_batch('shipment_addons', $insert_addons);
 		}
 
-		// Insert Tracking
+		// FIX LOGIKA TRACKING FOTO: Tempel nama file booking di kolom photo_proof
 		$this->db->insert('shipment_tracking', [
 			'shipment_id' => $shipment_id,
 			'status'      => 'BOOKED',
 			'location'    => $origin,
 			'note'        => 'Shipment internasional berhasil dibuat.',
+			'photo_proof' => $photo_name,
 			'created_by'  => $sess['id'],
 		]);
-
-		$this->db->trans_complete();
 
 		// ── 14. Upsert Master Customer ──
 		$customer_data = [
@@ -848,15 +846,19 @@ class Shipment extends Authenticated_Controller
 			$this->db->insert('master_customers', $customer_data);
 		}
 
-		// ── 15. Response ──
+		// ── 15. Response & Transaction Check ──
 		if ($this->db->trans_status() === FALSE) {
-			// Rollback foto kalau transaksi gagal
-			if ($photo_path && file_exists(FCPATH . $photo_path)) {
-				unlink(FCPATH . $photo_path);
+			$this->db->trans_rollback();
+
+			// Rollback file fisik di storage jika database bermasalah
+			if ($photo_name && file_exists(FCPATH . 'uploads/shipments/booking/' . $photo_name)) {
+				unlink(FCPATH . 'uploads/shipments/booking/' . $photo_name);
 			}
 			$this->session->set_flashdata('error', 'Gagal menyimpan data booking internasional!');
 			redirect('shipment/create_intl');
 		} else {
+			$this->db->trans_commit(); // Sukses total, kunci data
+
 			if ($payment_type === 'TRANSFER') {
 				$url      = base_url('home/confirm_payment/' . $no_resi);
 				$total_rp = number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.');
