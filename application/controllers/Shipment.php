@@ -531,8 +531,6 @@ class Shipment extends Authenticated_Controller
 		$total_koli          = 0;
 
 		if (!empty($dim_qty)) {
-			$koli_counter = 1; // Pemicu nomor urut kardus fisik
-
 			foreach ($dim_qty as $key => $qty) {
 				if ($qty > 0) {
 					$total_koli += $qty;
@@ -541,18 +539,16 @@ class Shipment extends Authenticated_Controller
 					$l = str_replace(',', '.', $dim_width[$key]);
 					$t = str_replace(',', '.', $dim_height[$key]);
 
-					// Rumus volume standard udara (P x L x T / 5000) dikali jumlah qty koli
 					$vol_weight_per_item = ($p * $l * $t) / 5000;
 					$total_volume_weight += ($vol_weight_per_item * $qty);
 
-					// Pecah data per koli fisik untuk kebutuhan barcode scanner
 					for ($i = 0; $i < $qty; $i++) {
 						$barcode_koli = $no_resi . '-' . str_pad($koli_counter, 2, '0', STR_PAD_LEFT);
 
 						$insert_dimensions[] = [
-							'shipment_id'  => NULL, // Di-inject nanti setelah dapat insert_id()
+							'shipment_id'  => NULL,
 							'barcode_koli' => $barcode_koli,
-							'qty'          => 1, // Dikunci di angka 1 per baris fisik
+							'qty'          => 1,
 							'length'       => $p,
 							'width'        => $l,
 							'height'       => $t
