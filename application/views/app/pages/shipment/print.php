@@ -30,7 +30,7 @@
 			width: 350px;
 			border: 2px solid #000;
 			padding: 5px;
-			margin-bottom: 20px;
+			margin-bottom: 10px;
 			/* Jarak antar label di layar */
 		}
 
@@ -166,14 +166,14 @@
 
 		.cut-line {
 			border-top: 1px dashed #444;
-			margin: 10px 0;
+			margin: 5px 0;
 			position: relative;
 			text-align: center;
 		}
 
 		.cut-line span {
 			background: #fff;
-			padding: 0 10px;
+			padding: 0 5px;
 			font-size: 8px;
 			color: #444;
 			position: absolute;
@@ -200,11 +200,11 @@
 			<div class="resi-container">
 				<div class="header">
 					<div class="header-logo">
-						<img src="<?= $logo_base64 ?>" style="width: 200px;">
+						<img src="<?= $logo_base64 ?>" style="width: 180px;">
 						<!-- <div class="koli-tag">KOLI: <?= $l['koli_ke'] ?>/<?= $total_koli ?></div> -->
 					</div>
 					<div class="header-qr">
-						<img src="<?= $l['qr_internal'] ?>" style="width: 80px; height: 80px;">
+						<img src="<?= $l['qr_internal'] ?>" style="width: 70px; height: 70px;">
 						<div style="font-size: 7px; color: #555;"><?= $l['piece_id'] ?></div>
 
 						<div style="font-size: 7px; color: #555; font-weight: bold;">KOLI: <?= $l['koli_ke'] ?>/<?= $total_koli ?></div>
