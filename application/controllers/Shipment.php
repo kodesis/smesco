@@ -568,8 +568,8 @@ class Shipment extends Authenticated_Controller
 		$chargeable = ceil($chargeable);
 
 		// ── 4. Harga & Tiered Pricing ──
-		$cost_per_kg = $pricelist->harga_modal;
-		$sell_per_kg = $pricelist->harga_jual;
+		$cost_per_kg = $pricelist->price_kribo;
+		$sell_per_kg = $pricelist->price_smesco;
 
 		if ($pricelist->is_tiered == 1) {
 			$tier = $this->db->where('pricelist_id', $pricelist->id)
@@ -578,16 +578,16 @@ class Shipment extends Authenticated_Controller
 				->get('pricelist_tiers')->row();
 
 			if ($tier) {
-				$cost_per_kg = $tier->harga_modal;
-				$sell_per_kg = $tier->harga_jual;
+				$cost_per_kg = $tier->price_kribo;
+				$sell_per_kg = $tier->price_smesco;
 			} else {
 				$last_tier = $this->db->where('pricelist_id', $pricelist->id)
 					->order_by('max_weight', 'DESC')
 					->limit(1)
 					->get('pricelist_tiers')->row();
 				if ($last_tier) {
-					$cost_per_kg = $last_tier->harga_modal;
-					$sell_per_kg = $last_tier->harga_jual;
+					$cost_per_kg = $last_tier->price_kribo;
+					$sell_per_kg = $last_tier->price_smesco;
 				}
 			}
 		}
@@ -605,7 +605,7 @@ class Shipment extends Authenticated_Controller
 
 			if ($rate_db && $chargeable >= $rate_db->min_weight) {
 				$pickup_id  = $p_id;
-				$pickup_fee = $rate_db->harga_jual;
+				$pickup_fee = $rate_db->price_smesco;
 			}
 		}
 
@@ -1345,8 +1345,8 @@ class Shipment extends Authenticated_Controller
 		if ($chargeable < $pricelist->min_weight_kg) $chargeable = $pricelist->min_weight_kg;
 		$chargeable = ceil($chargeable);
 
-		$cost_per_kg = $pricelist->harga_modal;
-		$sell_per_kg = $pricelist->harga_jual;
+		$cost_per_kg = $pricelist->price_kribo;
+		$sell_per_kg = $pricelist->price_smesco;
 
 		if ($pricelist->is_tiered == 1) {
 			$tier = $this->db->where('pricelist_id', $pricelist->id)
@@ -1354,14 +1354,14 @@ class Shipment extends Authenticated_Controller
 				->where('max_weight >=', $chargeable)
 				->get('pricelist_tiers')->row();
 			if ($tier) {
-				$cost_per_kg = $tier->harga_modal;
-				$sell_per_kg = $tier->harga_jual;
+				$cost_per_kg = $tier->price_kribo;
+				$sell_per_kg = $tier->price_smesco;
 			} else {
 				$last_tier = $this->db->where('pricelist_id', $pricelist->id)
 					->order_by('max_weight', 'DESC')->limit(1)->get('pricelist_tiers')->row();
 				if ($last_tier) {
-					$cost_per_kg = $last_tier->harga_modal;
-					$sell_per_kg = $last_tier->harga_jual;
+					$cost_per_kg = $last_tier->price_kribo;
+					$sell_per_kg = $last_tier->price_smesco;
 				}
 			}
 		}
@@ -1376,7 +1376,7 @@ class Shipment extends Authenticated_Controller
 			$rate_db = $this->db->get_where('master_pickup_rates', ['id' => $p_id])->row();
 			if ($rate_db && $chargeable >= $rate_db->min_weight) {
 				$pickup_id  = $p_id;
-				$pickup_fee = $rate_db->harga_jual;
+				$pickup_fee = $rate_db->price_smesco;
 			}
 		}
 
