@@ -529,6 +529,7 @@ class Shipment extends Authenticated_Controller
 		$insert_dimensions   = [];
 		$total_volume_weight = 0;
 		$total_koli          = 0;
+		$koli_counter        = 1;
 
 		if (!empty($dim_qty)) {
 			foreach ($dim_qty as $key => $qty) {
