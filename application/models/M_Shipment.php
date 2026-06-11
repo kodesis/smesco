@@ -498,13 +498,25 @@ class M_Shipment extends CI_Model
 
 	public function get_inbound_pending($city_name)
 	{
-		// Ambil resi yang tujuannya ke kota agen ini dan statusnya sudah Arrived/Departed
-		$this->db->select('shipments.*, agents.name as origin_agent');
-		$this->db->from('shipments');
-		$this->db->join('agents', 'agents.id = shipments.agent_id', 'left');
-		$this->db->where('shipments.destination', $city_name);
-		$this->db->where_in('shipments.status', ['ARRIVED', 'DEPARTED']);
-		return $this->db->get()->result();
+		return $this->db->select("
+        s.no_resi,
+        s.koli,
+        s.destination,
+        a.name as origin_agent,
+        COALESCE((
+            SELECT SUM(sd.qty)
+            FROM shipment_tracking st
+            INNER JOIN shipment_dimensions sd ON sd.barcode_koli = st.piece_barcode
+            WHERE st.shipment_id = s.id
+            AND st.status = 'PIECE_RECEIVED_DESTINATION'
+        ), 0) as received_qty
+    ", FALSE)
+			->from('shipments s')
+			->join('agents a', 'a.id = s.agent_id', 'left')
+			->where('s.destination', $city_name)
+			->where_in('s.status', ['ARRIVED', 'DEPARTED', 'PARTIAL_ARRIVED']) // ← tambah PARTIAL_ARRIVED
+			->order_by('s.created_at', 'ASC')
+			->get()->result();
 	}
 
 	public function get_superadmin_stats()

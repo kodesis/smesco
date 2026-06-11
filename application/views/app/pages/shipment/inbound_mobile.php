@@ -27,7 +27,10 @@
 				<div class="text-muted small mb-2 text-uppercase fw-bold">1. Daftar Barang Masuk</div>
 				<div id="list-container" class="overflow-auto" style="max-height: 55vh;">
 					<?php if ($pending_list): foreach ($pending_list as $p): ?>
-							<div class="card mb-2 shipment-item shadow-none border" id="item-<?= $p->no_resi ?>" data-total="<?= $p->koli ?>" data-received="0">
+							<div class="card mb-2 shipment-item shadow-none border"
+								id="item-<?= $p->no_resi ?>"
+								data-total="<?= $p->koli ?>"
+								data-received="<?= $p->received_qty ?>">
 								<div class="card-body p-2">
 									<div class="row align-items-center">
 										<div class="col">
@@ -35,12 +38,16 @@
 											<div class="small text-muted">Asal: <?= $p->origin_agent ?></div>
 										</div>
 										<div class="col-auto text-end">
-											<div class="h4 m-0 counter-label text-yellow">0 / <?= $p->koli ?></div>
+											<div class="h4 m-0 counter-label <?= $p->received_qty > 0 ? 'text-orange' : 'text-yellow' ?>">
+												<?= $p->received_qty ?> / <?= $p->koli ?>
+											</div>
 											<div class="small text-muted" style="font-size: 10px;">Koli</div>
 										</div>
 									</div>
 									<div class="progress progress-xs mt-2">
-										<div class="progress-bar bg-primary" style="width: 0%"></div>
+										<div class="progress-bar bg-primary"
+											style="width: <?= $p->koli > 0 ? round($p->received_qty / $p->koli * 100) : 0 ?>%">
+										</div>
 									</div>
 								</div>
 							</div>
