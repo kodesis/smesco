@@ -138,13 +138,32 @@
 			document.getElementById('beep_success').play();
 
 			if ($('#modal-scanner').is(':visible')) {
+				// Tunggu modal benar-benar hilang, BARU tampilkan Swal
+				$('#modal-scanner').one('hidden.bs.modal', function() {
+					showFotoPrompt();
+				});
 				html5QrCode.stop().then(() => {
 					$('#modal-scanner').modal('hide');
-					$('#camera_input').click();
 				});
 			} else {
-				$('#camera_input').click();
+				// Dari input manual/gun, langsung tampilkan
+				showFotoPrompt();
 			}
+		}
+
+		function showFotoPrompt() {
+			Swal.fire({
+				title: 'Resi: ' + tempBarcode,
+				text: 'Ambil foto bukti penerimaan koli.',
+				icon: 'info',
+				confirmButtonText: '📷 Ambil Foto',
+				showCancelButton: true,
+				cancelButtonText: 'Batal'
+			}).then((result) => {
+				if (result.isConfirmed) {
+					document.getElementById('camera_input').click();
+				}
+			});
 		}
 
 		// --- KETIKA SELESAI FOTO & PROSES AJAX ---
