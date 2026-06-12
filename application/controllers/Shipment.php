@@ -2008,7 +2008,7 @@ class Shipment extends Authenticated_Controller
 		$total_existing = $this->db->count_all_results('awb_koli');
 		$next_number = str_pad($total_existing + 1, 2, '0', STR_PAD_LEFT);
 
-		$this->db->where('awb_id', $awb_id);
+		$this->db->where('id', $awb_id);
 		$awb = $this->db->get('master_awb')->row();
 
 		$koli_number = $awb->awb_number . '-' . $next_number;
