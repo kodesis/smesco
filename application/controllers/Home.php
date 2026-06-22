@@ -251,13 +251,17 @@ class Home extends CI_Controller {
 			], ['no_resi' => $no_resi]);
 
 			// Notifikasi WA ke admin
-			// $admin_phone = '085240719210'; // ambil dari config/db
-			$admin_phone = '087777346509'; // ambil dari config/db
+			$finance = $this->db->select('phone')->where('confirm_payment', '1')->get('users')->row();
+			$admin_phone = $finance->phone;
+
+			$url = base_url('auth');
+
 			$pesan_admin = "*SMESCO EXPRESS — Bukti Transfer Masuk*\n\n" .
 				"No. Resi: *$no_resi*\n" .
 				"Pengirim: *{$shipment->sender_name}*\n" .
 				"Total: *Rp " . number_format($shipment->total_amount, 0, ',', '.') . "*\n\n" .
-				"Silakan verifikasi di panel admin.";
+				"Silakan verifikasi di panel admin." .
+				"$url\n\n" .;
 
 			try {
 				$this->api_whatsapp->wa_notif_v2($admin_phone, $pesan_admin);

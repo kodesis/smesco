@@ -17,9 +17,18 @@
 	<div class="container-xl">
 		<?php defined('BASEPATH') or exit('No direct script access allowed'); ?>
 
-		<!-- Agent Header Card -->
+		<?php
+		// 1. Ambil akses dari session atau informasi agen
+		$user_sess       = $this->session->userdata('user');
+		$can_pickup      = $user_sess['can_scan_pickup_as_driver'] ?? false;
+
+		// Asumsi: can_scan_origin juga disimpan di session atau $agent_info
+		// Silakan sesuaikan variabelnya jika namanya berbeda di database kamu
+		$can_scan_origin = $user_sess['can_scan_at_origin'] ?? ($agent_info->can_scan_origin ?? false);
+		?>
+
 		<div class="row mb-4">
-			<div class="col-sm-6 col-xl-9">
+			<div class="col-12">
 				<div class="card card-body bg-primary-lt border-primary">
 					<div class="row align-items-center">
 						<div class="col-auto">
@@ -28,12 +37,12 @@
 							</span>
 						</div>
 						<div class="col">
-							<h3 class="mb-0"><?= ($agent_info->name ?? '—') ?></h3>
+							<h3 class="mb-0"><?= htmlspecialchars($agent_info->name ?? '—') ?></h3>
 							<div class="text-muted">
-								Kode: <strong><?= ($agent_info->code ?? '—') ?></strong>
-								· <?= ($agent_info->regency_name ?? '—') ?>
+								Kode: <strong><?= htmlspecialchars($agent_info->code ?? '—') ?></strong>
+								· <?= htmlspecialchars($agent_info->regency_name ?? '—') ?>
 								<?php if (!empty($agent_info->province_name)): ?>
-									, <?= ($agent_info->province_name) ?>
+									, <?= htmlspecialchars($agent_info->province_name) ?>
 								<?php endif; ?>
 							</div>
 						</div>
@@ -47,32 +56,81 @@
 					</div>
 				</div>
 			</div>
-			<div class="col-sm-6 col-xl-3">
-				<div class="card card-sm">
-					<div class="card-body">
-						<div class="row align-items-center">
-							<div class="col-auto">
-								<span class="bg-purple text-white avatar"><?= tabler_icon('package-import') ?></span>
-							</div>
-							<div class="col">
-								<div class="fw-bold"><?= number_format($shipment_stats->inbound_pending ?? 0) ?></div>
-								<div class="text-muted small">Menunggu Inbound</div>
-							</div>
-						</div>
-					</div>
-					<?php if ($city_name): ?>
-						<div class="card-footer p-2">
-							<a href="<?= site_url('shipment/inbound_scan') ?>" class="btn btn-sm btn-purple w-100">
-								<?= tabler_icon('scan', 'me-1') ?> Buka Scanner Inbound
-							</a>
-						</div>
-					<?php endif; ?>
-				</div>
-			</div>
 		</div>
 
+		<div class="row row-deck row-cards mb-4">
 
-		<!-- Stats -->
+			<?php if ($city_name): ?>
+				<div class="col-sm-6 col-xl-4">
+					<div class="card card-sm">
+						<div class="card-body">
+							<div class="row align-items-center">
+								<div class="col-auto">
+									<span class="bg-purple text-white avatar"><?= tabler_icon('package-import') ?></span>
+								</div>
+								<div class="col">
+									<div class="fw-bold"><?= number_format($shipment_stats->inbound_pending ?? 0) ?></div>
+									<div class="text-muted small">Menunggu Inbound</div>
+								</div>
+							</div>
+						</div>
+						<div class="card-footer p-2">
+							<a href="<?= site_url('shipment/inbound_scan') ?>" class="btn btn-sm btn-purple w-100">
+								<?= tabler_icon('scan', 'me-1') ?> Scan Inbound
+							</a>
+						</div>
+					</div>
+				</div>
+			<?php endif; ?>
+
+			<?php if ($can_pickup): ?>
+				<div class="col-sm-6 col-xl-4">
+					<div class="card card-sm">
+						<div class="card-body">
+							<div class="row align-items-center">
+								<div class="col-auto">
+									<span class="bg-teal text-white avatar"><?= tabler_icon('truck-loading') ?></span>
+								</div>
+								<div class="col">
+									<div class="fw-bold">Pickup Kurir</div>
+									<div class="text-muted small">Ambil paket dari pengirim</div>
+								</div>
+							</div>
+						</div>
+						<div class="card-footer p-2">
+							<a href="<?= site_url('shipment/pickup_scan') ?>" class="btn btn-sm btn-teal w-100">
+								<?= tabler_icon('scan', 'me-1') ?> Scan Pickup
+							</a>
+						</div>
+					</div>
+				</div>
+			<?php endif; ?>
+
+			<?php if ($can_scan_origin): ?>
+				<div class="col-sm-6 col-xl-4">
+					<div class="card card-sm">
+						<div class="card-body">
+							<div class="row align-items-center">
+								<div class="col-auto">
+									<span class="bg-orange text-white avatar"><?= tabler_icon('box-seam') ?></span>
+								</div>
+								<div class="col">
+									<div class="fw-bold">Origin Scan</div>
+									<div class="text-muted small">Terima paket di agen</div>
+								</div>
+							</div>
+						</div>
+						<div class="card-footer p-2">
+							<a href="<?= site_url('shipment/acceptance_scan') ?>" class="btn btn-sm btn-orange w-100">
+								<?= tabler_icon('scan', 'me-1') ?> Scan di Origin
+							</a>
+						</div>
+					</div>
+				</div>
+			<?php endif; ?>
+
+		</div>
+
 		<div class="row row-deck row-cards mb-4">
 			<div class="col-sm-6 col-xl-3">
 				<div class="card card-sm">

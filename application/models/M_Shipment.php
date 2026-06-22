@@ -256,27 +256,66 @@ class M_Shipment extends CI_Model
 
 	public function get_tracking_public($shipment_id)
 	{
-		$this->db->where('shipment_id', $shipment_id);
-		$this->db->where_not_in('status', ['PIECE_RECEIVED', 'PIECE_RECEIVED_DESTINATION']);
-		$this->db->order_by('created_at', 'DESC');
-		$query = $this->db->get('shipment_tracking');
+		// Ambil data tracking sekaligus category dari tabel shipments
+		$this->db->select('st.*, s.category as shipment_category');
+		$this->db->from('shipment_tracking st');
+		$this->db->join('shipments s', 's.id = st.shipment_id');
+		$this->db->where('st.shipment_id', $shipment_id);
+		$this->db->where_not_in('st.status', ['PIECE_RECEIVED', 'PIECE_RECEIVED_DESTINATION']);
+		$this->db->order_by('st.created_at', 'DESC');
 
+		$query = $this->db->get();
 		$results = $query->result_array();
 
-		// ── LOGIC MASKING NOTE ──
 		foreach ($results as &$row) {
-			if ($row['status'] === 'MANIFESTED') {
-				// Kita ganti note internal dengan kalimat umum buat publik/mitra
-				$row['note'] = 'Paket telah masuk ke dalam daftar muatan kargo udara.';
+			// Cek jika kategori shipment adalah INTERNATIONAL
+			if (strtoupper($row['shipment_category']) === 'INTERNATIONAL') {
+
+				switch ($row['status']) {
+					case 'BOOKED':
+						$row['note'] = 'Your shipment has been booked / registered.';
+						break;
+					case 'PICKED_UP':
+						$row['note'] = 'Your shipment has been picked up by courier.';
+						break;
+					case 'RECEIVED_ORIGIN':
+						$row['note'] = 'On origin custom clearance process';
+						break;
+					case 'MANIFESTED':
+						$row['note'] = 'Your shipment has departed from origin airport';
+						break;
+					case 'ARRIVED':
+						$row['note'] = 'Your shipment has arrived at destination airport';
+						break;
+					case 'RECEIVED_DESTINATION':
+						// Bisa digunakan untuk menandakan proses masuk bea cukai tujuan
+						$row['note'] = 'On destination custom clearance process';
+						break;
+					case 'DELIVERED':
+						$row['note'] = 'Shipment delivered successfully.';
+						break;
+					default:
+						// Jika status internal lainnya, biarkan menggunakan note bawaan atau custom default
+						if (empty($row['note'])) {
+							$row['note'] = 'In transit / processing.';
+						}
+						break;
+				}
+			} else {
+				// ── LOGIC MASKING DOMESTIC (Bawaan Lama) ──
+				if ($row['status'] === 'MANIFESTED') {
+					$row['note'] = 'Paket telah masuk ke dalam daftar muatan kargo udara.';
+				}
+				if ($row['status'] === 'DEPARTED') {
+					$row['note'] = 'Pesawat telah berangkat menuju bandara tujuan.';
+				}
+				if ($row['status'] === 'ARRIVED') {
+					$row['note'] = 'Pesawat telah tiba di bandara tujuan.';
+				}
 			}
 
-			if ($row['status'] === 'DEPARTED') {
-				$row['note'] = 'Pesawat telah berangkat menuju bandara tujuan.';
-			}
-
-			if ($row['status'] === 'ARRIVED') {
-				$row['note'] = 'Pesawat telah tiba di bandara tujuan.';
-			}
+			// Hapus temp variabel category agar response API publik tetap bersih
+			unset($row['shipment_category']);
 		}
 
 		return $results;
@@ -363,19 +402,19 @@ class M_Shipment extends CI_Model
 	// 	$statuses = !empty($filters['status']) ? [$filters['status']] : ['DRAFT', 'MANIFESTED', 'DEPARTED'];
 
 	// 	$this->db->select("
-   //          ma.id as awb_id,
-   //          ma.awb_number,
-   //          ma.flight_number,
-   //          ma.departure_date,
-   //          ma.origin,
-   //          ma.destination,
-   //          ma.status,
-   //          al.name as airline_name,
-   //          COUNT(DISTINCT ak.id) as total_karung,
-   //          COUNT(s.id) as total_resi,
-   //          SUM(s.koli) as total_koli,
-   //          SUM(s.chargeable_weight) as total_weight
-   //      ");
+	//          ma.id as awb_id,
+	//          ma.awb_number,
+	//          ma.flight_number,
+	//          ma.departure_date,
+	//          ma.origin,
+	//          ma.destination,
+	//          ma.status,
+	//          al.name as airline_name,
+	//          COUNT(DISTINCT ak.id) as total_karung,
+	//          COUNT(s.id) as total_resi,
+	//          SUM(s.koli) as total_koli,
+	//          SUM(s.chargeable_weight) as total_weight
+	//      ");
 	// 	$this->db->from('master_awb ma');
 	// 	$this->db->join('airlines al', 'al.id = ma.airline_id', 'left');
 	// 	// Relasi ke tabel koli (karung konsolidasi)
@@ -399,45 +438,41 @@ class M_Shipment extends CI_Model
 
 	public function get_master_awb_list($filters = [])
 	{
-		// Status default jika tidak di-filter dari UI
-		$statuses = !empty($filters['status']) ? [$filters['status']] : ['DRAFT', 'MANIFESTED', 'DEPARTED'];
+		$statuses = !empty($filters['status']) ? [$filters['status']] : ['ARRIVED'];
 
 		$this->db->select("
-            ma.id as awb_id,
-            ma.awb_number as smu_number,
-            ma.flight_number,
-            ma.departure_date,
-            ma.origin,
-				s.origin_warehouse,
-            ma.destination,
-            ma.status,
-            al.name as airline_name,
-            COUNT(DISTINCT ak.id) as total_karung,
-            COUNT(DISTINCT s.id) as total_resi,
-            COUNT(sd.id) as total_koli,
-            SUM(s.chargeable_weight / s.koli) as total_weight
-        ");
+        ma.id as awb_id,
+        ma.awb_number as smu_number,
+        ma.flight_number,
+        ma.departure_date,
+        ma.origin,
+        ma.destination,
+        ma.status,
+        al.name as airline_name,
+        COUNT(DISTINCT ak.id) as total_karung,
+        COUNT(DISTINCT CASE WHEN ak.scanned_inbound_at IS NOT NULL THEN ak.id END) as received_karung,
+        COUNT(DISTINCT s.id) as total_resi,
+        COUNT(DISTINCT sd.barcode_koli) as total_koli,
+        SUM(ak.actual_weight) as total_weight
+    ");
 		$this->db->from('master_awb ma');
 		$this->db->join('airlines al', 'al.id = ma.airline_id', 'left');
-
-		// 1. Relasi ke tabel koli (karung konsolidasi)
 		$this->db->join('awb_koli ak', 'ak.awb_id = ma.id', 'left');
-
-		// 2. JALUR BARU: Hubungkan karung koli ke tabel dimensi (per dus fisik)
 		$this->db->join('shipment_dimensions sd', 'sd.awb_koli_id = ak.id', 'left');
-
-		// 3. Tarik ke tabel induk shipments untuk mendapatkan data no_resi, harga, dll
 		$this->db->join('shipments s', 's.id = sd.shipment_id', 'left');
 
 		$this->db->where_in('ma.status', $statuses);
 
-		// Jika user yang login terikat ke agen/hub tertentu
+		if (!empty($filters['destination'])) {
+			$this->db->where('ma.destination', $filters['destination']);
+		}
+
 		if (!empty($filters['agent_id'])) {
 			$this->db->where('ma.created_by', $filters['agent_id']);
 		}
 
 		$this->db->group_by('ma.id, ma.awb_number, ma.flight_number, ma.departure_date, ma.origin, ma.destination, ma.status, al.name');
-		$this->db->order_by('ma.departure_date', 'ASC');
+		$this->db->order_by('ma.departure_date', 'DESC');
 
 		return $this->db->get()->result();
 	}
@@ -499,23 +534,19 @@ class M_Shipment extends CI_Model
 	public function get_inbound_pending($city_name)
 	{
 		return $this->db->select("
-        s.no_resi,
-        s.koli,
-        s.destination,
-        a.name as origin_agent,
-        COALESCE((
-            SELECT SUM(sd.qty)
-            FROM shipment_tracking st
-            INNER JOIN shipment_dimensions sd ON sd.barcode_koli = st.piece_barcode
-            WHERE st.shipment_id = s.id
-            AND st.status = 'PIECE_RECEIVED_DESTINATION'
-        ), 0) as received_qty
+        ma.id,
+        ma.awb_number,
+        ma.origin as origin_agent,
+        COUNT(ak.id) as koli,
+        SUM(CASE WHEN ak.scanned_inbound_at IS NOT NULL THEN 1 ELSE 0 END) as received_qty
     ", FALSE)
-			->from('shipments s')
-			->join('agents a', 'a.id = s.agent_id', 'left')
-			->where('s.destination', $city_name)
-			->where_in('s.status', ['ARRIVED', 'DEPARTED', 'PARTIAL_ARRIVED']) // ← tambah PARTIAL_ARRIVED
-			->order_by('s.created_at', 'ASC')
+			->from('master_awb ma')
+			->join('awb_koli ak', 'ak.awb_id = ma.id', 'left')
+			->where('ma.destination', $city_name)
+			->where('ma.status', 'ARRIVED')
+			->group_by('ma.id')
+			->having('received_qty < koli')
+			->order_by('ma.created_at', 'ASC')
 			->get()->result();
 	}
 

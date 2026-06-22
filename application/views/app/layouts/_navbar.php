@@ -2,12 +2,22 @@
 	<div class="container-xl">
 		<ul class="navbar-nav">
 			<?php
-			$role_slug = $this->session->userdata('user')['role_slug'];
-			$menus     = $this->config->item('menus');
-			$nav_items = isset($menus[$role_slug]) ? $menus[$role_slug] : [];
-			$segment   = $this->uri->segment(1);
+			$user_session = $this->session->userdata('user');
+			$can_scan_pickup   = $user_session['can_scan_pickup_as_driver'] ?? false;
+			$can_scan_at_origin   = $user_session['can_scan_at_origin'] ?? false;
+			$role_slug    = $user_session['role_slug'];
+			$menus        = $this->config->item('menus');
+			$nav_items    = $menus[$role_slug] ?? [];
+			$segment      = $this->uri->segment(1);
 
 			foreach ($nav_items as $item):
+				if (!empty($item['show_if_can_scan_pickup']) && !$can_scan_pickup) {
+					continue;
+				}
+				if (!empty($item['show_if_can_scan_at_origin']) && !$can_scan_at_origin) {
+					continue;
+				}
+				
 				$has_child = !empty($item['children']);
 				$is_active = ($segment == $item['segment']) ? 'active' : '';
 			?>

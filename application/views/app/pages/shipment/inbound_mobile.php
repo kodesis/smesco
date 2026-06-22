@@ -28,13 +28,13 @@
 				<div id="list-container" class="overflow-auto" style="max-height: 55vh;">
 					<?php if ($pending_list): foreach ($pending_list as $p): ?>
 							<div class="card mb-2 shipment-item shadow-none border"
-								id="item-<?= $p->no_resi ?>"
+								id="item-<?= $p->awb_number ?>"
 								data-total="<?= $p->koli ?>"
 								data-received="<?= $p->received_qty ?>">
 								<div class="card-body p-2">
 									<div class="row align-items-center">
 										<div class="col">
-											<div class="fw-bold text-primary"><?= $p->no_resi ?></div>
+											<div class="fw-bold text-primary"><?= $p->awb_number ?></div>
 											<div class="small text-muted">Asal: <?= $p->origin_agent ?></div>
 										</div>
 										<div class="col-auto text-end">
@@ -194,7 +194,7 @@
 
 			// Masukkan ke FormData secara aman
 			let formData = new FormData();
-			formData.append('no_resi', tempBarcode); // tempBarcode berisi nomor resi/karung aktif
+			formData.append('awb_number', tempBarcode); // tempBarcode berisi nomor resi/karung aktif
 			formData.append('photo', fileTarget[0]); // Menyuntikkan file gambar asli
 
 			$.ajax({
@@ -205,7 +205,7 @@
 				contentType: false,
 				dataType: "json",
 				success: function(res) {
-					$('#camera_input').val(''); // Reset input kamera agar bisa dipakai scan ulang
+					$('#camera_input').val(''); // Reset input kamera
 
 					if (res.status) {
 						Swal.fire({
@@ -217,26 +217,36 @@
 							timer: 1500
 						});
 
-						if (res.is_koli) {
-							setTimeout(() => {
-								location.reload();
-							}, 1500);
-						} else {
-							const item = document.getElementById('item-' + res.data.no_resi);
-							if (item) {
-								let total = parseInt(item.getAttribute('data-total'));
-								let received = res.data.received;
+						// PERBAIKAN: DOM Update responsif tanpa reload (Berlaku untuk alur AWB Karung)
+						const item = document.getElementById('item-' + res.data.awb_number);
+						if (item) {
+							let total = parseInt(res.data.total);
+							let received = parseInt(res.data.received);
 
-								item.setAttribute('data-received', received);
-								item.querySelector('.counter-label').innerText = received + ' / ' + total;
-								item.querySelector('.progress-bar').style.width = (received / total * 100) + '%';
+							// Update atribut dataset
+							item.setAttribute('data-received', received);
 
-								if (res.is_complete) {
-									moveToSuccess(item);
-								}
+							// Update teks counter koli/karung
+							const counterLabel = item.querySelector('.counter-label');
+							counterLabel.innerText = received + ' / ' + total;
+
+							// Ubah warna indikator teks jika sedang on-progress
+							if (received > 0 && received < total) {
+								counterLabel.classList.remove('text-yellow');
+								counterLabel.classList.add('text-orange');
+							}
+
+							// Update progress bar
+							let progressPercent = total > 0 ? Math.round((received / total) * 100) : 0;
+							item.querySelector('.progress-bar').style.width = progressPercent + '%';
+
+							// Pindahkan card ke sebelah kanan jika 100% komplit
+							if (res.is_complete) {
+								moveToSuccess(item);
 							}
 						}
-						hidInput.focus();
+
+						hidInput.focus(); // Kembalikan kursor ke form tembak manual
 					} else {
 						Swal.fire('Gagal', res.message, 'error');
 					}

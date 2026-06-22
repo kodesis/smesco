@@ -75,7 +75,7 @@ $config['menus'] = [
 
 	'driver' => [
 		['title' => 'Dashboard',     'url' => 'dashboard',       'segment' => 'dashboard',   'icon' => 'dashboard'],
-		['title' => 'Scan Pickup',    'url' => 'shipment/pickup_scan', 'segment' => 'shipment', 'icon' => 'truck-loading'], // Menu utama Driver
+		['title' => 'Scan Pickup',    'url' => 'shipment/pickup_scan', 'segment' => 'scan_pickup', 'icon' => 'truck-loading'], // Menu utama Driver
 		// ['title' => 'Daftar Jemputan', 'url' => 'shipment?status=READY_TO_PICKUP', 'segment' => 'shipment', 'icon' => 'map-pin'],
 	],
 
@@ -90,6 +90,20 @@ $config['menus'] = [
 				['title' => 'List Kiriman', 'url' => 'shipment', 'segment' => 'shipment', 'icon' => 'list'],
 				['title' => 'Manifest Pickup', 'url' => 'shipment/manifest_list'],
 			]
+		],
+		[
+			'title' => 'Scan Pickup',
+			'url' => 'shipment/pickup_scan',
+			'segment' => 'scan_pickup',
+			'icon' => 'truck-loading',
+			'show_if_can_scan_pickup' => true
+		],
+		[
+			'title' => 'Scan Origin',
+			'url' => 'shipment/acceptance_scan',
+			'segment' => 'scan_origin',
+			'icon' => 'scan',
+			'show_if_can_scan_origin' => true
 		],
 		['title' => 'Manajemen Staff', 'url' => 'users',           'segment' => 'users',       'icon' => 'users'],
 		['title' => 'Laporan Agen',   'url' => 'reports',         'segment' => 'reports',     'icon' => 'file-spreadsheet'],
@@ -107,6 +121,20 @@ $config['menus'] = [
 				['title' => 'Buat Booking', 'url' => 'shipment/create', 'segment' => 'shipment', 'icon' => 'plus'],
 				['title' => 'Manifest Pickup', 'url' => 'shipment/manifest_list'],
 			]
+		],
+		[
+			'title' => 'Scan Pickup',
+			'url' => 'shipment/pickup_scan',
+			'segment' => 'scan_pickup',
+			'icon' => 'truck-loading',
+			'show_if_can_scan_pickup' => true
+		],
+		[
+			'title' => 'Scan Origin',
+			'url' => 'shipment/acceptance_scan',
+			'segment' => 'scan_origin',
+			'icon' => 'scan',
+			'show_if_can_scan_origin' => true
 		],
 	],
 

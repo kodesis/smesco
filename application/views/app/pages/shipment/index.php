@@ -157,7 +157,7 @@
 				<table class="table table-vcenter card-table table-hover">
 					<thead class="bg-light">
 						<tr>
-							<th style="width:20px"><input type="checkbox" id="check-all" class="form-check-input"></th>
+							<!-- <th style="width:20px"><input type="checkbox" id="check-all" class="form-check-input"></th> -->
 							<th class="w-1">No</th>
 							<th>No. Resi (AWB)</th>
 							<th>Rute & Layanan</th>
@@ -171,15 +171,15 @@
 						<?php if (!empty($shipments)): $no = 1;
 							foreach ($shipments as $s): ?>
 								<tr>
-									<td>
+									<!-- <td>
 										<?php if ($s->status == 'RECEIVED_ORIGIN' && $role_slug == 'admin-kribo'): ?>
 											<input type="checkbox" class="form-check-input shipment-check" value="<?= $s->id ?>">
 										<?php endif; ?>
-									</td>
+									</td> -->
 									<td class="text-muted small"><?= $no++ ?></td>
 									<td>
 										<div class="d-flex align-items-center gap-1">
-											<span class="fw-bold text-primary"><?= $s->no_resi ?></span>
+											<a href="<?= site_url('shipment/detail/' . $s->id) ?>"><span class="fw-bold text-primary"><?= $s->no_resi ?></span></a>
 											<?php if ($s->is_valuable): ?>
 												<span class="text-danger" title="Barang Berharga"><?= tabler_icon('shield-check', 'icon-sm') ?></span>
 											<?php endif; ?>

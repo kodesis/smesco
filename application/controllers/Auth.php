@@ -50,6 +50,7 @@ class Auth extends CI_Controller
 			// usernya ada
 			if ($user['is_active'] == 1) {
 				if (password_verify($password, $user['password'])) {
+					$agents = $this->db->select('can_scan_pickup_as_driver, city_id, can_scan_at_origin')->where('id', $user['agent_id'])->get('agents')->row();
 					$data = [
 						'user'       => [
 							'id'         => $user['id'],
@@ -60,6 +61,9 @@ class Auth extends CI_Controller
 							'role_scope' => $user['role_scope'],   // 'global' atau 'agent'
 							'role_name'  => $user['role_name'],    // untuk tampilan di UI
 							'agent_id'   => $user['agent_id'],     // NULL kalau scope global
+							'can_scan_pickup_as_driver' => $agents->can_scan_pickup_as_driver,
+							'can_scan_at_origin' => $agents->can_scan_at_origin,
+							'city_id' => $agents->city_id
 						],
 						'is_logged_in' => TRUE,
 					];

@@ -1709,11 +1709,17 @@ class Shipment extends Authenticated_Controller
 		$this->db->from('shipments');
 		$this->db->join('agents', 'agents.id = shipments.agent_id', 'left');
 		$this->db->where('shipments.status', 'READY_TO_PICKUP');
+
+		$session_user = $this->session->userdata('user');
+		if ($session_user['role_id'] !== '8') {
+			$this->db->where('shipments.agent_id', $session_user['agent_id']);
+		}
 		$pending_list = $this->db->get()->result();
 
 		$data = [
 			'title' => 'Scan Pickup Barang',
-			'pending_list' => $pending_list
+			'pending_list' => $pending_list,
+			'segment' => 'scan_pickup'
 		];
 
 		$this->render('app/pages/shipment/pickup_scan', $data);
@@ -1729,15 +1735,21 @@ class Shipment extends Authenticated_Controller
 		$parts = explode('-', $input_scan);
 		$no_resi = $parts[0];
 
+		$session_user = $this->session->userdata('user');
+		
 		// 1. Cari resi di database
-		$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
+		$this->db->where('no_resi', $no_resi);
+		if ($session_user['role_id'] !== '8') {
+			$this->db->where('shipments.agent_id', $session_user['agent_id']);
+		}
+		$shipment = $this->db->get('shipments')->row();
 
 		if (!$shipment) {
 			echo json_encode(['status' => false, 'message' => "Resi $no_resi tidak terdaftar!"]);
 			return;
 		}
 
-		// 2. Validasi status
+		// Validasi status
 		if ($shipment->status !== 'READY_TO_PICKUP') {
 			echo json_encode(['status' => false, 'message' => "Gagal! Status resi: $shipment->status"]);
 			return;
@@ -1775,6 +1787,12 @@ class Shipment extends Authenticated_Controller
 		// Ambil daftar barang yang statusnya PICKED_UP (yang harus discan checker)
 		$this->db->select('no_resi, receiver_name, destination, koli');
 		$this->db->where('status', 'PICKED_UP');
+
+		$session_user = $this->session->userdata('user');
+		if ($session_user['role_id'] !== '8') {
+			$this->db->where('shipments.agent_id', $session_user['agent_id']);
+		}
+
 		$pending_list = $this->db->get('shipments')->result();
 
 		$data = [
@@ -1797,6 +1815,12 @@ class Shipment extends Authenticated_Controller
 
 		if (!$shipment) {
 			echo json_encode(['status' => false, 'message' => 'Resi tidak ditemukan!']);
+			return;
+		}		
+		
+		// Validasi status
+		if ($shipment->status !== 'PICKED_UP') {
+			echo json_encode(['status' => false, 'message' => "Gagal! Status resi: $shipment->status"]);
 			return;
 		}
 
@@ -2053,6 +2077,12 @@ class Shipment extends Authenticated_Controller
 
 		// Ambil data resi induknya untuk keperluan info display & estimasi berat proporsional
 		$shipment = $this->db->get_where('shipments', ['id' => $dimensi->shipment_id])->row();
+
+		// Validasi status
+		if ($shipment->status !== 'RECEIVED_ORIGIN') {
+			echo json_encode(['status' => false, 'message' => "Gagal! Status resi: $shipment->status"]);
+			return;
+		}
 
 		// Hitung estimasi berat per koli (Berat total resi dibagi jumlah koli induk)
 		$berat_per_koli = $shipment->chargeable_weight / $shipment->koli;
@@ -2680,7 +2710,7 @@ class Shipment extends Authenticated_Controller
 		$sess = $this->session->userdata('user');
 
 		// 1. Cari Nama Kota Hub Agen ini (Hasil Mapping kita tadi)
-		$agent = $this->db->select('c.name')
+		$agent = $this->db->select('c.code')
 			->from('agents a')
 			->join('cities c', 'c.id = a.city_id')
 			->where('a.id', $sess['agent_id'])
@@ -2693,8 +2723,8 @@ class Shipment extends Authenticated_Controller
 		// 2. Tarik daftar barang yang menuju ke kota ini
 		$data = [
 			'title'        => 'Inbound: Terima Barang',
-			'my_city'      => $agent->name,
-			'pending_list' => $this->M_Shipment->get_inbound_pending($agent->name)
+			'my_city'      => $agent->code,
+			'pending_list' => $this->M_Shipment->get_inbound_pending($agent->code)
 		];
 
 		$this->render('app/pages/shipment/inbound_mobile', $data);
@@ -2705,7 +2735,8 @@ class Shipment extends Authenticated_Controller
 		$this->_check_access();
 		$sess = $this->session->userdata('user');
 
-		$input_scan = strtoupper(trim($this->input->post('no_resi', TRUE)));
+		// PERBAIKAN: Tangkap 'awb_number' sesuai dengan key FormData dari JavaScript
+		$input_scan = strtoupper(trim($this->input->post('awb_number', TRUE)));
 
 		if (empty($input_scan)) {
 			echo json_encode(['status' => false, 'message' => 'Barcode tidak boleh kosong!']);
@@ -2727,19 +2758,13 @@ class Shipment extends Authenticated_Controller
 			}
 		}
 
-		// ─── DETEKSI JALUR: AWB KARUNG vs KOLI FISIK RESI ───
-		// Format karung AWB : '990-12312312-01' → segment pertama numerik
-		// Format koli fisik : 'SMC240101-01'   → segment pertama alfanumerik
-		$first_segment = explode('-', $input_scan)[0];
-		$is_awb_koli   = ctype_digit($first_segment);
+		$segments = explode('-', $input_scan);
+		$first_segment = isset($segments) ? $segments : '';
+		$is_awb_koli   = ($first_segment);
 
 		$this->db->trans_begin();
 
-		if ($is_awb_koli) {
-			$result = $this->_process_inbound_awb_karung($input_scan, $photo_path, $sess);
-		} else {
-			$result = $this->_process_inbound_koli_fisik($input_scan, $photo_path, $sess);
-		}
+		$result = $this->_process_inbound_awb_karung($input_scan, $photo_path, $sess);
 
 		if ($this->db->trans_status() === FALSE) {
 			$this->db->trans_rollback();
@@ -2753,9 +2778,101 @@ class Shipment extends Authenticated_Controller
 		}
 	}
 
-	// ─── HELPER: CEK APAKAH RESI SUDAH LENGKAP ───
-	// Bandingkan SUM(qty) dari shipment_dimensions yang sudah di-scan
-	// vs shipments.koli. Bukan COUNT(*) karena qty per row bisa > 1.
+	private function _process_inbound_awb_karung($input_scan, $photo_path, $sess)
+	{
+		$last_dash   = strrpos($input_scan, '-');
+		$koli_seq    = substr($input_scan, $last_dash + 1);
+		$awb_number  = substr($input_scan, 0, $last_dash);
+		$koli_number = $awb_number . '-' . $koli_seq;
+
+		$awb = $this->db->get_where('master_awb', ['awb_number' => $awb_number])->row();
+
+		if (!$awb) {
+			return ['status' => false, 'message' => "AWB $awb_number tidak ditemukan di sistem!"];
+		}
+
+		$karung = $this->db->get_where('awb_koli', [
+			'awb_id'      => $awb->id,
+			'koli_number' => $koli_number
+		])->row();
+		
+		if (!$karung) {
+			return ['status' => false, 'message' => "Karung $koli_number dalam AWB $awb_number tidak ditemukan!"];
+		}
+
+		if ($karung->status !== 'ARRIVED') {
+			return ['status' => false, 'message' => "Karung $koli_number belum berstatus ARRIVED. Status saat ini: {$karung->status}"];
+		}
+
+		if (!empty($karung->scanned_inbound_at)) {
+			return ['status' => false, 'message' => "Karung $koli_number sudah pernah di-scan inbound pada {$karung->scanned_inbound_at}!"];
+		}
+
+		// Tandai karung di-scan inbound
+		$this->db->where('id', $karung->id)->update('awb_koli', [
+			'photo_inbound'      => $photo_path,
+			'scanned_inbound_at' => date('Y-m-d H:i:s'),
+			'status' => 'RECEIVED_AT_DESTINATION'
+		]);
+
+		// Ambil semua koli fisik
+		$dims = $this->db
+			->select('sd.*, s.koli as total_koli, s.destination')
+			->from('shipment_dimensions sd')
+			->join('shipments s', 's.id = sd.shipment_id', 'inner')
+			->where('sd.awb_koli_id', $karung->id)
+			->where('sd.barcode_koli IS NOT NULL', NULL, FALSE)
+			->get()->result();
+
+		$completed_resi = [];
+
+		if (!empty($dims)) {
+			foreach ($dims as $dim) {
+				$already = $this->db->get_where('shipment_tracking', [
+					'shipment_id'   => $dim->shipment_id,
+					'status'        => 'PIECE_RECEIVED_DESTINATION',
+					'piece_barcode' => $dim->barcode_koli
+				])->num_rows();
+
+				if ($already > 0) continue;
+
+				$this->db->insert('shipment_tracking', [
+					'shipment_id'   => $dim->shipment_id,
+					'status'        => 'PIECE_RECEIVED_DESTINATION',
+					'piece_barcode' => $dim->barcode_koli,
+					'location'      => "Gudang Cabang {$dim->destination}",
+					'note'          => "Koli {$dim->barcode_koli} tiba dalam karung {$koli_number} (AWB {$awb_number}).",
+					'photo_proof'   => $photo_path,
+					'created_by'    => $sess['id']
+				]);
+
+				if ($this->_is_resi_complete($dim->shipment_id, $dim->total_koli)) {
+					if (!in_array($dim->shipment_id, $completed_resi)) {
+						$this->_mark_resi_complete($dim->shipment_id, $photo_path, $sess, $dim->destination);
+						$completed_resi[] = $dim->shipment_id;
+					}
+				}
+			}
+		}
+
+		// PERBAIKAN: Hitung progres DOM untuk AWB
+		$total_karung = $this->db->where('awb_id', $awb->id)->count_all_results('awb_koli');
+		$received_karung = $this->db->where(['awb_id' => $awb->id])->count_all_results('awb_koli');
+		$is_complete = ($total_karung === $received_karung);
+
+		return [
+			'status'      => true,
+			'is_koli'     => true,
+			'is_complete' => $is_complete,
+			'data'        => [
+				'awb_number' => $awb->awb_number,
+				'received'   => $received_karung,
+				'total'      => $total_karung
+			],
+			'message'     => "Karung {$koli_number} berhasil diterima. " . count($completed_resi) . " resi tercatat."
+		];
+	}
+	
 	private function _is_resi_complete($shipment_id, $total_koli)
 	{
 		$received = $this->db
@@ -2787,94 +2904,94 @@ class Shipment extends Authenticated_Controller
 	}
 
 	// ─── BRANCH 1: SCAN KARUNG AWB ───
-	private function _process_inbound_awb_karung($input_scan, $photo_path, $sess)
-	{
-		$last_dash   = strrpos($input_scan, '-');
-		$koli_seq    = substr($input_scan, $last_dash + 1);
-		$awb_number  = substr($input_scan, 0, $last_dash);
-		$koli_number = $awb_number . '-' . $koli_seq;
+	// private function _process_inbound_awb_karung($input_scan, $photo_path, $sess)
+	// {
+	// 	$last_dash   = strrpos($input_scan, '-');
+	// 	$koli_seq    = substr($input_scan, $last_dash + 1);
+	// 	$awb_number  = substr($input_scan, 0, $last_dash);
+	// 	$koli_number = $awb_number . '-' . $koli_seq;
 
-		$awb = $this->db->get_where('master_awb', ['awb_number' => $awb_number])->row();
-		if (!$awb) {
-			return ['status' => false, 'message' => "AWB $awb_number tidak ditemukan di sistem!"];
-		}
+	// 	$awb = $this->db->get_where('master_awb', ['awb_number' => $awb_number])->row();
+	// 	if (!$awb) {
+	// 		return ['status' => false, 'message' => "AWB $awb_number tidak ditemukan di sistem!"];
+	// 	}
 
-		$karung = $this->db->get_where('awb_koli', [
-			'awb_id'      => $awb->id,
-			'koli_number' => $koli_number
-		])->row();
-		if (!$karung) {
-			return ['status' => false, 'message' => "Karung $koli_number dalam AWB $awb_number tidak ditemukan!"];
-		}
+	// 	$karung = $this->db->get_where('awb_koli', [
+	// 		'awb_id'      => $awb->id,
+	// 		'koli_number' => $koli_number
+	// 	])->row();
+	// 	if (!$karung) {
+	// 		return ['status' => false, 'message' => "Karung $koli_number dalam AWB $awb_number tidak ditemukan!"];
+	// 	}
 
-		// Karung harus ARRIVED dulu sebelum bisa di-scan inbound
-		if ($karung->status !== 'ARRIVED') {
-			return ['status' => false, 'message' => "Karung $koli_number belum berstatus ARRIVED. Status saat ini: {$karung->status}"];
-		}
+	// 	// Karung harus ARRIVED dulu sebelum bisa di-scan inbound
+	// 	if ($karung->status !== 'ARRIVED') {
+	// 		return ['status' => false, 'message' => "Karung $koli_number belum berstatus ARRIVED. Status saat ini: {$karung->status}"];
+	// 	}
 
-		// Cek duplikasi scan inbound via scanned_inbound_at
-		if (!empty($karung->scanned_inbound_at)) {
-			return ['status' => false, 'message' => "Karung $koli_number sudah pernah di-scan inbound pada {$karung->scanned_inbound_at}!"];
-		}
+	// 	// Cek duplikasi scan inbound via scanned_inbound_at
+	// 	if (!empty($karung->scanned_inbound_at)) {
+	// 		return ['status' => false, 'message' => "Karung $koli_number sudah pernah di-scan inbound pada {$karung->scanned_inbound_at}!"];
+	// 	}
 
-		// Tandai karung sudah di-scan inbound (status tetap ARRIVED, tidak diubah)
-		$this->db->where('id', $karung->id)->update('awb_koli', [
-			'photo_inbound'      => $photo_path,
-			'scanned_inbound_at' => date('Y-m-d H:i:s')
-		]);
+	// 	// Tandai karung sudah di-scan inbound (status tetap ARRIVED, tidak diubah)
+	// 	$this->db->where('id', $karung->id)->update('awb_koli', [
+	// 		'photo_inbound'      => $photo_path,
+	// 		'scanned_inbound_at' => date('Y-m-d H:i:s')
+	// 	]);
 
-		// Ambil semua koli fisik dalam karung ini
-		$dims = $this->db
-			->select('sd.*, s.koli as total_koli, s.destination')
-			->from('shipment_dimensions sd')
-			->join('shipments s', 's.id = sd.shipment_id', 'inner')
-			->where('sd.awb_koli_id', $karung->id)
-			->where('sd.barcode_koli IS NOT NULL', NULL, FALSE)
-			->get()->result();
+	// 	// Ambil semua koli fisik dalam karung ini
+	// 	$dims = $this->db
+	// 		->select('sd.*, s.koli as total_koli, s.destination')
+	// 		->from('shipment_dimensions sd')
+	// 		->join('shipments s', 's.id = sd.shipment_id', 'inner')
+	// 		->where('sd.awb_koli_id', $karung->id)
+	// 		->where('sd.barcode_koli IS NOT NULL', NULL, FALSE)
+	// 		->get()->result();
 
-		if (empty($dims)) {
-			return ['status' => false, 'message' => "Karung $koli_number tidak memiliki koli fisik terdaftar!"];
-		}
+	// 	if (empty($dims)) {
+	// 		return ['status' => false, 'message' => "Karung $koli_number tidak memiliki koli fisik terdaftar!"];
+	// 	}
 
-		$completed_resi = [];
+	// 	$completed_resi = [];
 
-		foreach ($dims as $dim) {
-			// Cek duplikasi per barcode_koli
-			$already = $this->db->get_where('shipment_tracking', [
-				'shipment_id'   => $dim->shipment_id,
-				'status'        => 'PIECE_RECEIVED_DESTINATION',
-				'piece_barcode' => $dim->barcode_koli
-			])->num_rows();
+	// 	foreach ($dims as $dim) {
+	// 		// Cek duplikasi per barcode_koli
+	// 		$already = $this->db->get_where('shipment_tracking', [
+	// 			'shipment_id'   => $dim->shipment_id,
+	// 			'status'        => 'PIECE_RECEIVED_DESTINATION',
+	// 			'piece_barcode' => $dim->barcode_koli
+	// 		])->num_rows();
 
-			if ($already > 0) continue;
+	// 		if ($already > 0) continue;
 
-			$this->db->insert('shipment_tracking', [
-				'shipment_id'   => $dim->shipment_id,
-				'status'        => 'PIECE_RECEIVED_DESTINATION',
-				'piece_barcode' => $dim->barcode_koli,
-				'location'      => "Gudang Cabang {$dim->destination}",
-				'note'          => "Koli {$dim->barcode_koli} tiba dalam karung {$koli_number} (AWB {$awb_number}).",
-				'photo_proof'   => $photo_path,
-				'created_by'    => $sess['id']
-			]);
+	// 		$this->db->insert('shipment_tracking', [
+	// 			'shipment_id'   => $dim->shipment_id,
+	// 			'status'        => 'PIECE_RECEIVED_DESTINATION',
+	// 			'piece_barcode' => $dim->barcode_koli,
+	// 			'location'      => "Gudang Cabang {$dim->destination}",
+	// 			'note'          => "Koli {$dim->barcode_koli} tiba dalam karung {$koli_number} (AWB {$awb_number}).",
+	// 			'photo_proof'   => $photo_path,
+	// 			'created_by'    => $sess['id']
+	// 		]);
 
-			if ($this->_is_resi_complete($dim->shipment_id, $dim->total_koli)) {
-				if (!in_array($dim->shipment_id, $completed_resi)) {
-					$this->_mark_resi_complete($dim->shipment_id, $photo_path, $sess, $dim->destination);
-					$completed_resi[] = $dim->shipment_id;
-				}
-			}
-		}
+	// 		if ($this->_is_resi_complete($dim->shipment_id, $dim->total_koli)) {
+	// 			if (!in_array($dim->shipment_id, $completed_resi)) {
+	// 				$this->_mark_resi_complete($dim->shipment_id, $photo_path, $sess, $dim->destination);
+	// 				$completed_resi[] = $dim->shipment_id;
+	// 			}
+	// 		}
+	// 	}
 
-		return [
-			'status'          => true,
-			'is_koli'         => true,
-			'is_complete'     => false,
-			'completed_count' => count($completed_resi),
-			'data'            => ['no_resi' => null, 'received' => 0, 'total' => 0],
-			'message'         => "Karung {$koli_number} (AWB {$awb_number}) berhasil diterima. " . count($completed_resi) . " resi lengkap."
-		];
-	}
+	// 	return [
+	// 		'status'          => true,
+	// 		'is_koli'         => true,
+	// 		'is_complete'     => false,
+	// 		'completed_count' => count($completed_resi),
+	// 		'data'            => ['no_resi' => null, 'received' => 0, 'total' => 0],
+	// 		'message'         => "Karung {$koli_number} (AWB {$awb_number}) berhasil diterima. " . count($completed_resi) . " resi lengkap."
+	// 	];
+	// }
 
 	// ─── BRANCH 2: SCAN KOLI FISIK PER RESI ───
 	private function _process_inbound_koli_fisik($input_scan, $photo_path, $sess)
