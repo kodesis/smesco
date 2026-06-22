@@ -261,7 +261,7 @@ class Home extends CI_Controller {
 				"Pengirim: *{$shipment->sender_name}*\n" .
 				"Total: *Rp " . number_format($shipment->total_amount, 0, ',', '.') . "*\n\n" .
 				"Silakan verifikasi di panel admin." .
-				"$url\n\n" .;
+				"$url\n\n";
 
 			try {
 				$this->api_whatsapp->wa_notif_v2($admin_phone, $pesan_admin);
