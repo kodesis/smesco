@@ -43,3 +43,5 @@ uploads/inbound/**
 # Abaikan semua file csv/sampah di folder temp, tapi sisakan foldernya
 uploads/temp/*
 !uploads/temp/index.html
+
+/application/config/database.php
