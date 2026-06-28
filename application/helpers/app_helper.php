@@ -7,6 +7,7 @@ function shipment_status_badge($status)
 		'READY_TO_PICKUP'      => ['bg-yellow',  'Ready to Pickup'],
 		'PICKED_UP'            => ['bg-teal',              'Picked Up'],
 		'RECEIVED_ORIGIN'      => ['bg-indigo',            'Received at Origin'],
+		'IN_TRANSIT'           => ['bg-azure',   'In Transit'],
 		'MANIFESTED'           => ['bg-blue',              'Manifested'],
 		'DEPARTED'             => ['bg-orange',            'Departed'],
 		'ARRIVED'              => ['bg-purple',            'Arrived'],

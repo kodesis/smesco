@@ -1533,6 +1533,27 @@ class Shipment extends Authenticated_Controller
 		}
 	}
 
+	// public function detail($id)
+	// {
+	// 	$this->_check_access();
+
+	// 	$shipment = $this->M_Shipment->get_by_id($id);
+
+	// 	if (!$shipment) {
+	// 		$this->session->set_flashdata('error', 'Data shipment tidak ditemukan.');
+	// 		redirect('shipment');
+	// 	}
+
+	// 	$data = [
+	// 		'title'      => 'Detail Shipment - ' . $shipment['no_resi'],
+	// 		'shipment'   => $shipment,
+	// 		'dimensions' => $this->M_Shipment->get_dimensions($id),
+	// 		'history'    => $this->M_Shipment->get_tracking_public($id)
+	// 	];
+
+	// 	$this->render('app/pages/shipment/detail', $data);
+	// }
+
 	public function detail($id)
 	{
 		$this->_check_access();
@@ -1544,11 +1565,21 @@ class Shipment extends Authenticated_Controller
 			redirect('shipment');
 		}
 
+		// echo '<pre>';
+		// print_r($shipment);
+		// echo '</pre>';
+		// exit;
+
+		// Sync tracking dari vendor kalau shipment ini punya vendor connote
+		if (!empty($shipment['vendor']) && !empty($shipment['vendor_connote'])) {
+			$this->M_Shipment->sync_vendor_tracking($id);
+		}
+
 		$data = [
 			'title'      => 'Detail Shipment - ' . $shipment['no_resi'],
 			'shipment'   => $shipment,
 			'dimensions' => $this->M_Shipment->get_dimensions($id),
-			'history'    => $this->M_Shipment->get_tracking_public($id)
+			'history'    => $this->M_Shipment->get_tracking_public($id),
 		];
 
 		$this->render('app/pages/shipment/detail', $data);
@@ -3488,5 +3519,26 @@ class Shipment extends Authenticated_Controller
 			}
 			exit;
 		}
+	}
+
+	public function ajax_set_vendor()
+	{
+		$id      = $this->input->post('id');
+		$vendor  = strtoupper(trim($this->input->post('vendor')));
+		$connote = trim($this->input->post('connote'));
+
+		if (!$id || !$vendor || !$connote) {
+			return $this->output->set_content_type('application/json')
+				->set_output(json_encode(['status' => false, 'message' => 'Data tidak lengkap.']));
+		}
+
+		$this->db->where('id', $id)->update('shipments', [
+			'vendor'         => $vendor,
+			'vendor_connote' => $connote,
+			'updated_at'     => date('Y-m-d H:i:s'),
+		]);
+
+		return $this->output->set_content_type('application/json')
+			->set_output(json_encode(['status' => true, 'message' => 'Vendor berhasil disimpan.']));
 	}
 }

@@ -202,23 +202,7 @@
 										<div class="fw-bold text-success small">Rp <?= number_format($s->total_amount, 0, ',', '.') ?></div>
 										<div class="small text-muted"><?= $s->koli ?> Koli | <?= floatval($s->chargeable_weight) ?> Kg</div>
 									</td>
-									<td>
-										<?php
-										$bg = 'bg-secondary';
-
-										if ($s->status == 'BOOKED')           $bg = 'bg-cyan';
-										if ($s->status == 'READY_TO_PICKUP')  $bg = 'bg-yellow';
-										if ($s->status == 'PICKED_UP')             $bg = 'bg-teal';
-										if ($s->status == 'RECEIVED_ORIGIN')  $bg = 'bg-indigo';
-										if ($s->status == 'MANIFESTED')       $bg = 'bg-blue';
-										if ($s->status == 'DEPARTED')              $bg = 'bg-orange';
-										if ($s->status == 'ARRIVED')               $bg = 'bg-purple';
-										if ($s->status == 'RECEIVED_DESTINATION')  $bg = 'bg-cyan';
-										if ($s->status == 'DELIVERED')        $bg = 'bg-success';
-										if ($s->status == 'CANCELLED')        $bg = 'bg-danger';
-										?>
-										<span class="badge <?= $bg ?> fw-bold"><?= str_replace('_', ' ', $s->status) ?></span>
-									</td>
+									<td><?= shipment_status_badge($s->status) ?></td>
 									<td>
 										<div class="btn-list flex-nowrap">
 											<?php if ($s->status == 'BOOKED'): ?>
@@ -238,6 +222,16 @@
 												<?php endif; ?>
 											<?php endif; ?>
 											<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-icon btn-outline-primary" title="Detail"><?= tabler_icon('eye') ?></a>
+											<?php if ($s->category === 'INTERNATIONAL'): ?>
+												<button type="button" class="btn btn-sm btn-icon btn-outline-azure btn-set-vendor"
+													data-id="<?= $s->id ?>"
+													data-resi="<?= $s->no_resi ?>"
+													data-vendor="<?= $s->vendor ?>"
+													data-connote="<?= $s->vendor_connote ?>"
+													title="Set Vendor Connote">
+													<?= tabler_icon('world-upload') ?>
+												</button>
+											<?php endif; ?>
 											<?php if ($s->status == 'RECEIVED_DESTINATION'): ?>
 												<button type="button" class="btn btn-sm btn-success btn-trigger-delivery"
 													data-id="<?= $s->id ?>"
@@ -342,6 +336,16 @@
 									<?php endif; ?>
 								<?php endif; ?>
 								<a href="<?= site_url('shipment/detail/' . $s->id) ?>" class="btn btn-sm btn-outline-primary"><?= tabler_icon('eye', 'me-1') ?> Detail</a>
+								<?php if ($s->category === 'INTERNATIONAL'): ?>
+									<button type="button" class="btn btn-sm btn-outline-azure btn-set-vendor"
+										data-id="<?= $s->id ?>"
+										data-resi="<?= $s->no_resi ?>"
+										data-vendor="<?= $s->vendor ?>"
+										data-connote="<?= $s->vendor_connote ?>"
+										title="Set Vendor Connote">
+										<?= tabler_icon('world-upload', 'me-1') ?> Vendor
+									</button>
+								<?php endif; ?>
 								<?php if ($s->status == 'RECEIVED_DESTINATION'): ?>
 									<button type="button" class="btn btn-sm btn-success btn-trigger-delivery"
 										data-id="<?= $s->id ?>"
@@ -440,6 +444,39 @@
 					<button type="submit" class="btn btn-primary">Simpan & Manifestkan</button>
 				</div>
 			</form>
+		</div>
+	</div>
+</div>
+
+<div class="modal fade" id="modal-set-vendor" tabindex="-1" role="dialog" aria-hidden="true">
+	<div class="modal-dialog modal-dialog-centered modal-sm" role="document">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title fw-bold">Set Vendor Tracking</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+			</div>
+			<div class="modal-body">
+				<input type="hidden" id="vendor-shipment-id">
+				<div class="mb-2">
+					<label class="form-label fw-bold mb-1">No. Resi</label>
+					<input type="text" id="vendor-no-resi" class="form-control bg-light fw-bold text-primary" readonly>
+				</div>
+				<div class="mb-2">
+					<label class="form-label fw-bold mb-1">Vendor <span class="text-danger">*</span></label>
+					<select id="vendor-name" class="form-select">
+						<option value="">-- Pilih Vendor --</option>
+						<option value="TLX">TLX</option>
+					</select>
+				</div>
+				<div class="mb-2">
+					<label class="form-label fw-bold mb-1">Connote / Resi Vendor <span class="text-danger">*</span></label>
+					<input type="text" id="vendor-connote" class="form-control" placeholder="Masukkan nomor resi vendor">
+				</div>
+			</div>
+			<div class="modal-footer">
+				<button type="button" class="btn btn-sm btn-link link-secondary" data-bs-dismiss="modal">Batal</button>
+				<button type="button" id="btn-save-vendor" class="btn btn-sm btn-primary">Simpan</button>
+			</div>
 		</div>
 	</div>
 </div>
@@ -576,6 +613,42 @@
 					$('#btn-save-delivery').attr('disabled', false).text('Konfirmasi & Delivered');
 				}
 			});
+		});
+
+		// Buka modal set vendor
+		$(document).on('click', '.btn-set-vendor', function() {
+			$('#vendor-shipment-id').val($(this).data('id'));
+			$('#vendor-no-resi').val($(this).data('resi'));
+			$('#vendor-name').val($(this).data('vendor') || '');
+			$('#vendor-connote').val($(this).data('connote') || '');
+			$('#modal-set-vendor').modal('show');
+		});
+
+		// Submit
+		$('#btn-save-vendor').on('click', function() {
+			const id = $('#vendor-shipment-id').val();
+			const vendor = $('#vendor-name').val();
+			const connote = $('#vendor-connote').val().trim();
+
+			if (!vendor || !connote) {
+				Swal.fire('Perhatian', 'Vendor dan connote wajib diisi.', 'warning');
+				return;
+			}
+
+			$('#btn-save-vendor').attr('disabled', true).text('Menyimpan...');
+
+			$.post("<?= site_url('shipment/ajax_set_vendor') ?>", {
+				id,
+				vendor,
+				connote
+			}, function(res) {
+				if (res.status) {
+					Swal.fire('Berhasil!', res.message, 'success').then(() => location.reload());
+				} else {
+					Swal.fire('Gagal', res.message, 'error');
+					$('#btn-save-vendor').attr('disabled', false).text('Simpan');
+				}
+			}, 'json');
 		});
 	});
 </script>
