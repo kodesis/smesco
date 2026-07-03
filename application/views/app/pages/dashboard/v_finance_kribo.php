@@ -30,7 +30,7 @@
 					<div class="card-body">
 						<div class="row align-items-center">
 							<div class="col-auto">
-								<span class="bg-green text-white avatar"><?= tabler_icon('building-store') ?></span>
+								<span class="bg-green text-white avatar"><?= tabler_icon('building') ?></span>
 							</div>
 							<div class="col">
 								<div class="font-weight-medium"><?= number_format($total_agents) ?></div>
@@ -92,7 +92,7 @@
 			<div class="col-12">
 				<div class="card">
 					<div class="card-header">
-						<h3 class="card-title"><?= tabler_icon('building-store', 'me-2') ?>Ringkasan per Agen</h3>
+						<h3 class="card-title"><?= tabler_icon('building', 'me-2') ?>Ringkasan per Agen</h3>
 					</div>
 					<div class="table-responsive">
 						<table class="table table-vcenter card-table">
@@ -103,7 +103,7 @@
 									<th>Kota</th>
 									<th>Total User</th>
 									<th>Status</th>
-									<th class="text-muted">Tagihan <small>(Phase 3)</small></th>
+									<!-- <th class="text-muted">Tagihan <small>(Phase 3)</small></th> -->
 								</tr>
 							</thead>
 							<tbody>
@@ -112,14 +112,14 @@
 										<tr>
 											<td><span class="badge bg-blue-lt"><?= ($a->code) ?></span></td>
 											<td><strong><?= ($a->name) ?></strong></td>
-											<td class="text-muted"><?= ($a->city) ?></td>
+											<td class="text-muted"><?= ($a->regency_name) ?></td>
 											<td><?= $a->total_users ?></td>
 											<td>
 												<?= $a->is_active
 													? '<span class="badge bg-success-lt">Aktif</span>'
 													: '<span class="badge bg-danger-lt">Nonaktif</span>' ?>
 											</td>
-											<td class="text-muted">—</td>
+											<!-- <td class="text-muted">—</td> -->
 										</tr>
 									<?php endforeach; ?>
 								<?php else: ?>
