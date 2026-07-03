@@ -142,5 +142,15 @@ $config['menus'] = [
 		['title' => 'Dashboard',     'url' => 'dashboard',       'segment' => 'dashboard',   'icon' => 'dashboard'],
 		['title' => 'Verifikasi',   'url' => 'finance/verifikasi', 'segment' => 'finance',     'icon' => 'message-check'],
 		// ['title' => 'Rekonsiliasi',   'url' => 'finance/reconcile', 'segment' => 'finance',    'icon' => 'cash'],
+
+		[
+			'title' => 'Master Data',
+			'url' => '#',
+			'segment' => 'master',
+			'icon' => 'database',
+			'children' => [
+				['title' => 'Pricelist Rute', 'url' => 'master/pricelist'],
+			]
+		],
 	],
 ];
