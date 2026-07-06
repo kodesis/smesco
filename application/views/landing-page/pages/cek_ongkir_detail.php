@@ -1,4 +1,3 @@
-<!-- cek_ongkir.php -->
 <!-- ── PAGE HEADER ── -->
 <section class="page-header">
 	<div class="container">
@@ -59,6 +58,11 @@
 										class="form-control trigger-calc"
 										value="1" min="1">
 									<span class="input-group-text">Kg</span>
+								</div>
+
+								<!-- HINT BREADCRUMB DI BAWAH INPUT BERAT (REAKTIF VIA JS) -->
+								<div id="weight_hint_left" class="mt-2 small fw-600 text-muted">
+									<!-- <i class="bi bi-info-circle-fill text-warning"></i> Minimal kargo kargo untuk pengiriman standar adalah 10 Kg. -->
 								</div>
 							</div>
 
@@ -135,6 +139,11 @@
 
 							<div class="summary-title">Ringkasan Estimasi</div>
 
+							<!-- HINT DI ATAS SUMMARY PANEL (REAKTIF VIA JS) -->
+							<div class="mb-3" id="weight_hint_right_container">
+
+							</div>
+
 							<!-- Berat -->
 							<div class="summary-row">
 								<span class="label">Total Koli</span>
@@ -195,6 +204,11 @@
 								<div><i class="bi bi-exclamation-triangle-fill"></i> Verifikasi fisik oleh Acceptance bersifat final.</div>
 							</div>
 
+							<div class="p-2 border border-warning rounded bg-warning bg-opacity-10 text-center mb-3 text-warning" style="font-size: 0.75rem; line-height: 1.4;">
+								<i class="bi bi-shield-exclamation me-1"></i> Pastikan kiriman Anda bebas dari
+								<a href="#lartas-section" class="text-warning fw-bold text-decoration-underline">Barang Terlarang (LARTAS)</a> sebelum melakukan pemesanan.
+							</div>
+
 							<!-- CTA -->
 							<a href="https://wa.me/6282220282863?text=Halo%20Smesco,%20saya%20mau%20booking%20kargo"
 								target="_blank" class="btn-wa">
@@ -206,6 +220,118 @@
 
 				</div>
 			</div>
+
+			<!-- ── SECTION INFORMASI LARTAS (BUKAN MODAL) ── -->
+			<div id="lartas-section" class="card mt-4 border-danger shadow-sm" style="border-radius: 18px; overflow: hidden; scroll-margin-top: 80px;">
+				<div class="card-header p-3 bg-light border-bottom d-flex align-items-center gap-2">
+					<i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+					<h5 class="mb-0 fw-bold text-danger" style="font-size: 1rem; letter-spacing: -0.2px;">
+						Daftar Barang Larangan & Terbatas (LARTAS)
+					</h5>
+				</div>
+				<div class="card-body p-4 text-dark">
+					<p class="text-muted mb-4" style="font-size: 0.85rem; line-height: 1.5;">
+						Sesuai dengan regulasi Keselamatan Penerbangan, Kepabeanan, dan <strong>Permendag No. 20 Tahun 2024</strong>, barang-barang berikut dilarang keras untuk diekspor / dikirimkan melalui Smesco Express:
+					</p>
+
+					<div class="row g-4">
+						<!-- Kelompok A -->
+						<div class="col-md-6">
+							<div class="p-3 border rounded-3 h-100 bg-light-subtle">
+								<h6 class="fw-bold text-navy mb-3 pb-2 border-bottom" style="font-size: 0.85rem;">
+									A. Kategori Komoditas Ekspor Terlarang (Permendag)
+								</h6>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-tree"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Barang Bidang Kehutanan</div>
+										<div class="text-muted small" style="line-height: 1.4;">Kayu bulat, bahan baku kayu serpih, dan produk kehutanan mentah lainnya.</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-flower1"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Barang Bidang Pertanian</div>
+										<div class="text-muted small" style="line-height: 1.4;">Rotan mentah, karet alam kualitas tertentu, dan bibit unggul.</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-bag-dash"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Pupuk Bersubsidi</div>
+										<div class="text-muted small" style="line-height: 1.4;">Segala jenis pupuk yang mendapatkan subsidi harga dari pemerintah.</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-gem"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Barang Bidang Pertambangan</div>
+										<div class="text-muted small" style="line-height: 1.4;">Bijih mineral dan hasil tambang yang belum melalui proses pemurnian (smelter).</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-bank"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Barang Cagar Budaya & Sisa Logam</div>
+										<div class="text-muted small" style="line-height: 1.4;">Benda bersejarah, artefak, sisa/skrap logam, serta pasir laut hasil sedimentasi.</div>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<!-- Kelompok B -->
+						<div class="col-md-6">
+							<div class="p-3 border rounded-3 h-100 bg-light-subtle">
+								<h6 class="fw-bold text-navy mb-3 pb-2 border-bottom" style="font-size: 0.85rem;">
+									B. Keamanan Penerbangan & Kargo (Dangerous Goods)
+								</h6>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-capsule"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Narkotika & Barang Ilegal</div>
+										<div class="text-muted small" style="line-height: 1.4;">Segala jenis narkoba, psikotropika, obat tanpa izin edar BPOM, dan uang palsu.</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-fire"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Barang Berbahaya (Dangerous Goods)</div>
+										<div class="text-muted small" style="line-height: 1.4;">Bahan mudah meledak, gas bertekanan (aerosol), cairan mudah terbakar, zat korosif.</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start mb-3">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-shield-slash"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Senjata & Benda Tajam</div>
+										<div class="text-muted small" style="line-height: 1.4;">Senjata api, senjata tajam tempur, airsoft gun, dan replika tanpa izin resmi.</div>
+									</div>
+								</div>
+
+								<div class="d-flex align-items-start">
+									<div class="text-danger bg-danger-subtle px-2 py-1 rounded me-3 mt-1"><i class="bi bi-bug"></i></div>
+									<div>
+										<div class="fw-bold text-dark" style="font-size: 0.8rem;">Biologis & Makhluk Hidup</div>
+										<div class="text-muted small" style="line-height: 1.4;">Hewan hidup, spesimen medis/biologi, serta tanaman langka tanpa izin karantina.</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<div class="alert alert-danger mt-4 mb-0" style="font-size: 0.78rem; border-radius: 10px;">
+						<strong>Peringatan Hukum:</strong> Pengirim yang dengan sengaja mengirimkan barang terlarang akan dilaporkan ke pihak berwajib dan menanggung seluruh denda atau sanksi pidana yang timbul.
+					</div>
+				</div>
+			</div>
+
 		</div>
 	</div>
 </div>
@@ -260,7 +386,6 @@
 
 	document.addEventListener("DOMContentLoaded", function() {
 
-		// ← Semua state di sini, SATU scope, tidak ada redeclare
 		let currentRate = 0;
 		let minWeightGlobal = 1;
 		let isTiered = false;
@@ -300,7 +425,6 @@
 			});
 		}
 
-		// Juga trigger fetchRate saat user manual ketik (blur)
 		$('#calc_origin, #calc_destination').on('change blur', function() {
 			fetchRate();
 		});
@@ -349,9 +473,38 @@
 						minWeightGlobal = 1;
 						isTiered = false;
 					}
+
+					// UPDATE BREADCRUMB REDAKSI SECARA REAKTIF SETELAH AJAX BERHASIL
+					updateWeightHints();
 					renderSummary();
 				})
 				.catch(e => console.error(e));
+		}
+
+		// LOGIC DYNAMIC DOM UNTUK UPDATE HINT DI KEDUA SISI Halaman
+		function updateWeightHints() {
+			const leftHint = $('#weight_hint_left');
+			const rightContainer = $('#weight_hint_right_container');
+
+			if (isTiered) {
+				// Ubah redaksi ke Tiering Mode
+				leftHint.html('<i class="bi bi-layers-half text-success"></i> <span class="text-success">Tiering price is active! Semakin berat barang Anda, tarif per kg berpotensi lebih murah.</span>');
+
+				rightContainer.html(`
+					<span class="badge bg-warning text-dark fw-bold px-3 py-2 rounded-pill w-100 text-center" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+						<i class="bi bi-layers-half me-1"></i> TIERING PRICE IS ACTIVE
+					</span>
+				`);
+			} else {
+				// Kembalikan ke standar Flat / Min 10kg
+				leftHint.html('<i class="bi bi-info-circle-fill text-warning"></i> Minimal kargo untuk rute ini adalah 10 Kg.');
+
+				rightContainer.html(`
+					<div class="p-2 text-center rounded text-white-50 border border-secondary" style="font-size: 0.75rem; background: rgba(255,255,255,0.05);">
+						<i class="bi bi-info-circle me-1 text-warning"></i> Keterangan: Minimum Kargo 10Kg
+					</div>
+				`);
+			}
 		}
 
 		function renderSummary() {
@@ -400,22 +553,20 @@
 			$('#sum_grand_total').text(formatRp(grandTotal));
 		}
 
-		// ← expose ke global agar attachEvents() bisa manggilnya
 		window.calculateAll = function() {
 			const origin = $('#calc_origin').val();
 			const dest = $('#calc_destination').val();
 
 			if (origin && dest && isTiered) {
-				fetchRate(); // re-fetch bawa berat terbaru → update harga tier
+				fetchRate();
 			} else {
-				renderSummary(); // non-tiered, langsung render
+				renderSummary();
 			}
 		};
 
 		attachEvents();
 		renderSummary();
 
-		// Tooltip Bootstrap
 		var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
 		tooltipTriggerList.map(function(el) {
 			return new bootstrap.Tooltip(el);
