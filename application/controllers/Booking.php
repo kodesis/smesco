@@ -835,8 +835,53 @@ class Booking extends CI_Controller
 
 			// $this->api_whatsapp->wa_notif($pesan_pengirim, $detailResi['telepon_pengirim']);
 			// $this->api_whatsapp->wa_notif($pesan_penerima, $detailResi['telepon_penerima']);
-			$this->api_whatsapp->wa_notif_v2($detailResi['telepon_pengirim'], $pesan_pengirim);
-			$this->api_whatsapp->wa_notif_v2($detailResi['telepon_penerima'], $pesan_penerima);
+			// $this->api_whatsapp->wa_notif_v2($detailResi['telepon_pengirim'], $pesan_pengirim);
+			// $this->api_whatsapp->wa_notif_v2($detailResi['telepon_penerima'], $pesan_penerima);
+
+			$setting_fast_wa = $this->db->where('key', 'is_fastwa_active')->get('setting')->row_array();
+
+			// Cek status toggle Fast WA aktif atau tidak (kondisi 1 atau true)
+			$is_fastwa_active = isset($setting_fast_wa['value']) && $setting_fast_wa['value'] == '1';
+
+			if ($is_fastwa_active) {
+				try {
+					$this->api_whatsapp->wa_notif_v2($detailResi['telepon_pengirim'], $pesan_pengirim);
+				} catch (Exception $e) {
+					log_message('error', 'WA Group Error (v2): ' . $e->getMessage());
+					// Fallback ke v3 kalau v2 gagal
+					try {
+						$this->api_whatsapp->wa_notif_v3($pesan_pengirim, $detailResi['telepon_pengirim']);
+					} catch (Exception $e3) {
+						log_message('error', 'WA Group Fallback Error (v3): ' . $e3->getMessage());
+					}
+				}
+			} else {
+				try {
+					$this->api_whatsapp->wa_notif_v3($pesan_pengirim, $detailResi['telepon_pengirim']);
+				} catch (Exception $e) {
+					log_message('error', 'WA Group Error (v3 Direct): ' . $e->getMessage());
+				}
+			}
+
+			if ($is_fastwa_active) {
+				try {
+					$this->api_whatsapp->wa_notif_v2($detailResi['telepon_penerima'], $pesan_penerima);
+				} catch (Exception $e) {
+					log_message('error', 'WA Group Error (v2): ' . $e->getMessage());
+					// Fallback ke v3 kalau v2 gagal
+					try {
+						$this->api_whatsapp->wa_notif_v3($pesan_penerima, $detailResi['telepon_penerima']);
+					} catch (Exception $e3) {
+						log_message('error', 'WA Group Fallback Error (v3): ' . $e3->getMessage());
+					}
+				}
+			} else {
+				try {
+					$this->api_whatsapp->wa_notif_v3($pesan_penerima, $detailResi['telepon_penerima']);
+				} catch (Exception $e) {
+					log_message('error', 'WA Group Error (v3 Direct): ' . $e->getMessage());
+				}
+			}
 		} else {
 			$message = "Barang batal konfirmasi tiba di alamat penerima";
 		}

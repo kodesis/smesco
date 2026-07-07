@@ -448,10 +448,35 @@ class Shipment extends Authenticated_Controller
 						"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
 						"_Terima kasih telah memilih Smesco Express_";
 
-					try {
-						$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
-					} catch (Exception $e) {
-						log_message('error', 'WA Notif Error: ' . $e->getMessage());
+					// try {
+					// 	$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+					// } catch (Exception $e) {
+					// 	log_message('error', 'WA Notif Error: ' . $e->getMessage());
+					// }
+
+					$setting_fast_wa = $this->db->where('key', 'is_fastwa_active')->get('setting')->row_array();
+
+					// Cek status toggle Fast WA aktif atau tidak (kondisi 1 atau true)
+					$is_fastwa_active = isset($setting_fast_wa['value']) && $setting_fast_wa['value'] == '1';
+
+					if ($is_fastwa_active) {
+						try {
+							$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+						} catch (Exception $e) {
+							log_message('error', 'WA Group Error (v2): ' . $e->getMessage());
+							// Fallback ke v3 kalau v2 gagal
+							try {
+								$this->api_whatsapp->wa_notif_v3($pesan_user, $sender_phone);
+							} catch (Exception $e3) {
+								log_message('error', 'WA Group Fallback Error (v3): ' . $e3->getMessage());
+							}
+						}
+					} else {
+						try {
+							$this->api_whatsapp->wa_notif_v3($pesan_user, $sender_phone);
+						} catch (Exception $e) {
+							log_message('error', 'WA Group Error (v3 Direct): ' . $e->getMessage());
+						}
 					}
 				}
 
