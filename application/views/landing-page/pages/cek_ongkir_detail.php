@@ -52,7 +52,7 @@
 							</div>
 
 							<div class="mb-3">
-								<label class="field-label">Total Berat Aktual (Timbangan)</label>
+								<label class="field-label">Berat Timbangan (Untuk Domestik min. 10kg)</label>
 								<div class="input-group">
 									<input type="number" id="calc_actual_weight"
 										class="form-control trigger-calc"
