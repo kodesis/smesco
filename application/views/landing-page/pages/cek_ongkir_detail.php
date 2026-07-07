@@ -62,7 +62,7 @@
 
 								<!-- HINT BREADCRUMB DI BAWAH INPUT BERAT (REAKTIF VIA JS) -->
 								<div id="weight_hint_left" class="mt-2 small fw-600 text-muted">
-									<!-- <i class="bi bi-info-circle-fill text-warning"></i> Minimal kargo kargo untuk pengiriman standar adalah 10 Kg. -->
+									<i class="bi bi-info-circle-fill text-warning"></i> Minimal berat kargo yang dihitung untuk pengiriman domestik adalah 10 Kg.
 								</div>
 							</div>
 
@@ -199,7 +199,7 @@
 
 							<!-- Catatan -->
 							<div class="info-note">
-								<div><i class="bi bi-info-circle-fill"></i> Minimal kargo <strong>10 Kg</strong>.</div>
+								<div><i class="bi bi-info-circle-fill"></i> Minimal kargo domestik <strong>10 Kg</strong>.</div>
 								<div><i class="bi bi-truck-flatbed"></i> Pickup tersedia untuk berat <strong>> 50 Kg</strong>.</div>
 								<div><i class="bi bi-exclamation-triangle-fill"></i> Verifikasi fisik oleh Acceptance bersifat final.</div>
 							</div>
