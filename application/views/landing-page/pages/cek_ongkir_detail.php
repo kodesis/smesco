@@ -62,7 +62,7 @@
 
 								<!-- HINT BREADCRUMB DI BAWAH INPUT BERAT (REAKTIF VIA JS) -->
 								<div id="weight_hint_left" class="mt-2 small fw-600 text-muted">
-									<i class="bi bi-info-circle-fill text-warning"></i> Minimal berat kargo yang dihitung untuk pengiriman domestik adalah 10 Kg.
+									<i class="bi bi-info-circle-fill text-warning"></i> Untuk kargo domestik, minimal berat 10 Kg.
 								</div>
 							</div>
 
