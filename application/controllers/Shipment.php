@@ -12,10 +12,21 @@ class Shipment extends Authenticated_Controller
 {
 	protected $allowed_roles = ['admin-kribo', 'finance-kribo', 'admin-mitra', 'staff-mitra', 'checker', 'driver'];
 
+	// private $merchantCode = 'sda';
+	// private $apiKey       = 'asdjaskjdaslkjd';
+	// private $isSandbox    = true;
+
+	// private $duitku_mode = 'pop';
+
+	// Hanya dipakai kalau $duitku_mode = 'api' — paymentMethod wajib diisi kode valid, gak bisa kosong
+	private $duitku_default_payment_method = 'VC';
+
+	private $is_payment_gateway = true;
+
 	public function __construct()
 	{
 		parent::__construct();
-		$this->load->library(['pdfgenerator', 'api_whatsapp']);
+		$this->load->library(['pdfgenerator', 'api_whatsapp', 'duitku_gateway']);
 		$this->load->model(['M_Shipment', 'M_Pricelist']); // Model yang bikin AWB tadi
 	}
 
@@ -360,7 +371,8 @@ class Shipment extends Authenticated_Controller
 				'payment_expired_at'      => $payment_expired_at,
 				'status'                  => 'BOOKED',
 				'is_lartas_agreed'        => $this->input->post('is_lartas_agreed') ?? 1,
-				'created_by'              => $sess['id']
+				'created_by'              => $sess['id'],
+				'payment_status' => $payment_type === 'TRANSFER' ? 'UNPAID' : NULL,
 			];
 
 			// 8. Database Transaction START
@@ -433,49 +445,74 @@ class Shipment extends Authenticated_Controller
 				redirect('shipment/create');
 			} else {
 				if ($payment_type === 'TRANSFER') {
-					$url = base_url('home/confirm_payment/' . $no_resi);
-					$total_rp = number_format($insert_shipment['total_amount'], 0, ',', '.');
 
-					$pesan_user = "*SMESCO EXPRESS*\n\n" .
-						"*RESERVASI BERHASIL*\n" .
-						"---------------------\n\n" .
-						"No. Resi: *$no_resi*\n" .
-						"Atas Nama: *$sender_name*\n" .
-						"Rute: $origin - $destination\n" .
-						"Total Pembayaran: *Rp $total_rp*\n\n" .
-						"📤 *Upload bukti transfer dalam 10 menit:*\n" .
-						"$url\n\n" .
-						"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
-						"_Terima kasih telah memilih Smesco Express_";
+					if ($this->is_payment_gateway) {
+						// ── JALUR GATEWAY ──
+						$duitkuResult = $this->_create_duitku_invoice(
+								$no_resi,
+								$insert_shipment['total_amount'],
+								$sender_name,
+								$sender_phone
+						);
 
-					// try {
-					// 	$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
-					// } catch (Exception $e) {
-					// 	log_message('error', 'WA Notif Error: ' . $e->getMessage());
-					// }
+						if (!$duitkuResult['status']) {
+								// Shipment record tetap ada (payment_status = UNPAID dari insert awal),
+								// tapi invoice gagal dibuat. Kasih tau user, arahkan ke detail buat retry manual.
+								log_message('error', "Duitku createInvoice gagal untuk {$no_resi}: " . $duitkuResult['message']);
+								$this->session->set_flashdata('warning',
+									"Resi <b>$no_resi</b> berhasil dibuat, tapi gagal membuat invoice pembayaran. " .
+									"Silakan hubungi admin atau coba lagi dari halaman detail."
+								);
+								redirect('shipment/detail/' . $shipment_id);
+								return;
+						}
 
-					$setting_fast_wa = $this->db->where('key', 'is_fastwa_active')->get('setting')->row_array();
+						// Sinkronkan payment_expired_at dengan expiryPeriod Duitku (satu sumber angka)
+						$expiry_minutes = $this->duitku_gateway->getExpiryMinutes();
+						$this->db->where('id', $shipment_id)->update('shipments', [
+								'payment_status'      => 'UNPAID',
+								'payment_expired_at'  => date('Y-m-d H:i:s', strtotime("+{$expiry_minutes} minutes")),
+						]);
 
-					// Cek status toggle Fast WA aktif atau tidak (kondisi 1 atau true)
-					$is_fastwa_active = isset($setting_fast_wa['value']) && $setting_fast_wa['value'] == '1';
+						$pesan_user = "*SMESCO EXPRESS*\n\n" .
+								"*RESERVASI BERHASIL*\n" .
+								"---------------------\n\n" .
+								"No. Resi: *$no_resi*\n" .
+								"Atas Nama: *$sender_name*\n" .
+								"Rute: $origin - $destination\n" .
+								"Total Pembayaran: *Rp " . number_format($insert_shipment['total_amount'], 0, ',', '.') . "*\n\n" .
+								"💳 *Bayar sekarang:*\n" .
+								"{$duitkuResult['paymentUrl']}\n\n" .
+								"Link berlaku {$expiry_minutes} menit.\n\n" .
+								"_Terima kasih telah memilih Smesco Express_";
 
-					if ($is_fastwa_active) {
+						$this->_send_wa_with_fallback($sender_phone, $pesan_user);
+
+						$this->session->set_flashdata('success', "Resi <b>$no_resi</b> berhasil dibuat! Silakan lanjutkan pembayaran.");
+						redirect($duitkuResult['paymentUrl']);
+						return;
+
+					} else {
+						// ── JALUR MANUAL (persis kode lama, TIDAK DIUBAH) ──
+						$url      = base_url('home/confirm_payment/' . $no_resi);
+						$total_rp = number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.');
+
+						$pesan_user = "*SMESCO EXPRESS*\n\n" .
+							"*RESERVASI BERHASIL*\n" .
+							"---------------------\n\n" .
+							"No. Resi: *{$no_resi}*\n" .
+							"Atas Nama: *{$sender_name}*\n" .
+							"Rute: {$origin} → {$destination}\n" .
+							"Total Pembayaran: *Rp {$total_rp}*\n\n" .
+							"📤 *Upload bukti transfer dalam 10 menit:*\n" .
+							"{$url}\n\n" .
+							"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
+							"_Terima kasih telah memilih Smesco Express_";
+
 						try {
 							$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
 						} catch (Exception $e) {
-							log_message('error', 'WA Group Error (v2): ' . $e->getMessage());
-							// Fallback ke v3 kalau v2 gagal
-							try {
-								$this->api_whatsapp->wa_notif_v3($pesan_user, $sender_phone);
-							} catch (Exception $e3) {
-								log_message('error', 'WA Group Fallback Error (v3): ' . $e3->getMessage());
-							}
-						}
-					} else {
-						try {
-							$this->api_whatsapp->wa_notif_v3($pesan_user, $sender_phone);
-						} catch (Exception $e) {
-							log_message('error', 'WA Group Error (v3 Direct): ' . $e->getMessage());
+							log_message('error', 'WA Notif Error (INTL): ' . $e->getMessage());
 						}
 					}
 				}
@@ -809,6 +846,7 @@ class Shipment extends Authenticated_Controller
 			'status'                  => 'BOOKED',
 			'created_by'              => $sess['id'],
 			'created_at'              => date('Y-m-d H:i:s'),
+			'payment_status' => $payment_type === 'TRANSFER' ? 'UNPAID' : NULL,
 		];
 
 		// ── 13. Database Transaction START ──
@@ -882,25 +920,75 @@ class Shipment extends Authenticated_Controller
 			$this->db->trans_commit(); // Sukses total, kunci data
 
 			if ($payment_type === 'TRANSFER') {
-				$url      = base_url('home/confirm_payment/' . $no_resi);
-				$total_rp = number_format($shipping_total + $pickup_fee + $total_addon_fee, 0, ',', '.');
 
-				$pesan_user = "*SMESCO EXPRESS*\n\n" .
-					"*RESERVASI BERHASIL*\n" .
-					"---------------------\n\n" .
-					"No. Resi: *{$no_resi}*\n" .
-					"Atas Nama: *{$sender_name}*\n" .
-					"Rute: {$origin} → {$destination}\n" .
-					"Total Pembayaran: *Rp {$total_rp}*\n\n" .
-					"📤 *Upload bukti transfer dalam 10 menit:*\n" .
-					"{$url}\n\n" .
-					"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
-					"_Terima kasih telah memilih Smesco Express_";
+				if ($this->is_payment_gateway) {
+					// ── JALUR GATEWAY ──
+					$duitkuResult = $this->_create_duitku_invoice(
+							$no_resi,
+							$insert_shipment['total_amount'],
+							$sender_name,
+							$sender_phone
+					);
 
-				try {
-					$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
-				} catch (Exception $e) {
-					log_message('error', 'WA Notif Error (INTL): ' . $e->getMessage());
+					if (!$duitkuResult['status']) {
+							// Shipment record tetap ada (payment_status = UNPAID dari insert awal),
+							// tapi invoice gagal dibuat. Kasih tau user, arahkan ke detail buat retry manual.
+							log_message('error', "Duitku createInvoice gagal untuk {$no_resi}: " . $duitkuResult['message']);
+							$this->session->set_flashdata('warning',
+								"Resi <b>$no_resi</b> berhasil dibuat, tapi gagal membuat invoice pembayaran. " .
+								"Silakan hubungi admin atau coba lagi dari halaman detail."
+							);
+							redirect('shipment/detail/' . $shipment_id);
+							return;
+					}
+
+					// Sinkronkan payment_expired_at dengan expiryPeriod Duitku (satu sumber angka)
+					$expiry_minutes = $this->duitku_gateway->getExpiryMinutes();
+					$this->db->where('id', $shipment_id)->update('shipments', [
+							'payment_status'      => 'UNPAID',
+							'payment_expired_at'  => date('Y-m-d H:i:s', strtotime("+{$expiry_minutes} minutes")),
+					]);
+
+					$pesan_user = "*SMESCO EXPRESS*\n\n" .
+							"*RESERVASI BERHASIL*\n" .
+							"---------------------\n\n" .
+							"No. Resi: *$no_resi*\n" .
+							"Atas Nama: *$sender_name*\n" .
+							"Rute: $origin - $destination\n" .
+							"Total Pembayaran: *Rp " . number_format($insert_shipment['total_amount'], 0, ',', '.') . "*\n\n" .
+							"💳 *Bayar sekarang:*\n" .
+							"{$duitkuResult['paymentUrl']}\n\n" .
+							"Link berlaku {$expiry_minutes} menit.\n\n" .
+							"_Terima kasih telah memilih Smesco Express_";
+
+					$this->_send_wa_with_fallback($sender_phone, $pesan_user);
+
+					$this->session->set_flashdata('success', "Resi <b>$no_resi</b> berhasil dibuat! Silakan lanjutkan pembayaran.");
+					redirect($duitkuResult['paymentUrl']);
+					return;
+
+				} else {
+					// ── JALUR MANUAL (persis kode lama, TIDAK DIUBAH) ──
+					$url = base_url('home/confirm_payment/' . $no_resi);
+					$total_rp = number_format($insert_shipment['total_amount'], 0, ',', '.');
+
+					$pesan_user = "*SMESCO EXPRESS*\n\n" .
+						"*RESERVASI BERHASIL*\n" .
+						"---------------------\n\n" .
+						"No. Resi: *{$no_resi}*\n" .
+						"Atas Nama: *{$sender_name}*\n" .
+						"Rute: {$origin} → {$destination}\n" .
+						"Total Pembayaran: *Rp {$total_rp}*\n\n" .
+						"📤 *Upload bukti transfer dalam 10 menit:*\n" .
+						"{$url}\n\n" .
+						"Lakukan pembayaran sebelum: *" . date('H:i', strtotime($payment_expired_at)) . " WIB*\n\n" .
+						"_Terima kasih telah memilih Smesco Express_";
+
+					try {
+						$this->api_whatsapp->wa_notif_v2($sender_phone, $pesan_user);
+					} catch (Exception $e) {
+						log_message('error', 'WA Notif Error (INTL): ' . $e->getMessage());
+					}
 				}
 			}
 
@@ -3565,5 +3653,61 @@ class Shipment extends Authenticated_Controller
 
 		return $this->output->set_content_type('application/json')
 			->set_output(json_encode(['status' => true, 'message' => 'Vendor berhasil disimpan.']));
+	}
+
+	/**
+	 * Bikin invoice Duitku buat satu shipment. Return array:
+	 * ['status' => true, 'paymentUrl' => ...] kalau sukses,
+	 * ['status' => false, 'message' => ...] kalau gagal.
+	 *
+	 * CATATAN: kalau ini gagal SETELAH shipment record udah ke-insert (trans_complete
+	 * udah commit), shipment TETAP disimpan dengan payment_status = 'UNPAID' —
+	 * sengaja TIDAK di-delete, karena dimensions/addons/tracking log-nya udah nyangkut
+	 * di transaksi yang sama. User perlu jalur "retry invoice" dari halaman detail
+	 * shipment (belum dibikin — ini scope tambahan yang perlu didiskusiin kalau perlu).
+	 */
+	private function _create_duitku_invoice($no_resi, $total_amount, $sender_name, $sender_phone)
+	{
+		$orderData = [
+			'total_amount'   => $total_amount,
+			'order_number'   => $no_resi,
+			'customer_name'  => $sender_name,
+			'customer_wa'    => $sender_phone,
+			// customer_email sengaja dikosongin — Duitku_gateway sudah fallback ke
+			// appSettings['duitku_fallback_email'], gak perlu diisi dummy di sini.
+		];
+
+		$itemDetails = [[
+			'name'     => 'Ongkos Kirim ' . $no_resi,
+			'price'    => (int) round($total_amount),
+			'quantity' => 1,
+		]];
+
+		return $this->duitku_gateway->createInvoice($orderData, $itemDetails);
+	}
+
+	private function _send_wa_with_fallback($phone, $message)
+	{
+		$setting_fast_wa = $this->db->where('key', 'is_fastwa_active')->get('setting')->row_array();
+		$is_fastwa_active = isset($setting_fast_wa['value']) && $setting_fast_wa['value'] == '1';
+
+		if ($is_fastwa_active) {
+			try {
+				$this->api_whatsapp->wa_notif_v2($phone, $message);
+			} catch (Exception $e) {
+				log_message('error', 'WA Error (v2): ' . $e->getMessage());
+				try {
+					$this->api_whatsapp->wa_notif_v3($message, $phone);
+				} catch (Exception $e3) {
+					log_message('error', 'WA Fallback Error (v3): ' . $e3->getMessage());
+				}
+			}
+		} else {
+			try {
+				$this->api_whatsapp->wa_notif_v3($message, $phone);
+			} catch (Exception $e) {
+				log_message('error', 'WA Error (v3 Direct): ' . $e->getMessage());
+			}
+		}
 	}
 }

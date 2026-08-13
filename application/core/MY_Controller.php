@@ -9,6 +9,11 @@ class MY_Controller extends CI_Controller
 	{
 		parent::__construct();
 		$this->current_user = $this->session->userdata('user');
+
+		$rows = $this->db->get('setting')->result_array();
+		foreach ($rows as $row) {
+			$this->appSettings[$row['key']] = $row['value'];
+		}
 	}
 
 	// Render view dengan layout master

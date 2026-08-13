@@ -632,14 +632,14 @@ class Master extends Authenticated_Controller
 
 	public function ajax_get_provinsi()
 	{
-		if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
+		// if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
 		$provinsi = $this->db->order_by('nama_provinsi', 'ASC')->get('mt_provinsi')->result();
 		echo json_encode($provinsi);
 	}
 
 	public function ajax_get_kota($provinsi_id)
 	{
-		if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
+		// if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
 		$kota = $this->db->where('provinsi_id', $provinsi_id)
 			->order_by('nama_kota', 'ASC')
 			->get('mt_kota')->result();
@@ -648,7 +648,7 @@ class Master extends Authenticated_Controller
 
 	public function ajax_get_kecamatan($kota_id)
 	{
-		if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
+		// if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
 		$kecamatan = $this->db->where('kota_id', $kota_id)
 			->order_by('nama_kecamatan', 'ASC')
 			->get('mt_kecamatan')->result();
@@ -657,7 +657,7 @@ class Master extends Authenticated_Controller
 
 	public function ajax_get_kelurahan($kecamatan_id)
 	{
-		if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
+		// if (!$this->input->is_ajax_request()) exit('No direct script access allowed');
 		$kelurahan = $this->db->where('kecamatan_id', $kecamatan_id)
 			->order_by('nama_kelurahan', 'ASC')
 			->get('mt_kelurahan')->result();

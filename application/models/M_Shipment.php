@@ -428,7 +428,7 @@ class M_Shipment extends CI_Model
 	{
 		$statuses = isset($filters['statuses']) ? $filters['statuses'] : ['MANIFESTED', 'DEPARTED'];
 
-			$this->db->select("
+		$this->db->select("
 				smu_number,
 				flight_number,
 				departure_date,
@@ -734,5 +734,71 @@ class M_Shipment extends CI_Model
 		}
 
 		return true;
+	}
+
+	/**
+	 * Konfirmasi pembayaran Duitku via callback. Idempotent — kalau udah PAID,
+	 * gak nulis tracking log lagi (Duitku retry callback sampai 5x).
+	 * PENTING: created_by pakai SYSTEM_USER_ID punya konstanta, karena ini
+	 * dipanggil server Duitku, bukan user yang login — kolom shipment_tracking.created_by
+	 * NOT NULL jadi wajib diisi ID user "system" yang valid.
+	 */
+	public function confirmDuitkuPayment($no_resi, $reference)
+	{
+		$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
+		if (!$shipment) {
+			return ['outcome' => 'not_found'];
+		}
+
+		if ($shipment->payment_status === 'PAID') {
+			return ['outcome' => 'already_processed', 'shipment_id' => $shipment->id];
+		}
+
+		$this->db->trans_start();
+
+		$this->db->where('id', $shipment->id)->update('shipments', [
+			'payment_status' => 'PAID',
+			'updated_at'      => date('Y-m-d H:i:s'),
+		]);
+
+		// Status operasional (BOOKED, MANIFESTED, dst) TIDAK diubah di sini —
+		// itu tetap ngikutin flow fisik shipment yang udah ada.
+		$this->db->insert('shipment_tracking', [
+			'shipment_id' => $shipment->id,
+			'status'      => $shipment->status,
+			'location'    => $shipment->origin,
+			'note'        => "Pembayaran Duitku dikonfirmasi. Ref: {$reference}",
+			'created_by'  => '0', // TODO: ganti dari konstanta dummy, isi ID user system yang beneran
+		]);
+
+		$this->db->trans_complete();
+
+		return [
+			'outcome'     => $this->db->trans_status() ? 'paid' : 'error',
+			'shipment_id' => $shipment->id,
+		];
+	}
+
+	/**
+	 * Tandai pembayaran gagal/expired. Idempotent — sekali FAILED atau udah PAID,
+	 * gak diproses ulang (misal retry callback Duitku setelah manual override admin).
+	 */
+	public function markDuitkuFailed($no_resi, $reference)
+	{
+		$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
+		if (!$shipment) {
+			return ['outcome' => 'not_found'];
+		}
+
+		if (in_array($shipment->payment_status, ['PAID', 'FAILED'], true)) {
+			return ['outcome' => 'already_processed', 'shipment_id' => $shipment->id];
+		}
+
+		$this->db->where('id', $shipment->id)->update('shipments', [
+			'payment_status' => 'FAILED',
+			'updated_at'      => date('Y-m-d H:i:s'),
+		]);
+
+		return ['outcome' => 'failed', 'shipment_id' => $shipment->id];
 	}
 }
