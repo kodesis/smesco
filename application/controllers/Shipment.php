@@ -27,7 +27,7 @@ class Shipment extends Authenticated_Controller
 	{
 		parent::__construct();
 		$this->load->library(['pdfgenerator', 'api_whatsapp', 'duitku_gateway']);
-		$this->load->model(['M_Shipment', 'M_Pricelist']); // Model yang bikin AWB tadi
+		$this->load->model(['M_Shipment', 'M_Pricelist', 'M_Setting']);
 	}
 
 	public function index()
@@ -72,6 +72,7 @@ class Shipment extends Authenticated_Controller
 			'filters'   => $filters,
 			'is_agent'  => $is_agent,
 			'role_slug'  => $sess['role_slug'],
+			'vendors' => $this->M_Setting->getActiveVendors(),
 		], $paginate);
 
 		$this->render('app/pages/shipment/index', $data);
@@ -715,6 +716,22 @@ class Shipment extends Authenticated_Controller
 			}
 		}
 
+		// ── 6b. Hitung TESS (Temporary Surcharge) ──
+		$tess_fee = 0;
+		if (!empty($pricelist->vendor_id)) {
+			$vendor = $this->db->get_where('vendors', [
+				'id'        => $pricelist->vendor_id,
+				'is_active' => '1'
+			])->row();
+
+			if ($vendor && floatval($vendor->temporary_surcharge) > 0) {
+				$calc_tess = $chargeable * floatval($vendor->temporary_surcharge);
+				// Minimal total TESS adalah Rp 100.000
+				$tess_fee  = max($calc_tess, 100000);
+			}
+		}
+
+		// Margin Murni dari Selisih Harga Ongkir (TESS tidak merusak margin)
 		$total_margin = $shipping_margin;
 
 		// ── 7. Resolve Nama Wilayah Pengirim ──
@@ -835,7 +852,8 @@ class Shipment extends Authenticated_Controller
 			'pickup_rate_id'          => $pickup_id,
 			'pickup_fee'              => $pickup_fee,
 			'total_addon_fee'         => $total_addon_fee,
-			'total_amount'            => $shipping_total + $pickup_fee + $total_addon_fee,
+			'tess'                    => $tess_fee,
+			'total_amount'            => $shipping_total + $pickup_fee + $total_addon_fee + $tess_fee,
 			'margin_amount'           => $total_margin,
 
 			// Misc

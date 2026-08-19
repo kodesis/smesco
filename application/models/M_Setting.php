@@ -145,4 +145,9 @@ class M_Setting extends CI_Model
     {
         return $this->db->insert('user', $data);
     }
+
+	public function getActiveVendors()
+	{
+		return $this->db->where('is_active', '1')->get('vendors')->result();
+	}
 }

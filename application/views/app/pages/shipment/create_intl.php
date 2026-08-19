@@ -417,6 +417,11 @@
 							<span class="fw-bold text-dark small" id="lbl_pickup_cost">Rp 0</span>
 						</div>
 
+						<div class="d-flex justify-content-between align-items-center mb-2 d-none" id="row_tess_cost">
+							<span class="text-dark small">Biaya TESS (Surcharge)</span>
+							<span class="fw-bold text-warning small" id="lbl_tess_cost">Rp 0</span>
+						</div>
+
 						<div id="addon_summary_container"></div>
 
 						<hr class="my-3 border-secondary opacity-25">
@@ -675,6 +680,7 @@
 		const pickupSelect = document.getElementById('pickup_rate_id');
 
 		let currentPricePerKg = 0;
+		let vendorSurchargePerKg = 0;
 		let minWeightKg = 1;
 
 		// ==========================================
@@ -812,7 +818,20 @@
 				rowPickup.classList.add('d-none');
 			}
 
-			// --- 3. RENDER LAYANAN TAMBAHAN (ADD-ONS) ---
+
+			// --- 💡 3. HITUNG & TAMPILKAN BIAYA TESS ---
+			let tessFee = 0;
+			const rowTess = document.getElementById('row_tess_cost');
+			if (vendorSurchargePerKg > 0 && shippingCost > 0) {
+				let calcTess = chargeable * vendorSurchargePerKg;
+				tessFee = Math.max(calcTess, 100000); // Minimum 100rb
+				document.getElementById('lbl_tess_cost').innerText = formatRp(tessFee);
+				rowTess.classList.remove('d-none');
+			} else {
+				rowTess.classList.add('d-none');
+			}
+
+			// --- 4. RENDER LAYANAN TAMBAHAN (ADD-ONS) ---
 			const addonContainer = document.getElementById('addon_summary_container');
 			addonContainer.innerHTML = ''; // Bersihkan kontainer
 
@@ -831,7 +850,7 @@
 			}
 
 			// --- 4. GRAND TOTAL ---
-			let grandTotal = shippingCost + pickupFee + totalAddonFee;
+			let grandTotal = shippingCost + pickupFee + totalAddonFee + tessFee;
 
 			lblTotal.innerText = formatRp(grandTotal);
 			btnSubmit.disabled = (shippingCost <= 0);
@@ -870,6 +889,7 @@
 						if (res.status) {
 							alertPrice.classList.add('d-none');
 							currentPricePerKg = parseFloat(res.data.price_per_kg);
+							vendorSurchargePerKg = parseFloat(res.data.vendor_surcharge_per_kg || 0);
 							minWeightKg = parseFloat(res.data.min_weight_kg);
 
 							const bTiered = document.getElementById('badge-tiered');
@@ -882,6 +902,7 @@
 						} else {
 							alertPrice.classList.remove('d-none');
 							currentPricePerKg = 0;
+							vendorSurchargePerKg = 0;
 							calculateAll();
 						}
 					});

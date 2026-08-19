@@ -442,7 +442,7 @@ class Master extends Authenticated_Controller
 		$pricelist = $this->db->get_where('pricelist', [
 			'origin'          => $origin,
 			'destination'     => $destination,
-			'service_type_id' => $service_type_id,
+			'service_type_id' => $service_id ?? $service_type_id,
 			'is_active'       => 1
 		])->row();
 
@@ -454,7 +454,6 @@ class Master extends Authenticated_Controller
 
 			// LOGIC TIERING: Jika rute ini pake tiering
 			if ($pricelist->is_tiered == 1) {
-				// Cari tier yang sesuai dengan berat input
 				$tier = $this->db->where('pricelist_id', $pricelist->id)
 					->where('min_weight <=', $weight)
 					->where('max_weight >=', $weight)
@@ -464,7 +463,6 @@ class Master extends Authenticated_Controller
 					$price_smesco = $tier->price_smesco;
 					$price_kribo  = $tier->price_kribo;
 				} else {
-					// Jika berat melebihi tier tertinggi, ambil tier terakhir (max_weight 9999)
 					$last_tier = $this->db->where('pricelist_id', $pricelist->id)
 						->order_by('max_weight', 'DESC')
 						->get('pricelist_tiers', 1)->row();
@@ -475,21 +473,38 @@ class Master extends Authenticated_Controller
 				}
 			}
 
+			// --- 💡 LOGIK TESS (Temporary Surcharge) ---
+			$vendor_surcharge_per_kg = 0;
+			if (!empty($pricelist->vendor_id)) {
+				$vendor = $this->db->get_where('vendors', [
+					'id'        => $pricelist->vendor_id,
+					'is_active' => '1'
+				])->row();
+
+				if ($vendor && floatval($vendor->temporary_surcharge) > 0) {
+					$vendor_surcharge_per_kg = floatval($vendor->temporary_surcharge);
+				}
+			}
+
 			echo json_encode([
 				'status' => true,
 				'data'   => [
-					'price_per_kg'  => $price_smesco,
-					'min_weight_kg' => $min_weight,
-					'category'      => $category,
-					'is_tiered'     => $pricelist->is_tiered
+					'price_per_kg'            => $price_smesco,
+					'min_weight_kg'           => $min_weight,
+					'category'                => $category,
+					'is_tiered'               => $pricelist->is_tiered,
+					'vendor_surcharge_per_kg' => $vendor_surcharge_per_kg // ← Kirim ke JS
 				]
 			]);
 		} else {
-			echo json_encode(['status' => false, 'message' => 'Harga tidak ditemukan.',
-				'origin'          => $origin,
-				'destination'     => $destination,
+			echo json_encode([
+				'status'  => false,
+				'message' => 'Harga tidak ditemukan.',
+				'origin'  => $origin,
+				'destination' => $destination,
 				'service_type_id' => $service_type_id,
-				'is_active'       => 1]);
+				'is_active' => 1
+			]);
 		}
 	}
 

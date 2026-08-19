@@ -465,7 +465,11 @@
 					<label class="form-label fw-bold mb-1">Vendor <span class="text-danger">*</span></label>
 					<select id="vendor-name" class="form-select">
 						<option value="">-- Pilih Vendor --</option>
-						<option value="TLX">TLX</option>
+						<?php
+						foreach ($vendors as $v) : ?>
+							<option value="<?= $v->vendor_name ?>"><?= $v->vendor_name ?></option>
+						<?php
+						endforeach; ?>
 					</select>
 				</div>
 				<div class="mb-2">
