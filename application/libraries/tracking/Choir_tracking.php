@@ -84,6 +84,10 @@ class Choir_tracking implements Tracking_contract
 			$raw_status  = trim($item['status'] ?? '');
 			$mapped_code = $this->resolve_status($raw_status);
 
+			if ($mapped_code === 'BOOKED') {
+				continue;
+			}
+
 			// Gabungkan note
 			$note = $raw_status;
 			if (!empty($item['notes'])) {

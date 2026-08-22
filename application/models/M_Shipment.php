@@ -679,7 +679,7 @@ class M_Shipment extends CI_Model
 		$shipment = $this->db->select('id, vendor, vendor_connote, status')
 			->from('shipments')
 			->where('id', $shipment_id)
-			->where_in('vendor', ['TLX', 'CHOIR EXPRESS']) // Tambah CHOIR
+			->where_in('vendor', ['TLX', 'CHOIR'])
 			->get()->row_array();
 
 		if (!$shipment || empty($shipment['vendor_connote'])) return false;
@@ -688,7 +688,7 @@ class M_Shipment extends CI_Model
 		// Resolve vendor class
 		$vendor_map = [
 			'TLX'            => 'Tlx_tracking',
-			'CHOIR EXPRESS'          => 'Choir_tracking',
+			'CHOIR'          => 'Choir_tracking',
 		];
 
 		$class_name = $vendor_map[$shipment['vendor']] ?? null;
@@ -709,7 +709,12 @@ class M_Shipment extends CI_Model
 			->get()->result_array();
 
 		$existing_timestamps = array_column($existing, 'created_at');
-		$has_delivered = false;
+		$inserted_count = 0;
+
+		// Urutkan $items ASC berdasarkan created_at agar pemrosesan berurutan dari lama ke baru
+		usort($items, function ($a, $b) {
+			return strtotime($a['created_at']) <=> strtotime($b['created_at']);
+		});
 
 		foreach ($items as $item) {
 			if (in_array($item['created_at'], $existing_timestamps)) continue;
@@ -723,15 +728,22 @@ class M_Shipment extends CI_Model
 				'created_at'  => $item['created_at'],
 			]);
 
-			if ($item['status'] === 'DELIVERED') $has_delivered = true;
+			$inserted_count++;
 		}
 
-		if ($has_delivered) {
-			$this->db->where('id', $shipment_id)
-				->update('shipments', [
-					'status'     => 'DELIVERED',
-					'updated_at' => date('Y-m-d H:i:s'),
-				]);
+		// ── UPDATE STATUS TERBARU KE TABEL SHIPMENTS ──
+		// Ambil record tracking paling akhir dari array items yang sudah diurutkan
+		$latest_item = end($items);
+
+		if ($latest_item && !empty($latest_item['status'])) {
+			// Jika ada data baru atau status di shipments berbeda dengan status paling akhir dari vendor
+			if ($inserted_count > 0 || $shipment['status'] !== $latest_item['status']) {
+				$this->db->where('id', $shipment_id)
+					->update('shipments', [
+						'status'     => $latest_item['status'],
+						'updated_at' => date('Y-m-d H:i:s'),
+					]);
+			}
 		}
 
 		return true;
