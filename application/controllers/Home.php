@@ -55,6 +55,11 @@ class Home extends CI_Controller {
 			$shipment = $this->M_Shipment->getResi($awb);
 
 			if ($shipment) {
+
+				if (!empty($shipment['vendor']) && !empty($shipment['vendor_connote'])) {
+					$this->M_Shipment->sync_vendor_tracking($id);
+				}
+				
 				$data['shipment'] = $shipment;
 				// 2. Ambil riwayat tracking berdasarkan ID shipment
 				$data['history']  = $this->M_Shipment->get_tracking_public($shipment['id']);
