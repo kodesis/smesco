@@ -679,7 +679,7 @@ class M_Shipment extends CI_Model
 		$shipment = $this->db->select('id, vendor, vendor_connote, status')
 			->from('shipments')
 			->where('id', $shipment_id)
-			->where_in('vendor', ['TLX', 'TRACKINGEXPORT']) // tambah vendor baru di sini
+			->where_in('vendor', ['TLX', 'CHOIR EXPRESS']) // Tambah CHOIR
 			->get()->row_array();
 
 		if (!$shipment || empty($shipment['vendor_connote'])) return false;
@@ -687,15 +687,16 @@ class M_Shipment extends CI_Model
 
 		// Resolve vendor class
 		$vendor_map = [
-			'TLX'           => 'Tlx_tracking',
-			'TRACKINGEXPORT' => 'Trackingexport_tracking', // nanti
+			'TLX'            => 'Tlx_tracking',
+			'CHOIR EXPRESS'          => 'Choir_tracking',
 		];
 
 		$class_name = $vendor_map[$shipment['vendor']] ?? null;
 		if (!$class_name) return false;
 
-		require_once APPPATH . 'libraries/tracking/Tracking_contract.php'; // ← tambah ini
+		require_once APPPATH . 'libraries/tracking/Tracking_contract.php';
 		require_once APPPATH . 'libraries/tracking/' . $class_name . '.php';
+
 		$tracker = new $class_name();
 		$items   = $tracker->fetch($shipment['vendor_connote']);
 
