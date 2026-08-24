@@ -21,7 +21,7 @@ class Shipment extends Authenticated_Controller
 	// Hanya dipakai kalau $duitku_mode = 'api' — paymentMethod wajib diisi kode valid, gak bisa kosong
 	private $duitku_default_payment_method = 'VC';
 
-	private $is_payment_gateway = false;
+	private $is_payment_gateway = true;
 
 	public function __construct()
 	{

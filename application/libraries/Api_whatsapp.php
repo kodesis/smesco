@@ -5,35 +5,35 @@ if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 class Api_whatsapp
 {
-  function wa_notif($msgg, $phonee)
-  {
-    // $sender = 'buskipm';
-    $phone = $phonee;
-    $msg = $msgg;
+	function wa_notif($msgg, $phonee)
+	{
+		// $sender = 'buskipm';
+		$phone = $phonee;
+		$msg = $msgg;
 
-    // $token = "whvSyvdbM5CDv1wKvXhQmajGAbTgJfyxfV5xuX1g7hpuMktyj4kllsalda";
-    $token = "whvSyvdbM5CDv1wKvXhQmajGAbTgJfyxfV5xuX1g7hpuMktyj4";
-    // $phone= "62812xxxxxx"; //untuk group pakai groupid contoh: 62812xxxxxx-xxxxx
-    // $message = "Testing by API ruangwa";
+		// $token = "whvSyvdbM5CDv1wKvXhQmajGAbTgJfyxfV5xuX1g7hpuMktyj4kllsalda";
+		$token = "whvSyvdbM5CDv1wKvXhQmajGAbTgJfyxfV5xuX1g7hpuMktyj4";
+		// $phone= "62812xxxxxx"; //untuk group pakai groupid contoh: 62812xxxxxx-xxxxx
+		// $message = "Testing by API ruangwa";
 
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
-      CURLOPT_URL => 'https://app.ruangwa.id/api/send_message',
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_ENCODING => '',
-      CURLOPT_MAXREDIRS => 10,
-      CURLOPT_TIMEOUT => 0,
-      CURLOPT_FOLLOWLOCATION => true,
-      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-      CURLOPT_CUSTOMREQUEST => 'POST',
-      CURLOPT_POSTFIELDS => 'token=' . $token . '&number=' . $phone . '&message=' . $msgg,
-    ));
-    $response = curl_exec($curl);
-    curl_close($curl);
-    return $response;
-  }
+		$curl = curl_init();
+		curl_setopt_array($curl, array(
+			CURLOPT_URL => 'https://app.ruangwa.id/api/send_message',
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_ENCODING => '',
+			CURLOPT_MAXREDIRS => 10,
+			CURLOPT_TIMEOUT => 0,
+			CURLOPT_FOLLOWLOCATION => true,
+			CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+			CURLOPT_CUSTOMREQUEST => 'POST',
+			CURLOPT_POSTFIELDS => 'token=' . $token . '&number=' . $phone . '&message=' . $msgg,
+		));
+		$response = curl_exec($curl);
+		curl_close($curl);
+		return $response;
+	}
 
-	function wa_notif_v2($phone_number, $message)
+	function wa_notif_v2_old($phone_number, $message)
 	{
 		$curl = curl_init();
 
@@ -124,5 +124,27 @@ class Api_whatsapp
 
 		$result = json_decode($response, true);
 		return $result ?: array('success' => false, 'message' => 'Response tidak valid');
+	}
+
+	function wa_notif_v2($phone, $msgg)
+	{
+		$payload = json_encode([
+			"user_code" => "KMGAYP0826",
+			"secret" => "a5efccbbc66675e1bc6a2d75fbf12839126f1682ce19c7faaaf85aa8060f1a02",
+			"device_id" => "D-ONUFK",
+			"phone" => $phone,
+			"message" => $msgg
+		]);
+
+		$ch = curl_init("https://api.kirimi.id/v1/send-message");
+		curl_setopt_array($ch, [
+			CURLOPT_POST => true,
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_HTTPHEADER => ["Content-Type: application/json"],
+			CURLOPT_POSTFIELDS => $payload
+		]);
+		$response = curl_exec($ch);
+		curl_close($ch);
+		return $response;
 	}
 }
