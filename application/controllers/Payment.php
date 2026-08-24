@@ -100,7 +100,7 @@ class Payment extends MY_Controller
 		unset($shipment['sender_phone'], $shipment['receiver_phone']);
 
 		$data = [
-			'pageTitle' => 'Status Pembayaran',
+			'title' => 'Status Pembayaran',
 			'segment'   => 'checkout',
 			'shipment'  => $shipment,
 		];
