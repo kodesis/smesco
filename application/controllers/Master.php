@@ -427,6 +427,115 @@ class Master extends Authenticated_Controller
 		force_download('Template_Pricelist_Smesco_V2.csv', $csv_content);
 	}
 
+	public function export_excel_pricelist()
+	{
+		@ini_set('display_errors', 0);
+		error_reporting(0);
+		$this->_check_access();
+
+		$search = $this->input->get('q');
+		$status = $this->input->get('status');
+
+		$pricelists = $this->M_Pricelist->get_all_pricelist_for_export($search, $status);
+
+		if (empty($pricelists)) {
+			$this->session->set_flashdata('error', 'Tidak ada data untuk diekspor.');
+			redirect('pricelist');
+			return;
+		}
+
+		require_once APPPATH . 'libraries/PHPExcel.php';
+		require_once APPPATH . 'libraries/PHPExcel/IOFactory.php';
+
+		$objPHPExcel = new PHPExcel();
+		$objPHPExcel->getProperties()
+			->setCreator("System")
+			->setTitle("Pricelist Export");
+
+		$sheet = $objPHPExcel->getActiveSheet();
+		$sheet->setTitle('Pricelist Data');
+
+		$headers = [
+			'A1' => 'ID',
+			'B1' => 'Origin',
+			'C1' => 'Destination',
+			'D1' => 'Category',
+			'E1' => 'Is Tiered',
+			'F1' => 'Min Weight (Kg)',
+			'G1' => 'Max Weight (Kg)',
+			'H1' => 'Base Price / Kg',
+			'I1' => 'Price Kribo',
+			'J1' => 'Price Smesco',
+			'K1' => 'Status'
+		];
+
+		foreach ($headers as $cell => $value) {
+			$sheet->setCellValue($cell, $value);
+			$sheet->getStyle($cell)->getFont()->setBold(true);
+		}
+
+		$row = 2;
+		foreach ($pricelists as $item) {
+			$is_tiered = (bool)$item->is_tiered;
+
+			$price_kribo = $is_tiered ? $item->tier_price_kribo : $item->price_kribo;
+			$price_smesco = $is_tiered ? $item->tier_price_smesco : $item->price_smesco;
+			$min_weight   = $is_tiered ? $item->tier_min_weight : $item->min_weight_kg;
+			// FIX: max_weight non-tiered pakai null/0, bukan string '-'
+			// supaya tidak konflik dengan format number
+			$max_weight   = $is_tiered ? $item->tier_max_weight : null;
+
+			$sheet->setCellValue('A' . $row, $item->id);
+			$sheet->setCellValue('B' . $row, $item->origin);
+			$sheet->setCellValue('C' . $row, $item->destination);
+			$sheet->setCellValue('D' . $row, $item->category);
+			$sheet->setCellValue('E' . $row, $is_tiered ? 'YES' : 'NO');
+			$sheet->setCellValue('F' . $row, $min_weight);
+			$sheet->setCellValue('G' . $row, $max_weight);
+			$sheet->setCellValue('H' . $row, $item->price_per_kg);
+			$sheet->setCellValue('I' . $row, $price_kribo);
+			$sheet->setCellValue('J' . $row, $price_smesco);
+			$sheet->setCellValue('K' . $row, $item->is_active ? 'Active' : 'Inactive');
+
+			// Format number hanya untuk kolom yang memang numeric
+			$sheet->getStyle('F' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
+			$sheet->getStyle('H' . $row . ':J' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
+
+			// Kolom G (max_weight): format hanya jika tiered
+			if ($is_tiered) {
+				$sheet->getStyle('G' . $row)->getNumberFormat()->setFormatCode('#,##0.00');
+			}
+
+			$row++;
+		}
+
+		foreach (range('A', 'K') as $col) {
+			$sheet->getColumnDimension($col)->setAutoSize(true);
+		}
+
+		// SAVE ke temp file dulu — hindari kontaminasi output buffer
+		$tmpFile = tempnam(sys_get_temp_dir(), 'pricelist_') . '.xlsx';
+		$objWriter = PHPExcel_IOFactory::createWriter($objPHPExcel, 'Excel2007');
+		$objWriter->save($tmpFile);
+
+		// Baru setelah file siap, bersihkan buffer dan kirim
+		while (ob_get_level() > 0) {
+			ob_end_clean();
+		}
+
+		$filename = 'Pricelist_Export_' . date('Ymd_His') . '.xlsx';
+
+		header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+		header('Content-Disposition: attachment; filename="' . $filename . '"');
+		header('Content-Length: ' . filesize($tmpFile));
+		header('Cache-Control: max-age=0');
+		header('Pragma: public');
+
+		readfile($tmpFile);
+		unlink($tmpFile); // hapus temp file
+		exit;
+	}
+
 	// ----------------------------------------------------------------
 	// AJAX: Cek Harga Pricelist
 	// ----------------------------------------------------------------

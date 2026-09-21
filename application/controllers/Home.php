@@ -55,9 +55,8 @@ class Home extends CI_Controller {
 			$shipment = $this->M_Shipment->getResi($awb);
 
 			if ($shipment) {
-
 				if (!empty($shipment['vendor']) && !empty($shipment['vendor_connote'])) {
-					$this->M_Shipment->sync_vendor_tracking($id);
+					$this->M_Shipment->sync_vendor_tracking($shipment['id']);
 				}
 				
 				$data['shipment'] = $shipment;

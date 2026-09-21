@@ -69,4 +69,37 @@ class M_Pricelist extends MY_Model
 		return $this->db->select('pricelist.*, users.name AS created_by_name, service_types.name AS service_name')->from('pricelist')->join('users', 'users.id = pricelist.created_by', 'left')->join('service_types', 'service_types.id = pricelist.service_type_id', 'left')->where('pricelist.id', $id)->get()->row();
 	}
 
+	public function get_all_pricelist_for_export($search = null, $status = null)
+	{
+		$this->db->select('
+        p.*, 
+        st.name as service_type_name, 
+        v.vendor_name as vendor_name,
+        pt.min_weight as tier_min_weight,
+        pt.max_weight as tier_max_weight,
+        pt.price_kribo as tier_price_kribo,
+        pt.price_smesco as tier_price_smesco
+    ');
+		$this->db->from('pricelist p');
+		$this->db->join('service_types st', 'st.id = p.service_type_id', 'left');
+		$this->db->join('vendors v', 'v.id = p.vendor_id', 'left');
+		// LEFT JOIN ke tiers agar data tiered ikut terambil
+		$this->db->join('pricelist_tiers pt', 'pt.pricelist_id = p.id', 'left');
+
+		if (!empty($search)) {
+			$this->db->group_start();
+			$this->db->like('p.origin', $search);
+			$this->db->or_like('p.destination', $search);
+			$this->db->group_end();
+		}
+
+		if ($status !== null && $status !== '') {
+			$this->db->where('p.is_active', $status);
+		}
+
+		$this->db->order_by('p.id', 'ASC');
+		$this->db->order_by('pt.min_weight', 'ASC');
+
+		return $this->db->get()->result();
+	}
 }

@@ -94,6 +94,10 @@ class Choir_tracking implements Tracking_contract
 				$note .= ($note ? ' — ' : '') . $item['notes'];
 			}
 
+			if (!empty($item['extra'])) {
+				$note .= ' (' . $item['extra'] . ')'; // Menyimpan info penerima (Abrahem Delivered by...)
+			}
+
 			$result[] = [
 				'status'     => $mapped_code,
 				'note'       => $note,
