@@ -137,7 +137,7 @@ class Shipment extends Authenticated_Controller
 						$l = str_replace(',', '.', $dim_width[$key]);
 						$t = str_replace(',', '.', $dim_height[$key]);
 
-						$vol_weight_per_item = ($p * $l * $t) / 5000;
+						$vol_weight_per_item = ($p * $l * $t) / 6000;
 						$total_volume_weight += ($vol_weight_per_item * $qty);
 
 						for ($i = 0; $i < $qty; $i++) {
@@ -1106,7 +1106,7 @@ class Shipment extends Authenticated_Controller
 					$l = str_replace(',', '.', $dim_width[$key]);
 					$t = str_replace(',', '.', $dim_height[$key]);
 
-					$vol_weight_per_item = ($p * $l * $t) / 5000;
+					$vol_weight_per_item = ($p * $l * $t) / 6000;
 					$total_volume_weight += ($vol_weight_per_item * $qty);
 
 					for ($i = 0; $i < $qty; $i++) {

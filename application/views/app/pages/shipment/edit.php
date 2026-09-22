@@ -396,7 +396,7 @@
 
 <script>
 	document.addEventListener("DOMContentLoaded", function() {
-		const pembagi_volume = 5000;
+		const pembagi_volume = 6000;
 
 		const preloadOrigin = "<?= $shipment->origin ?>";
 		const preloadDestination = "<?= $shipment->destination ?>";

@@ -612,7 +612,7 @@
 
 <script>
 	document.addEventListener("DOMContentLoaded", function() {
-		const pembagi_volume = 5000;
+		const pembagi_volume = 6000;
 
 		// --- Inisiasi Select2 ---
 		if (jQuery().select2) {
