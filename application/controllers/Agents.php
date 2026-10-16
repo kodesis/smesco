@@ -78,39 +78,46 @@ class Agents extends Authenticated_Controller
 		// AMBIL DATA KOTA KARGO (HUB)
 		$cargo_cities = $this->db->get_where('cities', ['is_active' => 1])->result();
 
-		$this->form_validation->set_rules('name',        'Nama Agen',  'required|trim|max_length[150]');
-		$this->form_validation->set_rules('province_id', 'Provinsi',   'required|trim');
-		$this->form_validation->set_rules('regency_id',  'Kota/Kab',   'required|trim');
-		$this->form_validation->set_rules('address',     'Alamat',     'trim');
-		$this->form_validation->set_rules('phone',       'Telepon',    'trim|max_length[30]');
-		$this->form_validation->set_rules('email',       'Email Agen', 'trim|valid_email|max_length[150]');
+		$this->form_validation->set_rules('name',           'Nama Agen',  'required|trim|max_length[150]');
+		$this->form_validation->set_rules('province_id',    'Provinsi',   'required|trim');
+		$this->form_validation->set_rules('regency_id',     'Kota/Kab',   'required|trim');
+		$this->form_validation->set_rules('subdistrict_id', 'Kecamatan',  'required|trim');
+		$this->form_validation->set_rules('city_id',        'Hub Kargo',  'required|trim');
+		$this->form_validation->set_rules('address',        'Alamat',     'trim');
+		$this->form_validation->set_rules('phone',          'Telepon',    'trim|max_length[30]');
+		$this->form_validation->set_rules('email',          'Email Agen', 'trim|valid_email|max_length[150]');
 
 		if ($this->form_validation->run()) {
-			$regency_id  = $this->input->post('regency_id');
-			$province_id = $this->input->post('province_id');
+			$province_id    = $this->input->post('province_id');
+			$regency_id     = $this->input->post('regency_id');
+			$subdistrict_id = $this->input->post('subdistrict_id');
 
-			// Generate kode otomatis
-			$code = $this->M_Agent->generate_code($regency_id);
+			// 1. Generate kode otomatis berbasis kecamatan (subdistrict_id)
+			$code = $this->M_Agent->get_next_sequence_by_subdistrict($subdistrict_id);
 
-			// Pastikan tidak collision (edge case concurrent request)
+			// 2. Handle collision jika ada race condition (concurrent submission)
 			if ($this->M_Agent->code_exists($code)) {
-				// Coba generate ulang dengan count actual
+				$subdistrict = $this->db->get_where('subdistricts', ['id' => $subdistrict_id])->row();
+				$sub_code    = (!empty($subdistrict) && !empty($subdistrict->code)) ? $subdistrict->code : $subdistrict_id;
+
 				$count = $this->db
-					->where('regency_id', $regency_id)
+					->where('subdistrict_id', $subdistrict_id)
 					->count_all_results('agents');
-				$code = 'SMC-' . $regency_id . '.' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+
+				$code = 'SMC-' . $sub_code . '.' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
 			}
 
 			$insert = [
-				'name'        => $this->input->post('name'),
-				'code'        => $code,
-				'city_id'     => $this->input->post('city_id'),
-				'province_id' => $province_id,
-				'regency_id'  => $regency_id,
-				'address'     => $this->input->post('address'),
-				'phone'       => $this->input->post('phone'),
-				'email'       => $this->input->post('email'),
-				'is_active'   => 1,
+				'name'           => $this->input->post('name'),
+				'code'           => $code,
+				'city_id'        => $this->input->post('city_id'),
+				'province_id'    => $province_id,
+				'regency_id'     => $regency_id,
+				'subdistrict_id' => $subdistrict_id,
+				'address'        => $this->input->post('address'),
+				'phone'          => $this->input->post('phone'),
+				'email'          => $this->input->post('email'),
+				'is_active'      => 1,
 			];
 
 			$new_id = $this->M_Agent->insert($insert);
@@ -125,8 +132,8 @@ class Agents extends Authenticated_Controller
 		}
 
 		$data = [
-			'title'     => 'Tambah Agen',
-			'provinces' => $provinces,
+			'title'        => 'Tambah Agen',
+			'provinces'    => $provinces,
 			'cargo_cities' => $cargo_cities,
 		];
 
@@ -227,6 +234,34 @@ class Agents extends Authenticated_Controller
 		$this->output
 			->set_content_type('application/json')
 			->set_output(json_encode($result));
+	}
+
+	public function get_subdistricts($regency_id)
+	{
+		if (!$this->input->is_ajax_request()) {
+			exit('No direct script access allowed');
+		}
+
+		$subdistricts = $this->M_Agent->get_subdistricts_by_regency($regency_id);
+
+		$response = [];
+
+		foreach ($subdistricts as $sub) {
+			// Misal format kode kecamatan Kemendagri = 31.75.03
+			// Hitung urutan next agent di kecamatan tersebut
+			$next_number = $this->M_Agent->get_next_sequence_by_subdistrict($sub->id);
+			$code_preview = 'SMC-' . $sub->id . '.' . str_pad($next_number, 3, '0', STR_PAD_LEFT);
+
+			$response[] = [
+				'id'           => $sub->id,
+				'nama'         => $sub->nama,
+				'code_preview' => $code_preview
+			];
+		}
+
+		$this->output
+			->set_content_type('application/json')
+			->set_output(json_encode($response));
 	}
 
 	// ----------------------------------------------------------------

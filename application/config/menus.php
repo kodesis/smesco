@@ -153,4 +153,21 @@ $config['menus'] = [
 			]
 		],
 	],
+
+	'admin-mitra-kecamatan' => [
+		['title' => 'Dashboard',     'url' => 'dashboard',       'segment' => 'dashboard',   'icon' => 'dashboard'],
+		[
+			'title' => 'Daftar Pengiriman',
+			'url' => 'agentkecamatan/',
+			'segment' => 'shipment-kecamatan',
+			'icon' => 'box',
+		],
+		[
+			'title' => 'Buat Pengiriman',
+			'url' => 'agentkecamatan/create',
+			'segment' => 'create_shipment_kecamatan',
+			'icon' => 'plus',
+		],
+		['title' => 'Laporan',   'url' => 'reports',         'segment' => 'reports',     'icon' => 'file-spreadsheet'],
+	],
 ];

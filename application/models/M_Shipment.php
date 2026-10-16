@@ -3,6 +3,10 @@ defined('BASEPATH') or exit('No direct script access allowed');
 
 class M_Shipment extends CI_Model
 {
+	const KEC_PRICING_ORIGIN = 'JAKARTA';
+	const KEC_VOLUME_DIVISOR = 5000;
+	const KEC_TESS_MIN       = 100000;
+
 	/**
 	 * Fungsi untuk generate Nomor AWB (Resi)
 	 * Format: SMC + YYMMDD + 0001 (Reset tiap hari)
@@ -100,11 +104,12 @@ class M_Shipment extends CI_Model
 	// 2. Menarik data per halaman (Limit & Offset)
 	public function get_paged($limit, $offset, $agent_id = NULL, $filters = [])
 	{
-		$this->db->select('shipments.*, service_types.name as service_name, service_types.code as service_code, users.name as created_by_name');
+		$this->db->select('shipments.*, service_types.name as service_name, service_types.code as service_code, users.name as created_by_name, agents.is_kecamatan');
 		$this->db->from('shipments');
 		$this->db->join('service_types', 'service_types.id = shipments.service_type_id', 'left');
-		$this->db->join('users', 'users.id = shipments.created_by', 'left'); // Join ke tabel users buat nampilin nama admin yang input resi
-
+		$this->db->join('users', 'users.id = shipments.created_by', 'left');
+		$this->db->join('agents', 'agents.id = shipments.agent_id', 'left');
+		
 		$this->_apply_filters($agent_id, $filters);
 
 		$this->db->order_by('shipments.id', 'DESC');
@@ -685,7 +690,7 @@ class M_Shipment extends CI_Model
 		if (!$shipment || empty($shipment['vendor_connote'])) return false;
 
 		// 🔴 REMOVED: 
-		if ($shipment['status'] === 'DELIVERED') return false; 
+		if ($shipment['status'] === 'DELIVERED') return false;
 		// Baris di atas dihapus agar jika data tracking dihapus manual/di-reset, sync tetap bisa berjalan.
 
 		// Resolve vendor class
@@ -820,5 +825,849 @@ class M_Shipment extends CI_Model
 		]);
 
 		return ['outcome' => 'failed', 'shipment_id' => $shipment->id];
+	}
+
+	public function get_agent_kecamatan_stats($agent_id)
+	{
+		$start = date('Y-m-d 00:00:00');
+		$end   = date('Y-m-d 00:00:00', strtotime('+1 day'));
+
+		$row = $this->db->query("
+		SELECT
+		  COUNT(*) AS total,
+		  SUM(created_at >= ? AND created_at < ?) AS today,
+		  SUM(payment_status = 'PAID') AS paid,
+		  SUM((payment_status IS NULL OR payment_status <> 'PAID') AND status <> 'CANCELLED') AS unpaid,
+		  SUM(status = 'READY_FOR_HANDOVER')      AS ready_for_handover,
+		  SUM(status = 'READY_FOR_FORWARDING')    AS ready_for_forwarding,
+		  SUM(status = 'IN_TRANSIT_TO_JAKARTA')   AS in_transit_jakarta,
+		  SUM(status = 'RECEIVED_JAKARTA')        AS received_jakarta,
+		  SUM(status = 'HANDOVER_TO_COURIER')     AS handover_to_courier
+		FROM shipments
+		WHERE agent_id = ? AND category = 'INTERNATIONAL'
+	", [$start, $end, (int) $agent_id])->row();
+
+		$keys = [
+			'total',
+			'today',
+			'paid',
+			'unpaid',
+			'ready_for_handover',
+			'ready_for_forwarding',
+			'in_transit_jakarta',
+			'received_jakarta',
+			'handover_to_courier'
+		];
+
+		$out = [];
+		foreach ($keys as $k) {
+			$out[$k] = (int) ($row->$k ?? 0);
+		}
+		return $out;
+	}
+
+	public function get_recent_agent_kecamatan_shipments($agent_id, $limit = 5)
+	{
+		return $this->db
+			->select('
+				s.id,
+				s.no_resi,
+				s.sender_name,
+				s.receiver_name,
+				s.destination,
+				s.chargeable_weight,
+				s.total_amount,
+				s.payment_status,
+				s.status,
+				s.created_at
+			')
+			->from('shipments s')
+			->where('s.agent_id', $agent_id)
+			->where('s.category', 'INTERNATIONAL')
+			->order_by('s.created_at', 'DESC')
+			->limit($limit)
+			->get()
+			->result();
+	}
+
+	/**
+	 * Create shipment international khusus Agen Kecamatan.
+	 *
+	 * Perbedaan dengan save_intl():
+	 * - Harga menggunakan price_kecamatan
+	 * - Tidak menggunakan payment gateway
+	 * - Tidak ada payment proof upload
+	 * - Shipment dibuat BOOKED / UNPAID
+	 * - Pembayaran dikonfirmasi melalui confirm_payment()
+	 *
+	 * @param array $data
+	 * @return array
+	 */
+	/*
+	 * Taruh di dalam class M_Shipment (bagian atas class):
+	 *
+	 * const KEC_VOLUME_DIVISOR = 6000;     // HARUS sama dengan pembagi_volume di view
+	 * const KEC_TESS_MIN       = 100000;   // minimal TESS (Rp)
+	 * const KEC_PHOTO_MAX      = 2097152;  // 2MB
+	 */
+
+	/**
+	 * Buat shipment Agen Kecamatan.
+	 * Semua harga dihitung ulang di sini; nilai dari browser tidak dipercaya.
+	 */
+	public function create_shipment_kecamatan($data = [])
+	{
+		$agent_id    = (int) ($data['agent_id'] ?? 0);
+		$user_id     = (int) ($data['user_id'] ?? 0);
+		$origin      = trim($data['origin'] ?? '');
+		$destination = trim($data['destination'] ?? '');
+		$agent_origin = trim($data['agent_origin'] ?? '');
+		$service_id  = (int) ($data['service_id'] ?? 0);
+		$post        = is_array($data['post'] ?? NULL) ? $data['post'] : [];
+		$files       = is_array($data['files'] ?? NULL) ? $data['files'] : [];
+
+		/* ---------------------------------------------------------
+		 * 1. VALIDASI
+		 * --------------------------------------------------------- */
+		if (!$agent_id || !$user_id) {
+			return $this->_kec_fail('Data agen atau user tidak valid.');
+		}
+
+		if ($origin === '' || $destination === '' || !$service_id) {
+			return $this->_kec_fail('Asal, tujuan, dan layanan wajib diisi.');
+		}
+
+		$missing = $this->_kec_validate_required($post);
+		if ($missing) {
+			return $this->_kec_fail($missing);
+		}
+
+		if (empty($post['is_lartas_agreed'])) {
+			return $this->_kec_fail('Verifikasi barang terlarang (LARTAS) wajib dikonfirmasi.');
+		}
+
+		/*
+		 * Kecamatan hanya CASH / TRANSFER.
+		 * Status tetap UNPAID sampai pembayaran dikonfirmasi.
+		 */
+		$payment_type = strtoupper(trim($post['payment_type'] ?? ''));
+		if (!in_array($payment_type, ['CASH', 'TRANSFER'], TRUE)) {
+			return $this->_kec_fail('Metode pembayaran tidak valid.');
+		}
+
+		$actual_weight = $this->_kec_parse_number($post['actual_weight'] ?? 0);
+		if ($actual_weight <= 0) {
+			return $this->_kec_fail('Berat aktual wajib lebih dari 0.');
+		}
+
+		$dims = $this->_kec_parse_koli($post);
+		if (!$dims['ok']) {
+			return $this->_kec_fail($dims['message']);
+		}
+
+		$koli         = $dims['items'];              // satu elemen = satu koli
+		$total_koli   = max(1, count($koli));        // tanpa dimensi tetap 1 koli
+		$volume_weight = $dims['volume'];
+
+		$photo = $this->_kec_validate_photo($files);
+		if (!$photo['ok']) {
+			return $this->_kec_fail($photo['message']);
+		}
+
+		/* ---------------------------------------------------------
+		 * 2. PRICELIST & HARGA
+		 * --------------------------------------------------------- */
+		$pricelist = $this->db
+			->where('origin', $origin)
+			->where('destination', $destination)
+			->where('service_type_id', $service_id)
+			->where('category', 'INTERNATIONAL')
+			->where('is_active', 1)
+			->get('pricelist')
+			->row();
+
+		if (!$pricelist) {
+			return $this->_kec_fail('Tarif internasional untuk tujuan tersebut belum tersedia.');
+		}
+
+		// Urutan: max(aktual, volume) -> minimum tarif -> bulatkan ke atas.
+		$chargeable = max($actual_weight, $volume_weight);
+		$min_weight = (float) ($pricelist->min_weight_kg ?? 0);
+
+		if ($min_weight > 0 && $chargeable < $min_weight) {
+			$chargeable = $min_weight;
+		}
+
+		$chargeable = ceil($chargeable);
+
+		$price = $this->_kec_resolve_price($pricelist, $chargeable);
+		if (!$price) {
+			return $this->_kec_fail('Harga Kecamatan untuk tarif tersebut belum tersedia.');
+		}
+
+		$shipping_total  = $chargeable * $price['price_kecamatan'];
+		$shipping_margin_smesco = ($price['price_smesco'] - $price['price_kribo']) * $chargeable; // tanpa TESS & addon
+		$shipping_margin_kecamatan = ($price['price_kecamatan'] - $price['price_smesco']) * $chargeable; // tanpa TESS & addon
+
+		$tagihan_kecamatan = $shipping_total - $shipping_margin_kecamatan;
+
+		$addon_codes = is_array($post['addons'] ?? NULL) ? $post['addons'] : [];
+		$addons      = $this->_kec_calc_addons($addon_codes, $koli, $total_koli);
+		$tess_fee    = $this->_kec_calc_tess($pricelist, $chargeable);
+
+		$total_amount = $shipping_total + $addons['total'] + $tess_fee;
+
+		/* ---------------------------------------------------------
+		 * 3. DATA PENGIRIM & PENERIMA
+		 * --------------------------------------------------------- */
+		$val = function ($key) use ($post) {
+			$v = isset($post[$key]) ? trim((string) $post[$key]) : '';
+			return $v === '' ? NULL : $v;
+		};
+
+		$prov_id = $val('sender_provinsi');
+		$kota_id = $val('sender_kota');
+		$kec_id  = $val('sender_kecamatan');
+		$kel_id  = $val('sender_kelurahan');
+
+		$prov_name = $this->_kec_region_name('mt_provinsi', $prov_id, 'nama_provinsi');
+		$kota_name = $this->_kec_region_name('mt_kota', $kota_id, 'nama_kota');
+		$kec_name  = $this->_kec_region_name('mt_kecamatan', $kec_id, 'nama_kecamatan');
+		$kel_name  = $this->_kec_region_name('mt_kelurahan', $kel_id, 'nama_kelurahan');
+
+		$sender_address = implode(', ', array_filter([
+			$val('sender_address_detail'),
+			$kel_name,
+			$kec_name ? 'Kec. ' . $kec_name : '',
+			$kota_name ? 'Kab/Kota ' . $kota_name : '',
+			$prov_name,
+		]));
+
+		$receiver_address = implode(', ', array_filter([
+			$val('receiver_address_detail'),
+			$val('receiver_city'),
+			$val('receiver_zipcode'),
+			$destination,
+		]));
+
+		$is_valuable = !empty($post['is_valuable']) ? 1 : 0;
+		$goods_value = $is_valuable ? $this->_kec_parse_number($post['goods_value'] ?? 0) : 0;
+		$now         = date('Y-m-d H:i:s');
+
+		/* ---------------------------------------------------------
+		 * 4. NOMOR RESI & FOTO
+		 * Dibuat setelah semua validasi lolos supaya nomor resi
+		 * tidak terbuang kalau validasi gagal.
+		 * --------------------------------------------------------- */
+		$no_resi = $this->generate_no_resi();
+		if (!$no_resi) {
+			return $this->_kec_fail('Gagal membuat nomor resi.');
+		}
+
+		$photo_name = $this->_kec_store_photo($files['shipment_photo'], $no_resi, $photo['ext']);
+		if (!$photo_name) {
+			return $this->_kec_fail('Gagal mengupload foto kargo.');
+		}
+
+		/* ---------------------------------------------------------
+		 * 5. SIMPAN (TRANSAKSI)
+		 * --------------------------------------------------------- */
+		$data_insert = [
+			'no_resi'                 => $no_resi,
+			'agent_id'                => $agent_id,
+			'category'                => 'INTERNATIONAL',
+			'origin'                  => $origin,
+			'destination'             => $destination,
+			'agent_origin' => $agent_origin !== '' ? $agent_origin : NULL,
+			'service_type_id'         => $service_id,
+
+			'sender_name'             => $val('sender_name'),
+			'sender_phone'            => $val('sender_phone'),
+			'sender_nik'              => $val('sender_nik'),
+			'sender_provinsi'         => $prov_name,
+			'sender_kota'             => $kota_name,
+			'sender_kecamatan'        => $kec_name,
+			'sender_kelurahan'        => $kel_name,
+			'sender_address_detail'   => $val('sender_address_detail'),
+			'sender_address'          => $sender_address,
+
+			'receiver_name'           => $val('receiver_name'),
+			'receiver_phone'          => $val('receiver_phone'),
+			'receiver_kota'           => $val('receiver_city'),
+			'receiver_zipcode'        => $val('receiver_zipcode'),
+			'receiver_address_detail' => $val('receiver_address_detail'),
+			'receiver_address'        => $receiver_address,
+
+			'commodity_id'            => $val('commodity_id'),
+			'commodity_detail'        => $val('commodity_detail'),
+			'commodity_detail_en'     => $val('commodity_detail_en'),
+
+			'customs_value_usd'       => $this->_kec_parse_number($post['customs_value_usd'] ?? 0),
+			'is_lartas_agreed'        => 1,
+			'is_valuable'             => $is_valuable,
+			'goods_value'             => $goods_value,
+
+			// Belum PAID; dikonfirmasi lewat confirm_payment().
+			'payment_type'            => $payment_type,
+			'payment_status'          => 'UNPAID',
+			'payment_confirmed_by'    => NULL,
+			'payment_confirmed_at'    => NULL,
+			'payment_expired_at'      => NULL,
+
+			'koli'                    => $total_koli,
+			'actual_weight'           => $actual_weight,
+			'volume_weight'           => $volume_weight,
+			'chargeable_weight'       => $chargeable,
+
+			'cost_price'              => $price['price_smesco'],
+			'sell_price'              => $price['price_kecamatan'],
+			'price_per_kg'            => $price['price_kecamatan'],
+
+			// Kecamatan tidak memakai pickup Jakarta.
+			'pickup_rate_id'          => NULL,
+			'pickup_fee'              => 0,
+
+			'total_addon_fee'         => $addons['total'],
+			'tess'                    => $tess_fee,
+			'total_amount'            => $total_amount,
+			'margin_amount'           => $shipping_margin_smesco,
+
+			'status'                  => 'BOOKED',
+			'created_by'              => $user_id,
+			'created_at'              => $now,
+
+			'shipment_photo' => 'uploads/shipments/booking/' . $photo_name,
+
+			'status_tagihan_smesco' => 'UNPAID',
+			'nominal_tagihan_smesco' => $tagihan_kecamatan,
+			'margin_kecamatan' => $shipping_margin_kecamatan,
+		];
+
+		// echo '<pre>';
+		// print_r($data_insert);
+		// echo '</pre>';
+		// exit;
+
+
+		$this->db->trans_start();
+
+		$this->db->insert('shipments', $data_insert);
+
+		$shipment_id = (int) $this->db->insert_id();
+
+		if ($shipment_id) {
+
+			if ($koli) {
+				$dim_rows = [];
+				foreach ($koli as $i => $k) {
+					$dim_rows[] = [
+						'shipment_id'  => $shipment_id,
+						'barcode_koli' => $no_resi . '-' . str_pad($i + 1, 2, '0', STR_PAD_LEFT),
+						'qty'          => 1,
+						'length'       => $k['length'],
+						'width'        => $k['width'],
+						'height'       => $k['height'],
+					];
+				}
+				$this->db->insert_batch('shipment_dimensions', $dim_rows);
+			}
+
+			if ($addons['rows']) {
+				foreach ($addons['rows'] as $i => $row) {
+					$addons['rows'][$i]['shipment_id'] = $shipment_id;
+				}
+				$this->db->insert_batch('shipment_addons', $addons['rows']);
+			}
+
+			// Menunggu konfirmasi pembayaran: BOOKED -> READY_FOR_HANDOVER.
+			$this->db->insert('shipment_tracking', [
+				'shipment_id' => $shipment_id,
+				'status'      => 'BOOKED',
+				'location' => $agent_origin !== '' ? $agent_origin : $origin,
+				'note'        => 'Shipment Kecamatan berhasil dibuat. Menunggu konfirmasi pembayaran.',
+				'photo_proof' => $photo_name,
+				'created_by'  => $user_id,
+				'created_at'  => $now,
+			]);
+
+			if ($val('sender_phone')) {
+				$this->_kec_upsert_customer([
+					'name'           => $val('sender_name'),
+					'phone'          => $val('sender_phone'),
+					'nik'            => $val('sender_nik'),
+					'provinsi_id'    => $prov_id,
+					'provinsi_name'  => $prov_name,
+					'kota_id'        => $kota_id,
+					'kota_name'      => $kota_name,
+					'kecamatan_id'   => $kec_id,
+					'kecamatan_name' => $kec_name,
+					'kelurahan_id'   => $kel_id,
+					'kelurahan_name' => $kel_name,
+					'address_detail' => $val('sender_address_detail'),
+				], $user_id, $now);
+			}
+		}
+
+		$this->db->trans_complete();
+
+		// Satu jalur gagal: hapus foto supaya tidak jadi file yatim.
+		if (!$shipment_id || $this->db->trans_status() === FALSE) {
+			@unlink($this->_kec_photo_dir() . $photo_name);
+			return $this->_kec_fail('Gagal menyimpan shipment Kecamatan ke database.');
+		}
+
+		return [
+			'status'         => TRUE,
+			'shipment_id'    => $shipment_id,
+			'no_resi'        => $no_resi,
+			'payment_status' => 'UNPAID',
+			'status_code'    => 'BOOKED',
+			'total_amount'   => $total_amount,
+		];
+	}
+
+	/* =============================================================
+	 * HELPER (private) - khusus alur Kecamatan
+	 * ============================================================= */
+
+	private function _kec_fail($message)
+	{
+		return ['status' => FALSE, 'message' => $message];
+	}
+
+	/**
+	 * Form selalu mengirim format Indonesia lewat mask JS:
+	 * titik = ribuan, koma = desimal ("1.250,5" = 1250.5).
+	 * Harus sama dengan parseIndoNumber() di view.
+	 */
+	private function _kec_parse_number($value)
+	{
+		if ($value === NULL || $value === '') {
+			return 0.0;
+		}
+
+		$value = str_replace('.', '', trim((string) $value));
+
+		return (float) str_replace(',', '.', $value);
+	}
+
+	/**
+	 * Cek field wajib di server (atribut `required` di HTML mudah dilewati).
+	 * Return pesan error, atau NULL kalau lengkap.
+	 */
+	private function _kec_validate_required(array $post)
+	{
+		$required = [
+			'sender_name'             => 'Nama pengirim',
+			'sender_phone'            => 'No. WhatsApp pengirim',
+			'sender_provinsi'         => 'Provinsi pengirim',
+			'sender_kota'             => 'Kota pengirim',
+			'sender_kecamatan'        => 'Kecamatan pengirim',
+			'sender_kelurahan'        => 'Kelurahan pengirim',
+			'sender_address_detail'   => 'Alamat pengirim',
+			'receiver_name'           => 'Nama penerima',
+			'receiver_phone'          => 'Telepon penerima',
+			'receiver_city'           => 'Kota penerima',
+			'receiver_zipcode'        => 'Kode pos penerima',
+			'receiver_address_detail' => 'Alamat penerima',
+			'commodity_id'            => 'Kategori komoditi',
+			'commodity_detail'        => 'Isi barang',
+			'commodity_detail_en'     => 'English description',
+			'customs_value_usd'       => 'Nilai barang (customs value)',
+		];
+
+		foreach ($required as $key => $label) {
+			if (trim((string) ($post[$key] ?? '')) === '') {
+				return $label . ' wajib diisi.';
+			}
+		}
+
+		return NULL;
+	}
+
+	/**
+	 * Parse dimensi. Hasil: satu elemen per koli (qty di-expand).
+	 */
+	private function _kec_parse_koli(array $post)
+	{
+		$lengths = (array) ($post['dim_length'] ?? []);
+		$widths  = (array) ($post['dim_width'] ?? []);
+		$heights = (array) ($post['dim_height'] ?? []);
+
+
+		$items  = [];
+		$volume = 0.0;
+
+		foreach ((array) ($post['dim_qty'] ?? []) as $key => $qty_raw) {
+
+			$qty = (int) $this->_kec_parse_number($qty_raw);
+			if ($qty <= 0) {
+				continue;
+			}
+
+			$p = $this->_kec_parse_number($lengths[$key] ?? 0);
+			$l = $this->_kec_parse_number($widths[$key] ?? 0);
+			$t = $this->_kec_parse_number($heights[$key] ?? 0);
+
+			$p = round($this->_kec_parse_number($lengths[$key] ?? 0), 2);
+			$l = round($this->_kec_parse_number($widths[$key] ?? 0), 2);
+			$t = round($this->_kec_parse_number($heights[$key] ?? 0), 2);
+
+			if ($p <= 0 || $l <= 0 || $t <= 0) {
+				return [
+					'ok'      => FALSE,
+					'message' => 'Panjang, lebar, dan tinggi setiap koli wajib diisi dengan benar.',
+				];
+			}
+
+			$volume += (($p * $l * $t) / self::KEC_VOLUME_DIVISOR) * $qty;
+
+			for ($i = 0; $i < $qty; $i++) {
+				$items[] = ['length' => $p, 'width' => $l, 'height' => $t];
+			}
+		}
+
+		return ['ok' => TRUE, 'items' => $items, 'volume' => round($volume, 2)];
+	}
+
+	/**
+	 * Harga per kg. Non-tier: dari pricelist. Tier: dari pricelist_tiers.
+	 * Berat di atas tier terakhir memakai tier terakhir.
+	 * Return ['cost' => , 'sell' => ] atau NULL kalau tidak ada harga.
+	 */
+	private function _kec_resolve_price($pricelist, $weight)
+	{
+		$price_kribo = (float) ($pricelist->price_kribo ?? 0);
+		$price_smesco = (float) ($pricelist->price_smesco ?? 0);
+		$price_kecamatan = (float) ($pricelist->price_kecamatan ?? 0);
+
+		if ((int) $pricelist->is_tiered === 1) {
+
+			$tiers = $this->db
+				->where('pricelist_id', $pricelist->id)
+				->order_by('min_weight', 'ASC')
+				->get('pricelist_tiers')
+				->result();
+
+			if (!$tiers) {
+				return NULL;
+			}
+
+			$picked = NULL;
+
+			foreach ($tiers as $tier) {
+				if ($weight >= (float) $tier->min_weight && $weight <= (float) $tier->max_weight) {
+					$picked = $tier;
+					break;
+				}
+			}
+
+			$last = end($tiers);
+
+			if (!$picked && $weight > (float) $last->max_weight) {
+				$picked = $last;
+			}
+
+			if (!$picked) {
+				return NULL; // celah antar tier / di bawah tier pertama
+			}
+
+			$price_kribo = isset($picked->price_kribo) ? (float) $picked->price_kribo : $price_kribo;
+			$price_smesco = isset($picked->price_smesco) ? (float) $picked->price_smesco : $price_smesco;
+			$price_kecamatan = (float) ($picked->price_kecamatan ?? 0);
+		}
+
+		if ($price_kecamatan <= 0) {
+			return NULL;
+		}
+
+		return ['price_kribo' => $price_kribo, 'price_smesco' => $price_smesco, 'price_kecamatan' => $price_kecamatan];
+	}
+
+	/**
+	 * Hitung biaya addon per koli. min_charge berlaku per koli.
+	 */
+	private function _kec_calc_addons(array $codes, array $koli, $total_koli)
+	{
+		$result = ['total' => 0.0, 'rows' => []];
+
+		if (!$codes) {
+			return $result;
+		}
+
+		$addons = $this->db
+			->where_in('code', $codes)
+			->where('is_active', 1)
+			->get('master_addons')
+			->result();
+
+		foreach ($addons as $addon) {
+
+			$factor = (float) ($addon->base_factor ?? 0);
+			$min    = (float) ($addon->min_charge ?? 0);
+			$fee    = 0.0;
+
+			if ($koli) {
+				foreach ($koli as $k) {
+					switch ($addon->calc_method) {
+						case 'VOLUME':
+							$per_koli = $k['length'] * $k['width'] * $k['height'] * $factor;
+							break;
+						case 'VOLUME_PLUS':
+							$per_koli = ($k['length'] + 10) * ($k['width'] + 10) * ($k['height'] + 10) * $factor;
+							break;
+						case 'PER_KOLI':
+							$per_koli = $factor;
+							break;
+						default:
+							continue 2;
+					}
+
+					$fee += max($per_koli, $min);
+				}
+			} elseif ($addon->calc_method === 'PER_KOLI') {
+				$fee = $factor * $total_koli;
+			}
+
+			if ($fee > 0) {
+				$result['total'] += $fee;
+				$result['rows'][] = [
+					'shipment_id'  => NULL,
+					'addon_id'     => $addon->id,
+					'addon_amount' => $fee,
+				];
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * TESS (surcharge vendor sementara), minimal KEC_TESS_MIN.
+	 * Tidak masuk margin, mengikuti save_intl().
+	 */
+	private function _kec_calc_tess($pricelist, $chargeable)
+	{
+		if (empty($pricelist->vendor_id)) {
+			return 0.0;
+		}
+
+		$vendor = $this->db
+			->where('id', $pricelist->vendor_id)
+			->where('is_active', '1')
+			->get('vendors')
+			->row();
+
+		$rate = $vendor ? (float) ($vendor->temporary_surcharge ?? 0) : 0;
+
+		return $rate > 0 ? max($chargeable * $rate, self::KEC_TESS_MIN) : 0.0;
+	}
+
+	/**
+	 * Nama wilayah dari ID. $table/$field hanya dari konstanta di kode.
+	 */
+	private function _kec_region_name($table, $id, $field)
+	{
+		if (empty($id)) {
+			return NULL;
+		}
+
+		$row = $this->db->select($field)->where('id', $id)->get($table)->row();
+
+		return $row ? $row->$field : NULL;
+	}
+
+	/* -------------------------------------------------------------
+	 * FOTO
+	 * ------------------------------------------------------------- */
+
+	private function _kec_photo_dir()
+	{
+		return FCPATH . 'uploads/shipments/booking/';
+	}
+
+	/**
+	 * Validasi foto berdasarkan ISI file (getimagesize), bukan
+	 * $_FILES['type'] atau nama file yang dikirim browser.
+	 * Ekstensi ditentukan dari hasil deteksi, jadi tidak bisa .php.
+	 */
+	private function _kec_validate_photo(array $files)
+	{
+		$file = $files['shipment_photo'] ?? NULL;
+
+		if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+			return ['ok' => FALSE, 'message' => 'Foto kargo wajib diupload.'];
+		}
+
+		if ($file['size'] > 2097152) { // 2MB
+			return ['ok' => FALSE, 'message' => 'Ukuran foto maksimal 2MB.'];
+		}
+
+		$info = @getimagesize($file['tmp_name']);
+		$ext_map = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png'];
+
+		if (!$info || !isset($ext_map[$info[2]])) {
+			return ['ok' => FALSE, 'message' => 'Format foto tidak valid. Gunakan JPG, JPEG, atau PNG.'];
+		}
+
+		return ['ok' => TRUE, 'ext' => $ext_map[$info[2]]];
+	}
+
+	/**
+	 * Pindahkan foto. Return nama file, atau FALSE kalau gagal.
+	 */
+	private function _kec_store_photo(array $file, $no_resi, $ext)
+	{
+		$dir = $this->_kec_photo_dir();
+
+		if (!is_dir($dir) && !mkdir($dir, 0755, TRUE) && !is_dir($dir)) {
+			return FALSE;
+		}
+
+		$name = 'BOOKING_' . $no_resi . '_' . time() . '.' . $ext;
+
+		return move_uploaded_file($file['tmp_name'], $dir . $name) ? $name : FALSE;
+	}
+
+	/* -------------------------------------------------------------
+	 * CUSTOMER
+	 * ------------------------------------------------------------- */
+
+	/**
+	 * Upsert master_customers berdasarkan phone.
+	 * created_by hanya diisi saat insert (tidak menimpa pembuat awal).
+	 */
+	private function _kec_upsert_customer(array $customer, $user_id, $now)
+	{
+		$customer['updated_at'] = $now;
+
+		$exists = $this->db
+			->where('phone', $customer['phone'])
+			->count_all_results('master_customers') > 0;
+
+		if ($exists) {
+			$this->db
+				->where('phone', $customer['phone'])
+				->update('master_customers', $customer);
+			return;
+		}
+
+		$customer['created_by'] = $user_id;
+		$this->db->insert('master_customers', $customer);
+	}
+
+	public function create_kec_handover($agent_id, $user_id, array $ids, array $fwd = [])
+	{
+		$ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+
+		if (!$ids) {
+			return $this->_kec_fail('Pilih minimal satu shipment.');
+		}
+
+		// if (empty($fwd['awb'])) {
+		// 	return $this->_kec_fail('AWB Indah Kargo wajib diisi.');
+		// }
+
+		$now = date('Y-m-d H:i:s');
+
+		$this->db->trans_start();
+
+		$rows = $this->db
+			->select('id, agent_origin')
+			->where_in('id', $ids)
+			->where('agent_id', $agent_id)
+			->where('category', 'INTERNATIONAL')
+			->where('status', 'READY_FOR_HANDOVER')
+			->get('shipments')
+			->result_array();
+
+		if (count($rows) !== count($ids)) {
+			$this->db->trans_rollback();
+			return $this->_kec_fail('Ada shipment yang tidak ditemukan atau belum siap diserahkan.');
+		}
+
+		$manifest_number = $this->_kec_manifest_number();
+
+		$this->db->insert('agent_manifests', [
+			'manifest_number' => $manifest_number,
+			'agent_id'        => $agent_id,
+			'destination_hub' => $fwd['hub'] ?? 'INDAH KARGO',
+			'handover_date'   => $now,
+			'forwarder_name'  => $fwd['name'] ?? NULL,
+			'forwarder_phone' => $fwd['phone'] ?? NULL,
+			'status'          => 'HANDED_OVER',
+			'created_by'      => $user_id,
+			'created_at'      => $now,
+		]);
+		$manifest_id = (int) $this->db->insert_id();
+
+		$items = $tracking = [];
+		foreach ($rows as $r) {
+			$items[] = [
+				'agent_manifest_id' => $manifest_id,
+				'shipment_id'       => $r['id'],
+				'created_at'        => $now,
+			];
+			$tracking[] = [
+				'shipment_id' => $r['id'],
+				'status'      => 'HANDOVER_TO_COURIER',
+				'location'    => $r['agent_origin'] ?: 'AGEN KECAMATAN',
+				'note'        => 'Shipment diserahkan ke Indah Kargo. AWB: ' . $fwd['awb'] . '. Manifest: ' . $manifest_number,
+				'created_by'  => $user_id,
+				'created_at'  => $now,
+			];
+		}
+
+		$this->db->insert_batch('agent_manifest_items', $items);
+
+		// Guard atomic: hanya yang masih READY_FOR_HANDOVER
+		$this->db
+			->where_in('id', $ids)
+			->where('agent_id', $agent_id)
+			->where('status', 'READY_FOR_HANDOVER')
+			->update('shipments', [
+				'origin_courier' => 'INDAH_KARGO',
+				'origin_courier_awb' => $fwd['awb'],
+				'status'         => 'HANDOVER_TO_COURIER',
+				'updated_by'     => $user_id,
+				'updated_at'     => $now,
+			]);
+
+		if ($this->db->affected_rows() !== count($ids)) {
+			$this->db->trans_rollback();
+			return $this->_kec_fail('Shipment sudah diproses sebelumnya.');
+		}
+
+		$this->db->insert_batch('shipment_tracking', $tracking);
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === FALSE) {
+			return $this->_kec_fail('Gagal menyimpan proses handover.');
+		}
+
+		return [
+			'status'          => TRUE,
+			'manifest_id'     => $manifest_id,
+			'manifest_number' => $manifest_number,
+			'total'           => count($ids),
+		];
+	}
+
+	private function _kec_manifest_number()
+	{
+		$prefix = 'KM' . date('ymd');
+
+		$row = $this->db
+			->select('manifest_number')
+			->like('manifest_number', $prefix, 'after')
+			->order_by('manifest_number', 'DESC')
+			->limit(1)
+			->get('agent_manifests')
+			->row();
+
+		$seq = $row ? ((int) substr($row->manifest_number, -4)) + 1 : 1;
+
+		return $prefix;
 	}
 }

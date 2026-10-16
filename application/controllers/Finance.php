@@ -63,50 +63,78 @@ class Finance extends Authenticated_Controller
 		$this->render('app/pages/finance/verifikasi_index', $data);
 	}
 
-	public function approve_payment($no_resi)
+	public function approve_payment()
 	{
-		$this->db->trans_start();
+		if ($this->input->method() !== 'post') {
+			show_404();
+		}
 
-		// 1. Ambil data shipment
-		$shipment = $this->db->get_where('shipments', ['no_resi' => $no_resi])->row();
+		$no_resi = trim((string) $this->input->post('no_resi', TRUE));
+		if ($no_resi === '') {
+			$this->session->set_flashdata('error', 'No. resi tidak valid.');
+			redirect('finance/verifikasi');
+		}
+		
+		$sess = $this->session->userdata('user');
+		$now  = date('Y-m-d H:i:s');
+
+		$shipment = $this->db
+			->select('s.*, a.is_kecamatan')
+			->from('shipments s')
+			->join('agents a', 'a.id = s.agent_id', 'left')
+			->where('s.no_resi', $no_resi)
+			->get()->row();
+
 		if (!$shipment) {
 			$this->session->set_flashdata('error', 'Resi tidak ditemukan.');
 			redirect('finance/verifikasi');
 		}
+		if (($shipment->is_kecamatan ?? '0') === '1') {
+			$this->session->set_flashdata('error', 'Pembayaran shipment kecamatan dikonfirmasi oleh agennya.');
+			redirect('finance/verifikasi');
+		}
+		if ($shipment->status !== 'BOOKED') {
+			$this->session->set_flashdata('error', "Resi $no_resi berstatus {$shipment->status}, tidak bisa diverifikasi.");
+			redirect('finance/verifikasi');
+		}
 
-		// 2. Tentukan status berikutnya
-		// Jika ada pickup_rate_id -> kurir pusat jemput (Waiting Pickup)
-		// Jika tidak ada -> barang dianggap sudah di kantor (Received at Origin)
-		// $next_status = ($shipment->pickup_rate_id != NULL) ? 'READY_TO_PICKUP' : 'RECEIVED_AT_ORIGIN';
 		$next_status = 'READY_TO_PICKUP';
 
-		// 3. Update Status Shipment
-		$this->db->update('shipments', [
-			'payment_status' => 'PAID',
-			'status'         => $next_status,
-			'updated_at'     => date('Y-m-d H:i:s')
-		], ['no_resi' => $no_resi]);
+		$this->db->trans_start();
 
-		// 4. Catat di Tracking (History)
+		$this->db->where('id', $shipment->id)->where('status', 'BOOKED')->update('shipments', [
+			'payment_status'       => 'PAID',
+			'status'               => $next_status,
+			'payment_confirmed_by' => (int) $sess['id'],
+			'payment_confirmed_at' => $now,
+			'updated_by'           => (int) $sess['id'],
+			'updated_at'           => $now,
+		]);
+
+		if ($this->db->affected_rows() !== 1) {
+			$this->db->trans_rollback();
+			$this->session->set_flashdata('error', 'Resi sudah diproses sebelumnya.');
+			redirect('finance/verifikasi');
+		}
+
 		$this->db->insert('shipment_tracking', [
 			'shipment_id' => $shipment->id,
 			'status'      => $next_status,
 			'location'    => $shipment->origin,
 			'note'        => 'Pembayaran dikonfirmasi. Barang siap diproses lebih lanjut.',
-			'created_by'  => $this->session->userdata('user')['id']
+			'created_by'  => (int) $sess['id'],
+			'created_at'  => $now,
 		]);
 
 		$this->db->trans_complete();
 
-		if ($this->db->trans_status() === TRUE) {
-			// 5. KIRIM WA NOTIFIKASI KE CUSTOMER
-			$this->_send_finance_wa_notif($shipment, 'APPROVE', $next_status);
-
-			$this->session->set_flashdata('success', "Pembayaran resi $no_resi berhasil diverifikasi.");
-		} else {
-			$this->session->set_flashdata('error', "Gagal melakukan verifikasi.");
+		if ($this->db->trans_status() === FALSE) {
+			$this->session->set_flashdata('error', 'Gagal melakukan verifikasi.');
+			redirect('finance/verifikasi');
 		}
 
+		$this->_send_finance_wa_notif($shipment, 'APPROVE', $next_status);
+		$this->session->set_flashdata('success', "Pembayaran resi $no_resi berhasil diverifikasi.");
 		redirect('finance/verifikasi');
 	}
 
@@ -202,6 +230,173 @@ class Finance extends Authenticated_Controller
 			} catch (Exception $e) {
 				log_message('error', 'Finance WA Notif Error [' . $type . ']: ' . $e->getMessage());
 			}
+		}
+	}
+
+	// ================= SETORAN AGEN KECAMATAN =================
+
+	/** Semua role di $allowed_roles boleh melihat. Hanya role ini yang boleh verifikasi/tolak. */
+	protected $settlement_verifiers = ['finance-kribo', 'superadmin'];
+
+	private function _can_verify_settlement()
+	{
+		$sess = $this->session->userdata('user');
+		return in_array($sess['role_slug'] ?? '', $this->settlement_verifiers, TRUE);
+	}
+
+	private function _require_verifier()
+	{
+		if (!$this->_can_verify_settlement()) {
+			show_error('Akses tidak diizinkan.', 403);
+		}
+	}
+
+	public function settlements()
+	{
+		$this->load->model('M_AgentSettlement');
+
+		$status = $this->input->get('status', TRUE);
+		$status = in_array($status, ['PENDING', 'VERIFIED', 'REJECTED', 'ALL'], TRUE) ? $status : 'PENDING';
+		$q      = trim((string) $this->input->get('q', TRUE));
+
+		$total    = $this->M_AgentSettlement->count_for_finance($status, $q);
+		$paginate = $this->paginate($total, 15, ['status' => $status, 'q' => $q]);
+
+		$this->render('app/pages/finance/settlement_index', array_merge([
+			'title'       => 'Setoran Agen Kecamatan',
+			'rows'        => $this->M_AgentSettlement->get_for_finance($status, $q, $paginate['per_page'], $paginate['offset']),
+			'total'       => $total,
+			'filters'     => ['status' => $status, 'q' => $q],
+			'pending_sum' => $this->M_AgentSettlement->get_pending_summary(),
+		], $paginate));
+	}
+
+	public function settlement_detail($id = NULL)
+	{
+		if ($id === NULL || !ctype_digit((string) $id)) {
+			show_404();
+		}
+		$this->load->model('M_AgentSettlement');
+
+		$st = $this->M_AgentSettlement->get_detail((int) $id);
+		if (!$st) {
+			show_404();
+		}
+
+		$this->render('app/pages/finance/settlement_detail', [
+			'title'      => 'Setoran ' . $st->settlement_no,
+			'st'         => $st,
+			'items'      => $this->M_AgentSettlement->get_items((int) $id),
+			'can_verify' => $this->_can_verify_settlement(),
+		]);
+	}
+
+	public function settlement_verify()
+	{
+		$this->_require_verifier();
+		if ($this->input->method() !== 'post') {
+			show_404();
+		}
+		$this->load->model('M_AgentSettlement');
+
+		$id   = (int) $this->input->post('id');
+		$sess = $this->session->userdata('user');
+
+		$res = $this->M_AgentSettlement->verify($id, (int) $sess['id']);
+		if (empty($res['status'])) {
+			$this->session->set_flashdata('error', $res['message']);
+			redirect('finance/settlement_detail/' . $id);
+		}
+
+		$st = $this->M_AgentSettlement->get_detail($id);
+		$this->_notify_settlement($st, 'VERIFIED');
+		$this->session->set_flashdata('success', 'Setoran ' . html_escape($st->settlement_no) . ' diverifikasi. Semua resi di dalamnya sekarang LUNAS ke Smesco.');
+		redirect('finance/settlement_detail/' . $id);
+	}
+
+	public function settlement_reject()
+	{
+		$this->_require_verifier();
+		if ($this->input->method() !== 'post') {
+			show_404();
+		}
+		$this->load->model('M_AgentSettlement');
+
+		$id   = (int) $this->input->post('id');
+		$note = trim((string) $this->input->post('reject_note', TRUE));
+		$sess = $this->session->userdata('user');
+
+		if (mb_strlen($note) < 5) {
+			$this->session->set_flashdata('error', 'Alasan penolakan wajib diisi (minimal 5 karakter).');
+			redirect('finance/settlement_detail/' . $id);
+		}
+
+		$res = $this->M_AgentSettlement->reject($id, (int) $sess['id'], $note);
+		if (empty($res['status'])) {
+			$this->session->set_flashdata('error', $res['message']);
+			redirect('finance/settlement_detail/' . $id);
+		}
+
+		$st = $this->M_AgentSettlement->get_detail($id);
+		$this->_notify_settlement($st, 'REJECTED', $note);
+		$this->session->set_flashdata('success', 'Setoran ' . html_escape($st->settlement_no) . ' ditolak. Resi dikembalikan ke agen.');
+		redirect('finance/settlement_detail/' . $id);
+	}
+
+	/** Penyaji bukti. File ada di luar webroot, jadi hanya lewat sini, dan hanya untuk role finance. */
+	public function settlement_proof($id = NULL)
+	{
+		if ($id === NULL || !ctype_digit((string) $id)) {
+			show_404();
+		}
+		$this->load->model('M_AgentSettlement');
+
+		$st = $this->M_AgentSettlement->get_detail((int) $id);
+		if (!$st) {
+			show_404();
+		}
+
+		$file  = basename((string) $st->proof_file);   // buang path apa pun
+		$path  = M_AgentSettlement::proof_dir() . $file;
+		$ext   = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+		$mimes = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'pdf' => 'application/pdf'];
+
+		if (!isset($mimes[$ext]) || !is_file($path)) {
+			show_404();
+		}
+
+		$this->output
+			->set_content_type($mimes[$ext])
+			->set_header('X-Content-Type-Options: nosniff')
+			->set_header('Cache-Control: private, no-store')
+			->set_header('Content-Disposition: inline; filename="bukti-' . $st->settlement_no . '.' . $ext . '"')
+			->set_output(file_get_contents($path));
+	}
+
+	private function _notify_settlement($st, $type, $note = '')
+	{
+		if (!$st || empty($st->agent_phone)) {
+			log_message('error', 'WA setoran: nomor agen tidak ditemukan untuk ' . ($st->settlement_no ?? '?'));
+			return;
+		}
+
+		$total = 'Rp ' . number_format((float) $st->total_amount, 0, ',', '.');
+
+		if ($type === 'VERIFIED') {
+			$pesan = "*SMESCO FINANCE — SETORAN DIVERIFIKASI*\n\n" .
+				"Setoran *{$st->settlement_no}* sebesar *$total* telah *DIVERIFIKASI*.\n" .
+				"Semua resi di dalamnya sekarang berstatus lunas ke Smesco.";
+		} else {
+			$pesan = "*SMESCO FINANCE — SETORAN DITOLAK*\n\n" .
+				"Setoran *{$st->settlement_no}* sebesar *$total* *DITOLAK*.\n" .
+				"Alasan: $note\n\n" .
+				"Resi sudah dikembalikan ke daftar setoran. Silakan kirim ulang dengan bukti transfer yang benar.";
+		}
+
+		try {
+			$this->api_whatsapp->wa_notif_v2($st->agent_phone, $pesan);
+		} catch (Exception $e) {
+			log_message('error', 'WA setoran error [' . $type . ']: ' . $e->getMessage());
 		}
 	}
 }

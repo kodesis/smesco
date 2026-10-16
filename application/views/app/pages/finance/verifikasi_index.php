@@ -230,10 +230,24 @@
 				cancelButtonText: 'Batal',
 				confirmButtonColor: '#28a745'
 			}).then((result) => {
-				if (result.isConfirmed) {
-					// Arahkan ke endpoint Controller (nanti kita bikin)
-					window.location.href = `<?= site_url('finance/approve_payment/') ?>${resi}`;
-				}
+				if (!result.isConfirmed) return;
+
+				const form = document.createElement('form');
+				form.method = 'POST';
+				form.action = "<?= site_url('finance/approve_payment') ?>";
+
+				const add = (name, value) => {
+					const i = document.createElement('input');
+					i.type = 'hidden';
+					i.name = name;
+					i.value = value;
+					form.appendChild(i);
+				};
+				add('no_resi', resi);
+				add('<?= $this->security->get_csrf_token_name() ?>', '<?= $this->security->get_csrf_hash() ?>');
+
+				document.body.appendChild(form);
+				form.submit();
 			});
 		}
 

@@ -12,11 +12,17 @@
 
 		<div class="mb-4">
 			<ul class="nav nav-tabs" data-bs-toggle="tabs">
+				<?php
+				if ($sess['role_slug'] !== "admin-mitra-kecamatan") {
+					?>
 				<li class="nav-item">
 					<a href="<?= site_url('shipment/create') ?>" class="nav-link text-muted">
 						<?= tabler_icon('truck', 'me-1') ?> Pengiriman Domestik
 					</a>
 				</li>
+					<?php 
+				}
+				?>
 				<li class="nav-item">
 					<a href="<?= site_url('shipment/create_intl') ?>" class="nav-link active fw-bold text-primary">
 						<?= tabler_icon('plane-departure', 'me-1') ?> Pengiriman Internasional
@@ -96,6 +102,7 @@
 									<div class="col-md-6 mb-3">
 										<label class="form-label required">Metode Pembayaran</label>
 										<select name="payment_type" class="form-select" required>
+											<option value="">Pilih metode pembayaran</option>
 											<option value="TRANSFER">TRANSFER (PREPAID)</option>
 											<option value="CASH">TUNAI (CASH)</option>
 										</select>

@@ -125,4 +125,14 @@ class Agent_Controller extends Authenticated_Controller
 
 		$this->agent_id = $this->current_user['agent_id'];
 	}
+
+	protected function _json_response($status, $message, $extra = [])
+	{
+		return $this->output
+			->set_content_type('application/json')
+			->set_output(json_encode(array_merge([
+				'status'  => (bool) $status,
+				'message' => $message,
+			], $extra)));
+	}
 }

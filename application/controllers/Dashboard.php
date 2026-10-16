@@ -42,6 +42,9 @@ class Dashboard extends Authenticated_Controller
 			case 'driver': // Tambahkan Role Driver
 				$this->_driver($sess);
 				break;
+			case 'admin-mitra-kecamatan':
+				$this->_admin_kecamatan($sess);
+				break;
 			default:
 				show_error('Role tidak dikenali.', 403);
 		}
@@ -254,5 +257,73 @@ class Dashboard extends Authenticated_Controller
 		")->get('shipments')->row();
 
 		$this->render('app/pages/dashboard/v_checker', compact('title', 'stats'));
+	}
+
+	private function _admin_kecamatan($sess)
+	{
+		$this->load->model('M_Shipment');
+
+		$agent_id = $sess['agent_id'];
+
+		// -------------------------------------------------
+		// Informasi Agent Kecamatan
+		// -------------------------------------------------
+		$agent_info = $this->M_Agent->get_detail($agent_id);
+
+		// -------------------------------------------------
+		// Ambil informasi wilayah Kecamatan agent
+		// agents.subdistrict_id -> mt_kecamatan
+		// -------------------------------------------------
+		$agent_region = $this->db
+			->select('
+				a.id AS agent_id,
+				a.code AS agent_code,
+				a.name AS agent_name,
+				a.province_id,
+				a.city_id,
+				a.subdistrict_id,
+				p.nama_provinsi,
+				k.nama_kota,
+				c.nama_kecamatan
+			')
+			->from('agents a')
+			->join('mt_provinsi p', 'p.id = a.province_id', 'left')
+			->join('mt_kota k', 'k.id = a.city_id', 'left')
+			->join('mt_kecamatan c', 'c.id = a.subdistrict_id', 'left')
+			->where('a.id', $agent_id)
+			->where('a.deleted_at IS NULL')
+			->get()
+			->row();
+
+		// -------------------------------------------------
+		// Statistik khusus Agen Kecamatan
+		// Hanya shipment milik agent ini
+		// dan hanya INTERNATIONAL
+		// -------------------------------------------------
+		$shipment_stats = $this->M_Shipment
+			->get_agent_kecamatan_stats($agent_id);
+
+		// -------------------------------------------------
+		// Pengiriman terbaru agent
+		// -------------------------------------------------
+		$recent_shipments = $this->M_Shipment
+			->get_recent_agent_kecamatan_shipments($agent_id, 5);
+
+		// -------------------------------------------------
+		// Data dashboard
+		// -------------------------------------------------
+		$data = [
+			'title'            => 'Dashboard Agen Kecamatan',
+			'agent_info'       => $agent_info,
+			'agent_region'     => $agent_region,
+			'shipment_stats'   => $shipment_stats,
+			'recent_shipments' => $recent_shipments,
+			'current_user'     => $this->current_user,
+		];
+
+		$this->render(
+			'app/pages/dashboard/v_mitra_kecamatan',
+			$data
+		);
 	}
 }

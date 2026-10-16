@@ -91,6 +91,12 @@ class Shipment extends Authenticated_Controller
 	{
 		$this->_check_access();
 
+		$sess         = $this->session->userdata('user');
+
+		if ($sess['role_slug'] == "admin-mitra-kecamatan") {
+			redirect('shipment/create_intl');
+		}
+
 		if ($this->input->server('REQUEST_METHOD') === 'POST') {
 
 			// 1. Dapatkan Input Dasar
@@ -204,7 +210,6 @@ class Shipment extends Authenticated_Controller
 			}
 
 			// 7. Kalkulasi Final & Persiapan Data Surcharge Addons
-			$sess         = $this->session->userdata('user');
 			$is_valuable  = $this->input->post('is_valuable') ? 1 : 0;
 			$addon_codes      = $this->input->post('addons') ?: [];
 			$total_addon_fee  = 0;
@@ -450,49 +455,49 @@ class Shipment extends Authenticated_Controller
 					if ($this->is_payment_gateway) {
 						// ── JALUR GATEWAY ──
 						$duitkuResult = $this->_create_duitku_invoice(
-								$no_resi,
-								$insert_shipment['total_amount'],
-								$sender_name,
-								$sender_phone
+							$no_resi,
+							$insert_shipment['total_amount'],
+							$sender_name,
+							$sender_phone
 						);
 
 						if (!$duitkuResult['status']) {
-								// Shipment record tetap ada (payment_status = UNPAID dari insert awal),
-								// tapi invoice gagal dibuat. Kasih tau user, arahkan ke detail buat retry manual.
-								log_message('error', "Duitku createInvoice gagal untuk {$no_resi}: " . $duitkuResult['message']);
-								$this->session->set_flashdata('warning',
-									"Resi <b>$no_resi</b> berhasil dibuat, tapi gagal membuat invoice pembayaran. " .
+							// Shipment record tetap ada (payment_status = UNPAID dari insert awal),
+							// tapi invoice gagal dibuat. Kasih tau user, arahkan ke detail buat retry manual.
+							log_message('error', "Duitku createInvoice gagal untuk {$no_resi}: " . $duitkuResult['message']);
+							$this->session->set_flashdata(
+								'warning',
+								"Resi <b>$no_resi</b> berhasil dibuat, tapi gagal membuat invoice pembayaran. " .
 									"Silakan hubungi admin atau coba lagi dari halaman detail."
-								);
-								redirect('shipment/detail/' . $shipment_id);
-								return;
+							);
+							redirect('shipment/detail/' . $shipment_id);
+							return;
 						}
 
 						// Sinkronkan payment_expired_at dengan expiryPeriod Duitku (satu sumber angka)
 						$expiry_minutes = $this->duitku_gateway->getExpiryMinutes();
 						$this->db->where('id', $shipment_id)->update('shipments', [
-								'payment_status'      => 'UNPAID',
-								'payment_expired_at'  => date('Y-m-d H:i:s', strtotime("+{$expiry_minutes} minutes")),
+							'payment_status'      => 'UNPAID',
+							'payment_expired_at'  => date('Y-m-d H:i:s', strtotime("+{$expiry_minutes} minutes")),
 						]);
 
 						$pesan_user = "*SMESCO EXPRESS*\n\n" .
-								"*RESERVASI BERHASIL*\n" .
-								"---------------------\n\n" .
-								"No. Resi: *$no_resi*\n" .
-								"Atas Nama: *$sender_name*\n" .
-								"Rute: $origin - $destination\n" .
-								"Total Pembayaran: *Rp " . number_format($insert_shipment['total_amount'], 0, ',', '.') . "*\n\n" .
-								"💳 *Bayar sekarang:*\n" .
-								"{$duitkuResult['paymentUrl']}\n\n" .
-								"Link berlaku {$expiry_minutes} menit.\n\n" .
-								"_Terima kasih telah memilih Smesco Express_";
+							"*RESERVASI BERHASIL*\n" .
+							"---------------------\n\n" .
+							"No. Resi: *$no_resi*\n" .
+							"Atas Nama: *$sender_name*\n" .
+							"Rute: $origin - $destination\n" .
+							"Total Pembayaran: *Rp " . number_format($insert_shipment['total_amount'], 0, ',', '.') . "*\n\n" .
+							"💳 *Bayar sekarang:*\n" .
+							"{$duitkuResult['paymentUrl']}\n\n" .
+							"Link berlaku {$expiry_minutes} menit.\n\n" .
+							"_Terima kasih telah memilih Smesco Express_";
 
 						$this->_send_wa_with_fallback($sender_phone, $pesan_user);
 
 						$this->session->set_flashdata('success', "Resi <b>$no_resi</b> berhasil dibuat! Silakan lanjutkan pembayaran.");
 						redirect($duitkuResult['paymentUrl']);
 						return;
-
 					} else {
 						// ── JALUR MANUAL (persis kode lama, TIDAK DIUBAH) ──
 						$url      = base_url('home/confirm_payment/' . $no_resi);
@@ -539,6 +544,8 @@ class Shipment extends Authenticated_Controller
 	{
 		$this->_check_access();
 
+
+		$sess         = $this->session->userdata('user');
 		// Nanti lu butuh master data negara untuk dropdown tujuan internasional
 		$data = [
 			'title'     => 'Buat Booking (Internasional)',
@@ -547,7 +554,8 @@ class Shipment extends Authenticated_Controller
 			'countries' => $this->db->select('destination')->where('category', 'INTERNATIONAL')->get('pricelist')->result(), // Tujuan (Destination)
 			'services'  => $this->M_Pricelist->get_services('INTERNATIONAL'),
 			'commodities' => $this->db->get_where('master_commodities', ['is_active' => 1])->result(),
-			'addons'    => $this->db->get_where('master_addons', ['is_active' => 1])->result()
+			'addons'    => $this->db->get_where('master_addons', ['is_active' => 1])->result(),
+			'sess' => $sess,
 		];
 
 		$this->render('app/pages/shipment/create_intl', $data);
@@ -942,49 +950,49 @@ class Shipment extends Authenticated_Controller
 				if ($this->is_payment_gateway) {
 					// ── JALUR GATEWAY ──
 					$duitkuResult = $this->_create_duitku_invoice(
-							$no_resi,
-							$insert_shipment['total_amount'],
-							$sender_name,
-							$sender_phone
+						$no_resi,
+						$insert_shipment['total_amount'],
+						$sender_name,
+						$sender_phone
 					);
 
 					if (!$duitkuResult['status']) {
-							// Shipment record tetap ada (payment_status = UNPAID dari insert awal),
-							// tapi invoice gagal dibuat. Kasih tau user, arahkan ke detail buat retry manual.
-							log_message('error', "Duitku createInvoice gagal untuk {$no_resi}: " . $duitkuResult['message']);
-							$this->session->set_flashdata('warning',
-								"Resi <b>$no_resi</b> berhasil dibuat, tapi gagal membuat invoice pembayaran. " .
+						// Shipment record tetap ada (payment_status = UNPAID dari insert awal),
+						// tapi invoice gagal dibuat. Kasih tau user, arahkan ke detail buat retry manual.
+						log_message('error', "Duitku createInvoice gagal untuk {$no_resi}: " . $duitkuResult['message']);
+						$this->session->set_flashdata(
+							'warning',
+							"Resi <b>$no_resi</b> berhasil dibuat, tapi gagal membuat invoice pembayaran. " .
 								"Silakan hubungi admin atau coba lagi dari halaman detail."
-							);
-							redirect('shipment/detail/' . $shipment_id);
-							return;
+						);
+						redirect('shipment/detail/' . $shipment_id);
+						return;
 					}
 
 					// Sinkronkan payment_expired_at dengan expiryPeriod Duitku (satu sumber angka)
 					$expiry_minutes = $this->duitku_gateway->getExpiryMinutes();
 					$this->db->where('id', $shipment_id)->update('shipments', [
-							'payment_status'      => 'UNPAID',
-							'payment_expired_at'  => date('Y-m-d H:i:s', strtotime("+{$expiry_minutes} minutes")),
+						'payment_status'      => 'UNPAID',
+						'payment_expired_at'  => date('Y-m-d H:i:s', strtotime("+{$expiry_minutes} minutes")),
 					]);
 
 					$pesan_user = "*SMESCO EXPRESS*\n\n" .
-							"*RESERVASI BERHASIL*\n" .
-							"---------------------\n\n" .
-							"No. Resi: *$no_resi*\n" .
-							"Atas Nama: *$sender_name*\n" .
-							"Rute: $origin - $destination\n" .
-							"Total Pembayaran: *Rp " . number_format($insert_shipment['total_amount'], 0, ',', '.') . "*\n\n" .
-							"💳 *Bayar sekarang:*\n" .
-							"{$duitkuResult['paymentUrl']}\n\n" .
-							"Link berlaku {$expiry_minutes} menit.\n\n" .
-							"_Terima kasih telah memilih Smesco Express_";
+						"*RESERVASI BERHASIL*\n" .
+						"---------------------\n\n" .
+						"No. Resi: *$no_resi*\n" .
+						"Atas Nama: *$sender_name*\n" .
+						"Rute: $origin - $destination\n" .
+						"Total Pembayaran: *Rp " . number_format($insert_shipment['total_amount'], 0, ',', '.') . "*\n\n" .
+						"💳 *Bayar sekarang:*\n" .
+						"{$duitkuResult['paymentUrl']}\n\n" .
+						"Link berlaku {$expiry_minutes} menit.\n\n" .
+						"_Terima kasih telah memilih Smesco Express_";
 
 					$this->_send_wa_with_fallback($sender_phone, $pesan_user);
 
 					$this->session->set_flashdata('success', "Resi <b>$no_resi</b> berhasil dibuat! Silakan lanjutkan pembayaran.");
 					redirect($duitkuResult['paymentUrl']);
 					return;
-
 				} else {
 					// ── JALUR MANUAL (persis kode lama, TIDAK DIUBAH) ──
 					$url = base_url('home/confirm_payment/' . $no_resi);
@@ -1739,15 +1747,73 @@ class Shipment extends Authenticated_Controller
 
 	public function ajax_confirm_paid()
 	{
-		$id = $this->input->post('id');
-		// Status tetap READY_TO_PICKUP, tapi note-nya kita perjelas
-		$update = $this->M_Shipment->update_status(
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$respond = function ($status, $message) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode(['status' => $status, 'message' => $message]));
+		};
+
+		$id = (int) $this->input->post('id');
+		if ($id <= 0) {
+			return $respond(false, 'ID tidak valid.');
+		}
+
+		$s = $this->db
+			->select('s.id, s.status, s.agent_id, s.payment_type, a.is_kecamatan')
+			->from('shipments s')
+			->join('agents a', 'a.id = s.agent_id', 'left')
+			->where('s.id', $id)
+			->get()->row();
+
+		if (!$s) {
+			return $respond(false, 'Shipment tidak ditemukan.');
+		}
+
+		if (($sess['role_scope'] ?? '') === 'agent' && (int) $s->agent_id !== (int) $sess['agent_id']) {
+			return $respond(false, 'Tidak punya akses ke shipment ini.');
+		}
+		if (($s->is_kecamatan ?? '0') === '1') {
+			return $respond(false, 'Pembayaran shipment kecamatan dikonfirmasi oleh agennya sendiri.');
+		}
+		if ($s->payment_type === 'TRANSFER') {
+			return $respond(false, 'Pembayaran transfer dikonfirmasi oleh Finance.');
+		}
+		if ($s->status !== 'BOOKED') {
+			return $respond(false, 'Status saat ini: ' . $s->status);
+		}
+
+		$now = date('Y-m-d H:i:s');
+		$this->db->trans_start();
+
+		$this->db->where('id', $id)->where('status', 'BOOKED')->update('shipments', [
+			'status'     => 'READY_TO_PICKUP',
+			'payment_status'       => 'PAID',
+			'payment_confirmed_by' => (int) $sess['id'],
+			'payment_confirmed_at' => $now,
+			'updated_by' => (int) $sess['id'],
+			'updated_at' => $now,
+		]);
+
+		if ($this->db->affected_rows() !== 1) {
+			$this->db->trans_rollback();
+			return $respond(false, 'Shipment sudah diproses sebelumnya.');
+		}
+
+		$this->M_Shipment->insert_tracking_log(
 			$id,
 			'READY_TO_PICKUP',
 			'Pembayaran lunas. Menunggu penjemputan driver untuk dikirim ke Warehouse.',
 			'Lokasi Mitra'
 		);
-		echo json_encode(['status' => $update]);
+
+		$this->db->trans_complete();
+
+		return $this->db->trans_status()
+			? $respond(true, 'Status berubah jadi Siap Pickup.')
+			: $respond(false, 'Gagal menyimpan.');
 	}
 
 	public function ajax_bulk_manifest()
@@ -1858,7 +1924,11 @@ class Shipment extends Authenticated_Controller
 		// $this->load->view('app/pages/shipment/print', $data);
 
 
+		if (!empty($shipment['agent_origin'])) {
+			redirect('agentkecamatan/print/' . $shipment['id']);
+		}
 		$html = $this->load->view('app/pages/shipment/print', $data, true);
+
 		$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
 	}
 
@@ -1898,7 +1968,7 @@ class Shipment extends Authenticated_Controller
 		$no_resi = $parts[0];
 
 		$session_user = $this->session->userdata('user');
-		
+
 		// 1. Cari resi di database
 		$this->db->where('no_resi', $no_resi);
 		if ($session_user['role_id'] !== '8') {
@@ -1978,8 +2048,8 @@ class Shipment extends Authenticated_Controller
 		if (!$shipment) {
 			echo json_encode(['status' => false, 'message' => 'Resi tidak ditemukan!']);
 			return;
-		}		
-		
+		}
+
 		// Validasi status
 		if ($shipment->status !== 'PICKED_UP') {
 			echo json_encode(['status' => false, 'message' => "Gagal! Status resi: $shipment->status"]);
@@ -2957,7 +3027,7 @@ class Shipment extends Authenticated_Controller
 			'awb_id'      => $awb->id,
 			'koli_number' => $koli_number
 		])->row();
-		
+
 		if (!$karung) {
 			return ['status' => false, 'message' => "Karung $koli_number dalam AWB $awb_number tidak ditemukan!"];
 		}
@@ -3034,7 +3104,7 @@ class Shipment extends Authenticated_Controller
 			'message'     => "Karung {$koli_number} berhasil diterima. " . count($completed_resi) . " resi tercatat."
 		];
 	}
-	
+
 	private function _is_resi_complete($shipment_id, $total_koli)
 	{
 		$received = $this->db
@@ -3320,7 +3390,7 @@ class Shipment extends Authenticated_Controller
 		if (!empty($sess['agent_id'])) {
 			$this->db->where('shipments.agent_id', $sess['agent_id']);
 		}
-		
+
 		$this->db->order_by('destination', 'ASC');
 
 		$shipments = $this->db->get()->result();
@@ -3654,23 +3724,93 @@ class Shipment extends Authenticated_Controller
 
 	public function ajax_set_vendor()
 	{
-		$id      = $this->input->post('id');
-		$vendor  = strtoupper(trim($this->input->post('vendor')));
-		$connote = trim($this->input->post('connote'));
+		$respond = function ($status, $message) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode(['status' => $status, 'message' => $message]));
+		};
+
+		$id      = (int) $this->input->post('id');
+		$vendor  = strtoupper(trim((string) $this->input->post('vendor')));
+		$connote = trim((string) $this->input->post('connote'));
 
 		if (!$id || !$vendor || !$connote) {
-			return $this->output->set_content_type('application/json')
-				->set_output(json_encode(['status' => false, 'message' => 'Data tidak lengkap.']));
+			return $respond(false, 'Data tidak lengkap.');
 		}
 
-		$this->db->where('id', $id)->update('shipments', [
+		$valid_vendor = $this->db
+			->where('vendor_name', $vendor)
+			->where('is_active', '1')
+			->count_all_results('vendors') > 0;
+
+		if (!$valid_vendor) {
+			return $respond(false, 'Vendor tidak valid.');
+		}
+
+		$shipment = $this->db
+			->select('s.id, s.status, a.is_kecamatan')
+			->from('shipments s')
+			->join('agents a', 'a.id = s.agent_id', 'left')
+			->where('s.id', $id)
+			->get()
+			->row_array();
+
+		if (!$shipment) {
+			return $respond(false, 'Shipment tidak ditemukan.');
+		}
+
+		$is_kecamatan  = ($shipment['is_kecamatan'] ?? '0') === '1';
+		$to_forwarding = false;
+
+		if ($is_kecamatan) {
+			// Belum sampai ke Indah Kargo -> belum boleh diproses hub
+			if (in_array($shipment['status'], ['BOOKED', 'READY_FOR_HANDOVER'], true)) {
+				return $respond(false, 'Shipment kecamatan ini belum diserahkan ke Indah Kargo.');
+			}
+			$to_forwarding = $shipment['status'] === 'HANDOVER_TO_COURIER';
+		}
+
+		$now    = date('Y-m-d H:i:s');
+		$update = [
 			'vendor'         => $vendor,
 			'vendor_connote' => $connote,
-			'updated_at'     => date('Y-m-d H:i:s'),
-		]);
+			'updated_at'     => $now,
+		];
+		if ($to_forwarding) {
+			$update['status'] = 'READY_FOR_FORWARDING';
+		}
 
-		return $this->output->set_content_type('application/json')
-			->set_output(json_encode(['status' => true, 'message' => 'Vendor berhasil disimpan.']));
+		$this->db->trans_start();
+
+		$this->db->where('id', $id);
+		if ($to_forwarding) {
+			$this->db->where('status', 'HANDOVER_TO_COURIER'); // atomic guard
+		}
+		$this->db->update('shipments', $update);
+
+		if ($to_forwarding) {
+			if ($this->db->affected_rows() !== 1) {
+				$this->db->trans_rollback();
+				return $respond(false, 'Shipment sudah diproses sebelumnya.');
+			}
+
+			$this->db->insert('shipment_tracking', [
+				'shipment_id' => $id,
+				'status'      => 'READY_FOR_FORWARDING',
+				'location'    => 'Hub Jakarta',
+				'note'        => 'Shipment diterima di hub Jakarta dan diteruskan ke forwarding.',
+				'created_by'  => $this->current_user['id'],
+				'created_at'  => $now,
+			]);
+		}
+
+		$this->db->trans_complete();
+
+		if ($this->db->trans_status() === false) {
+			return $respond(false, 'Gagal menyimpan vendor.');
+		}
+
+		return $respond(true, 'Vendor berhasil disimpan.');
 	}
 
 	/**
@@ -3727,5 +3867,63 @@ class Shipment extends Authenticated_Controller
 				log_message('error', 'WA Error (v3 Direct): ' . $e->getMessage());
 			}
 		}
+	}
+
+	public function ajax_cancel_shipment()
+	{
+		$this->_check_access();
+		$sess = $this->session->userdata('user');
+
+		$respond = function ($status, $message) {
+			return $this->output
+				->set_content_type('application/json')
+				->set_output(json_encode(['status' => $status, 'message' => $message]));
+		};
+
+		if (($sess['role_slug'] ?? '') === 'staff-mitra') {
+			return $respond(false, 'Tidak punya akses membatalkan shipment.');
+		}
+
+		$id     = (int) $this->input->post('id');
+		$reason = trim((string) $this->input->post('reason', TRUE));
+
+		if ($id <= 0 || $reason === '') {
+			return $respond(false, 'Alasan pembatalan wajib diisi.');
+		}
+
+		$s = $this->db->select('id, status, agent_id')->where('id', $id)->get('shipments')->row();
+		if (!$s) {
+			return $respond(false, 'Shipment tidak ditemukan.');
+		}
+
+		if (($sess['role_scope'] ?? '') === 'agent' && (int) $s->agent_id !== (int) $sess['agent_id']) {
+			return $respond(false, 'Tidak punya akses ke shipment ini.');
+		}
+
+		$cancellable = ['BOOKED'];
+		if (!in_array($s->status, $cancellable, true)) {
+			return $respond(false, 'Shipment berstatus ' . $s->status . ' tidak bisa dibatalkan.');
+		}
+
+		$now = date('Y-m-d H:i:s');
+		$this->db->trans_start();
+
+		$this->db->where('id', $id)->where('status', $s->status)->update('shipments', [
+			'status'     => 'CANCELLED',
+			'updated_by' => (int) $sess['id'],
+			'updated_at' => $now,
+		]);
+
+		if ($this->db->affected_rows() !== 1) {
+			$this->db->trans_rollback();
+			return $respond(false, 'Shipment sudah berubah, muat ulang halaman.');
+		}
+
+		$this->M_Shipment->insert_tracking_log($id, 'CANCELLED', 'Dibatalkan: ' . $reason, 'Lokasi Mitra');
+		$this->db->trans_complete();
+
+		return $this->db->trans_status()
+			? $respond(true, 'Shipment dibatalkan.')
+			: $respond(false, 'Gagal membatalkan shipment.');
 	}
 }

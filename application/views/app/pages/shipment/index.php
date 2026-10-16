@@ -13,14 +13,19 @@
 			<div class="col-auto ms-auto d-print-none">
 				<div class="btn-list">
 
-					<a href="<?= site_url('shipment/preview_manifest') ?>" class="btn btn-warning">
-						<?= tabler_icon('file-spreadsheet', 'me-1') ?>
-						Buat Manifest
-					</a>
+					<?php
+					if ($role_slug !== 'admin-mitra-kecamatan') {
+					?><a href="<?= site_url('shipment/preview_manifest') ?>" class="btn btn-warning">
+							<?= tabler_icon('file-spreadsheet', 'me-1') ?>
+							Buat Manifest
+						</a>
+					<?php
+					}
+					?>
 
 					<a href="<?= site_url('shipment/create') ?>" class="btn btn-primary">
 						<?= tabler_icon('plus', 'me-1') ?>
-						Buat Shipment Baru
+						Buat Pengiriman Baru
 					</a>
 
 				</div>
@@ -81,7 +86,7 @@
 							<div class="col-auto"><span class="bg-green text-white avatar shadow-sm"><?= tabler_icon('cash') ?></span></div>
 							<div class="col">
 								<div class="font-weight-medium">Total Omzet</div>
-								<div class="text-muted small">Rp <?= number_format($stats->total_omzet ?? 0, 0, ',', '.') ?></div>
+								<div class="text-muted small">Rp <?= number_format($stats->total_tagihan ?? 0, 0, ',', '.') ?></div>
 							</div>
 						</div>
 					</div>
@@ -96,7 +101,7 @@
 					<div class="row g-2 align-items-end">
 						<div class="col-12 col-md-3">
 							<label class="form-label small mb-1">Kata Kunci</label>
-							<input type="text" name="q" class="form-control form-control-sm" placeholder="Resi / nama..." value="<?= $filters['q'] ?>">
+							<input type="text" name="q" class="form-control form-control-sm" placeholder="Resi / nama..." value="<?= html_escape($filters['q']) ?>">
 						</div>
 						<div class="col-6 col-md-2">
 							<label class="form-label small mb-1">Status</label>
@@ -126,11 +131,11 @@
 						</div>
 						<div class="col-6 col-md-2">
 							<label class="form-label small mb-1">Tgl Dari</label>
-							<input type="date" name="start" class="form-control form-control-sm" value="<?= $filters['start'] ?>">
+							<input type="date" name="start" class="form-control form-control-sm" value="<?= html_escape($filters['start']) ?>">
 						</div>
 						<div class="col-6 col-md-2">
 							<label class="form-label small mb-1">Tgl Sampai</label>
-							<input type="date" name="end" class="form-control form-control-sm" value="<?= $filters['end'] ?>">
+							<input type="date" name="end" class="form-control form-control-sm" value="<?= html_escape($filters['end']) ?>">
 						</div>
 						<div class="col-6 col-md-3 d-flex gap-2">
 							<button type="submit" class="btn btn-sm btn-primary">Cari</button>
@@ -170,6 +175,7 @@
 					<tbody>
 						<?php if (!empty($shipments)): $no = 1;
 							foreach ($shipments as $s): ?>
+								<?php $is_kec = ($s->is_kecamatan ?? '0') === '1'; ?>
 								<tr>
 									<!-- <td>
 										<?php if ($s->status == 'RECEIVED_ORIGIN' && $role_slug == 'admin-kribo'): ?>
@@ -202,10 +208,15 @@
 										<div class="fw-bold text-success small">Rp <?= number_format($s->total_amount, 0, ',', '.') ?></div>
 										<div class="small text-muted"><?= $s->koli ?> Koli | <?= floatval($s->chargeable_weight) ?> Kg</div>
 									</td>
-									<td><?= shipment_status_badge($s->status) ?></td>
+									<td>
+										<?= shipment_status_badge($s->status) ?>
+										<?php if (!empty($s->origin_courier_awb)): ?>
+											<div class="small text-muted mt-1">AWB IK: <?= html_escape($s->origin_courier_awb) ?></div>
+										<?php endif; ?>
+									</td>
 									<td>
 										<div class="btn-list flex-nowrap">
-											<?php if ($s->status == 'BOOKED'): ?>
+											<?php if ($s->status == 'BOOKED' && !$is_kec): ?>
 												<?php if ($s->payment_type !== 'TRANSFER'): ?>
 
 													<button type="button" class="btn btn-sm btn-success btn-confirm-paid"
@@ -225,9 +236,9 @@
 											<?php if ($s->category === 'INTERNATIONAL'): ?>
 												<button type="button" class="btn btn-sm btn-icon btn-outline-azure btn-set-vendor"
 													data-id="<?= $s->id ?>"
-													data-resi="<?= $s->no_resi ?>"
-													data-vendor="<?= $s->vendor ?>"
-													data-connote="<?= $s->vendor_connote ?>"
+													data-resi="<?= html_escape($s->no_resi) ?>"
+													data-vendor="<?= html_escape($s->vendor) ?>"
+													data-connote="<?= html_escape($s->vendor_connote) ?>"
 													title="Set Vendor Connote">
 													<?= tabler_icon('world-upload') ?>
 												</button>
@@ -246,7 +257,7 @@
 												data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>" title="Batalkan"><?= tabler_icon('trash') ?></button> -->
 											<?php if ($role_slug !== 'staff-mitra'): ?>
 												<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-cancel-shipment"
-													data-id="<?= $s->id ?>" data-resi="<?= $s->no_resi ?>" title="Batalkan">
+													data-id="<?= $s->id ?>" data-resi="<?= html_escape($s->no_resi) ?>" title="Batalkan">
 													<?= tabler_icon('trash') ?>
 												</button>
 											<?php endif; ?>
@@ -256,7 +267,7 @@
 							<?php endforeach;
 						else: ?>
 							<tr>
-								<td colspan="8" class="text-center py-5">
+								<td colspan="7" class="text-center py-5">
 									<div class="empty">
 										<div class="empty-icon text-muted"><?= tabler_icon('mood-empty') ?></div>
 										<p class="empty-title">Data Kosong</p>
@@ -273,7 +284,10 @@
 
 		<!-- ===== MOBILE CARD LIST (hidden on desktop) ===== -->
 		<div class="d-md-none">
-			<?php if (!empty($shipments)): foreach ($shipments as $s): ?>
+			<?php
+			if (!empty($shipments)):
+				foreach ($shipments as $s): ?>
+					<?php $is_kec = ($s->is_kecamatan ?? '0') === '1'; ?>
 					<?php
 					$bg = 'bg-secondary';
 					if ($s->status == 'BOOKED')                $bg = 'bg-cyan';
@@ -319,7 +333,7 @@
 							</div>
 							<!-- Actions -->
 							<div class="d-flex gap-2 flex-wrap">
-								<?php if ($s->status == 'BOOKED'): ?>
+								<?php if ($s->status == 'BOOKED' && !$is_kec): ?>
 									<?php if ($s->payment_type !== 'TRANSFER'): ?>
 
 										<button type="button" class="btn btn-sm btn-success btn-confirm-paid"
@@ -354,11 +368,12 @@
 									</button>
 								<?php endif; ?>
 								<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('printer') ?></a>
-								<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-void-shipment"
-									data-id="<?= $s->id ?>"
-									data-resi="<?= $s->no_resi ?>"
-									title="Void Transaksi">
-									<?= tabler_icon('ban') ?> </button>
+								<?php if ($role_slug !== 'staff-mitra'): ?>
+									<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-cancel-shipment"
+										data-id="<?= $s->id ?>" data-resi="<?= html_escape($s->no_resi) ?>" title="Batalkan">
+										<?= tabler_icon('trash') ?>
+									</button>
+								<?php endif; ?>
 							</div>
 						</div>
 					</div>
@@ -379,7 +394,7 @@
 </div>
 
 <!-- MODAL UPLOAD BUKTI DELIVERED -->
-<div class="modal fade" id="modal-delivery" statistical="false" tabindex="-1" role="dialog" aria-hidden="true">
+<div class="modal fade" id="modal-delivery" tabindex="-1" role="dialog" aria-hidden="true">
 	<div class="modal-dialog modal-dialog-centered" role="document">
 		<div class="modal-content">
 			<div class="modal-header">
@@ -524,6 +539,7 @@
 				confirmButtonText: 'Ya, Proses!'
 			}).then(result => {
 				if (result.isConfirmed) {
+					// ✅ FIXED
 					fetch("<?= site_url('shipment/ajax_bulk_manifest') ?>", {
 							method: 'POST',
 							body: formData
@@ -531,7 +547,9 @@
 						.then(r => r.json())
 						.then(data => {
 							if (data.status) Swal.fire('Berhasil!', data.message, 'success').then(() => location.reload());
-						});
+							else Swal.fire('Gagal', data.message || 'Gagal memproses manifest.', 'error');
+						})
+						.catch(() => Swal.fire('Gagal', 'Terjadi kesalahan server.', 'error'));
 				}
 			});
 		});
@@ -555,7 +573,10 @@
 						id
 					}, function(res) {
 						if (res.status) Swal.fire('Sip!', 'Status berubah jadi Siap Pickup.', 'success').then(() => location.reload());
-					}, 'json');
+						else Swal.fire('Gagal', res.message || 'Gagal konfirmasi.', 'error');
+					}, 'json').fail(function(xhr) {
+						Swal.fire('Gagal', (xhr.responseJSON && xhr.responseJSON.message) || 'Terjadi kesalahan server.', 'error');
+					});
 				}
 			});
 		});
@@ -652,7 +673,36 @@
 					Swal.fire('Gagal', res.message, 'error');
 					$('#btn-save-vendor').attr('disabled', false).text('Simpan');
 				}
-			}, 'json');
+			}, 'json').fail(function() {
+				Swal.fire('Gagal', 'Terjadi kesalahan server.', 'error');
+				$('#btn-save-vendor').attr('disabled', false).text('Simpan');
+			});
+		});
+
+		$(document).on('click', '.btn-cancel-shipment', function() {
+			const id = $(this).data('id'),
+				resi = $(this).data('resi');
+			Swal.fire({
+				title: 'Batalkan ' + resi + '?',
+				input: 'text',
+				inputPlaceholder: 'Alasan pembatalan',
+				inputValidator: v => !v && 'Alasan wajib diisi',
+				icon: 'warning',
+				showCancelButton: true,
+				confirmButtonText: 'Ya, Batalkan',
+				confirmButtonColor: '#d63939'
+			}).then(r => {
+				if (!r.isConfirmed) return;
+				$.post("<?= site_url('shipment/ajax_cancel_shipment') ?>", {
+					id,
+					reason: r.value
+				}, function(res) {
+					if (res.status) Swal.fire('Berhasil', res.message, 'success').then(() => location.reload());
+					else Swal.fire('Gagal', res.message, 'error');
+				}, 'json').fail(function(xhr) {
+					Swal.fire('Gagal', (xhr.responseJSON && xhr.responseJSON.message) || 'Terjadi kesalahan server.', 'error');
+				});
+			});
 		});
 	});
 </script>

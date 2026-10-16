@@ -66,6 +66,30 @@ class M_Agent extends MY_Model
 			->result();
 	}
 
+	public function get_subdistricts_by_regency($regency_id)
+	{
+		return $this->db
+			->select('id, nama_kecamatan as nama')
+			->where('kota_id', $regency_id)
+			->order_by('nama', 'ASC')
+			->get('mt_kecamatan')
+			->result();
+	}
+
+	/**
+	 * Mengambil nomor urut berikutnya untuk agen berdasarkan kecamatan (subdistrict_id)
+	 * 
+	 * @param int $subdistrict_id
+	 * @return int
+	 */
+	public function get_next_sequence_by_subdistrict($subdistrict_id)
+	{
+		$this->db->where('subdistrict_id', $subdistrict_id);
+		$count = $this->db->count_all_results('agents'); // Sesuaikan 'agents' dengan nama tabel agen kamu
+
+		return $count + 1;
+	}
+
 	/**
 	 * Nama provinsi berdasarkan id
 	 */
@@ -81,6 +105,15 @@ class M_Agent extends MY_Model
 	public function get_regency_name($regency_id)
 	{
 		$row = $this->db->where('id', $regency_id)->get('mt_kota')->row();
+		return $row ? $row->nama : '—';
+	}
+
+	/**
+	 * Nama kecamatan berdasarkan id
+	 */
+	public function get_subdiscrict_name($subdistrict_id)
+	{
+		$row = $this->db->where('id', $subdistrict_id)->get('mt_kecamatan')->row();
 		return $row ? $row->nama : '—';
 	}
 
