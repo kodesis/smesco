@@ -16,11 +16,12 @@ class Tlx_tracking implements Tracking_contract
 
 	// tambahin di atas fetch(), di class
 	private $details_map = [
-		// urutan penting: yang spesifik dulu
 		'ARRIVED AT DESTINATION'   => 'ARRIVED',
 		'DEPARTED TO DESTINATION'  => 'IN_TRANSIT',
 		'has been processed'       => 'MANIFESTED',
 		'has been arrived'         => 'RECEIVED_ORIGIN',
+		'Delivery failed'          => 'DELIVERY_FAILED',
+		'not in touch'             => 'DELIVERY_FAILED',
 	];
 
 	public function fetch(string $connote): array

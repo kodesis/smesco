@@ -690,7 +690,7 @@ class M_Shipment extends CI_Model
 		if (!$shipment || empty($shipment['vendor_connote'])) return false;
 
 		// 🔴 REMOVED: 
-		if ($shipment['status'] === 'DELIVERED') return false;
+		// if ($shipment['status'] === 'DELIVERED') return false;
 		// Baris di atas dihapus agar jika data tracking dihapus manual/di-reset, sync tetap bisa berjalan.
 
 		// Resolve vendor class
@@ -740,6 +740,7 @@ class M_Shipment extends CI_Model
 				'created_by'  => 0,
 				'created_at'  => $item['created_at'],
 			]);
+			$existing_signatures[] = $signature;
 
 			$inserted_count++;
 		}
