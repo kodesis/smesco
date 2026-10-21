@@ -169,5 +169,6 @@ $config['menus'] = [
 			'icon' => 'plus',
 		],
 		['title' => 'Laporan',   'url' => 'reports',         'segment' => 'reports',     'icon' => 'file-spreadsheet'],
+		['title' => 'Settlement',   'url' => 'agentkecamatan/settlement',         'segment' => 'reports',     'icon' => 'file-spreadsheet'],
 	],
 ];
