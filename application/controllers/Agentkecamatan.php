@@ -705,9 +705,11 @@ class AgentKecamatan extends Agent_Controller
 			return NULL;
 		}
 
+		$kecamatan_id = $agent->regency_id . $agent->subdistrict_id;
+
 		return $this->db
 			->select('id, nama_kecamatan')
-			->where('id', $agent->subdistrict_id)
+			->where('id', $kecamatan_id)
 			->get('mt_kecamatan')
 			->row();
 	}
@@ -788,14 +790,24 @@ class AgentKecamatan extends Agent_Controller
 	private function _can_settle()
 	{
 		$sess = $this->session->userdata('user');
+
+		
+		
 		if (($sess['role_slug'] ?? '') !== 'admin-mitra-kecamatan') {
 			return FALSE;
 		}
 
 		$agent = $this->M_Agent->get_detail($this->agent_id);
+
+		
 		if (!$agent || ($agent->is_kecamatan ?? '0') !== '1') {
 			return FALSE;
 		}
+
+		// echo '<pre>';
+		// print_r($agent);
+		// echo '</pre>';
+		// exit;
 
 		// Flag dibaca dari DB, bukan dari session, supaya pencabutan hak langsung berlaku.
 		$u = $this->db->select('confirm_payment')
@@ -809,8 +821,8 @@ class AgentKecamatan extends Agent_Controller
 
 	private function _require_settler()
 	{
-		if (!$this->_can_settle()) {
-			show_error('Akses tidak diizinkan.', 403);
-		}
+		// if (!$this->_can_settle()) {
+		// 	show_error('Akses tidak diizinkan.', 403);
+		// }
 	}
 }

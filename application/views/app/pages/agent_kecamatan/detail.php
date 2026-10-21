@@ -292,7 +292,7 @@ $can_print = !in_array(
 										<td class="text-muted">
 											Nominal Smesco
 										</td>
-										<td class="text-end">
+										<td class="text-end text-red">
 											Rp <?= number_format($shipment['nominal_tagihan_smesco']) ?>
 										</td>
 									</tr>
