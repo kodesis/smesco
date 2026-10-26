@@ -11,12 +11,14 @@ class M_AgentSettlement extends CI_Model
 	/** Semua resi yang masih berutang ke Smesco (termasuk yang customernya belum lunas). */
 	public function get_unpaid_shipments($agent_id)
 	{
+		$date_closing = date('Y-m-d 15:00:00');
 		return $this->db
 			->select('id, no_resi, destination, status, payment_status, nominal_tagihan_smesco, created_at')
 			->where('agent_id', (int) $agent_id)
 			->where('category', 'INTERNATIONAL')
 			->where('status_tagihan_smesco', self::TAGIHAN_UNPAID)
 			->where('status !=', 'CANCELLED')
+			->where('created_at <', $date_closing)
 			->where('payment_status', 'PAID')
 			->order_by('created_at', 'ASC')
 			->get('shipments')
