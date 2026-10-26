@@ -39,7 +39,7 @@ $can_print = !in_array(
 							class="btn btn-primary"> <?= tabler_icon('printer', 'me-1') ?> Print Label </a>
 					<?php endif; ?>
 
-					<?php if ($shipment['status'] === 'READY_FOR_HANDOVER'): ?>
+					<?php if ($shipment['status'] === 'READY_FOR_HANDOVER' && $shipment['status_tagihan_smesco'] == 'PAID'): ?>
 						<button
 							type="button"
 							class="btn btn-primary btn-handover-courier"

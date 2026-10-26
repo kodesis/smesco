@@ -295,17 +295,17 @@ $agent_origin_name = !empty($agent_origin_name) ? $agent_origin_name : $agent_or
 
 									<!-- ENGLISH DESCRIPTION -->
 									<div class="col-md-6 mb-3">
-										<label class="form-label required">English Description</label>
-										<input type="text" name="commodity_detail_en" class="form-control" placeholder="e.g. CASSAVA CHIPS, COTTON T-SHIRT" oninput="this.value = this.value.toUpperCase()" required>
+										<label class="form-label">English Description</label>
+										<input type="text" name="commodity_detail_en" class="form-control" placeholder="e.g. CASSAVA CHIPS, COTTON T-SHIRT" oninput="this.value = this.value.toUpperCase()">
 										<div class="form-hint">Wajib menggunakan bahasa Inggris.</div>
 									</div>
 
 									<!-- CUSTOMS VALUE -->
 									<div class="col-md-6 mb-3">
-										<label class="form-label required">Nilai Barang - Customs Value</label>
+										<label class="form-label">Nilai Barang - Customs Value</label>
 										<div class="input-group">
 											<span class="input-group-text">US$</span>
-											<input type="text" name="customs_value_usd" class="form-control indo-format" placeholder="0,00" required>
+											<input type="text" name="customs_value_usd" class="form-control indo-format" placeholder="0">
 										</div>
 										<div class="form-hint">Estimasi nilai barang untuk kebutuhan kepabeanan.</div>
 									</div>
