@@ -1592,7 +1592,7 @@ class M_Shipment extends CI_Model
 		$this->db->insert('agent_manifests', [
 			'manifest_number' => $manifest_number,
 			'agent_id'        => $agent_id,
-			'destination_hub' => $fwd['hub'] ?? 'INDAH KARGO',
+			'destination_hub' => $fwd['hub'] ?? 'FORWARDER',
 			'handover_date'   => $now,
 			'forwarder_name'  => $fwd['name'] ?? NULL,
 			'forwarder_phone' => $fwd['phone'] ?? NULL,
@@ -1613,7 +1613,7 @@ class M_Shipment extends CI_Model
 				'shipment_id' => $r['id'],
 				'status'      => 'HANDOVER_TO_COURIER',
 				'location'    => $r['agent_origin'] ?: 'AGEN KECAMATAN',
-				'note'        => 'Shipment diserahkan ke Indah Kargo. AWB: ' . $fwd['awb'] . '. Manifest: ' . $manifest_number,
+				'note'        => 'Shipment diserahkan ke Forwarder. AWB: ' . $fwd['awb'] . '. Manifest: ' . $manifest_number,
 				'created_by'  => $user_id,
 				'created_at'  => $now,
 			];

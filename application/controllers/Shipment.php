@@ -3765,7 +3765,7 @@ class Shipment extends Authenticated_Controller
 		if ($is_kecamatan) {
 			// Belum sampai ke Indah Kargo -> belum boleh diproses hub
 			if (in_array($shipment['status'], ['BOOKED', 'READY_FOR_HANDOVER'], true)) {
-				return $respond(false, 'Shipment kecamatan ini belum diserahkan ke Indah Kargo.');
+				return $respond(false, 'Shipment kecamatan ini belum diserahkan ke Forwarder.');
 			}
 			$to_forwarding = $shipment['status'] === 'HANDOVER_TO_COURIER';
 		}

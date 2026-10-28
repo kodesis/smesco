@@ -11,7 +11,7 @@ $statuses = ['BOOKED', 'READY_FOR_HANDOVER', 'HANDOVER_TO_COURIER', 'READY_FOR_F
 
 			<div class="col-auto ms-auto btn-list">
 				<button type="button" class="btn btn-dark btn-bulk-handover bulk-ui bulk-off d-none d-md-inline-flex">
-					<?= tabler_icon('truck-delivery', 'me-1') ?> Serahkan ke Indah Kargo (<span class="selected-count">0</span>)
+					<?= tabler_icon('truck-delivery', 'me-1') ?> Serahkan ke Forwarder (<span class="selected-count">0</span>)
 				</button>
 				<a href="<?= site_url('agentkecamatan/create') ?>" class="btn btn-primary">
 					<?= tabler_icon('plus', 'me-1') ?> Kirim Barang
@@ -261,7 +261,7 @@ $statuses = ['BOOKED', 'READY_FOR_HANDOVER', 'HANDOVER_TO_COURIER', 'READY_FOR_F
 
 		<div class="sticky-bar d-md-none bulk-ui bulk-off">
 			<button type="button" class="btn btn-dark w-100 btn-bulk-handover">
-				<?= tabler_icon('truck-delivery', 'me-1') ?> Serahkan ke Indah Kargo (<span class="selected-count">0</span>)
+				<?= tabler_icon('truck-delivery', 'me-1') ?> Serahkan ke Forwarder (<span class="selected-count">0</span>)
 			</button>
 		</div>
 	</div>

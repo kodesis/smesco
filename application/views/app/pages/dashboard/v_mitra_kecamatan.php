@@ -19,7 +19,7 @@ $cards = [
 	['Hari Ini',         $n('today'),               'package',        'primary', site_url('agentkecamatan')],
 	['Belum Dibayar',    $n('unpaid'),              'clock',          'warning', site_url('agentkecamatan?status=BOOKED')],
 	['Siap Diserahkan',  $n('ready_for_handover'),  'package-export', 'success', site_url('agentkecamatan?status=READY_FOR_HANDOVER')],
-	['Di Indah Kargo',   $n('handover_to_courier'), 'truck-delivery', 'info',    site_url('agentkecamatan?status=HANDOVER_TO_COURIER')],
+	['Di Forwarder',   $n('handover_to_courier'), 'truck-delivery', 'info',    site_url('agentkecamatan?status=HANDOVER_TO_COURIER')],
 	['Diproses Jakarta', $n('ready_for_forwarding'), 'plane-departure', 'purple', site_url('agentkecamatan?status=READY_FOR_FORWARDING')],
 	['Total Pengiriman', $n('total'),               'list',           'secondary', site_url('agentkecamatan')],
 ];

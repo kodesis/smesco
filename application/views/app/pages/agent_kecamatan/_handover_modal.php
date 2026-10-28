@@ -2,17 +2,17 @@
 	<div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
 		<form class="modal-content" id="form-handover">
 			<div class="modal-header">
-				<h5 class="modal-title">Serahkan ke Indah Kargo (<span id="handover-count">0</span> resi)</h5>
+				<h5 class="modal-title">Serahkan ke Forwarder (<span id="handover-count">0</span> resi)</h5>
 				<button type="button" class="btn-close" data-bs-dismiss="modal"></button>
 			</div>
 			<div class="modal-body">
 				<div class="mb-3">
-					<label class="form-label required">AWB Indah Kargo</label>
+					<label class="form-label required">AWB Forwarder</label>
 					<input type="text" name="origin_courier_awb" autocapitalize="characters" class="form-control" required oninput="this.value=this.value.toUpperCase()">
 					<div class="form-hint">Satu AWB berlaku untuk semua resi dalam serah-terima ini.</div>
 				</div>
 				<div class="mb-3">
-					<label class="form-label">Cabang / Lokasi Indah Kargo</label>
+					<label class="form-label">Cabang / Lokasi Forwarder</label>
 					<input type="text" name="destination_hub" autocapitalize="characters" class="form-control" placeholder="INDAH KARGO KEC. ...">
 				</div>
 				<!-- <div class="row g-2">

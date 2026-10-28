@@ -281,7 +281,7 @@ $can_print = !in_array(
 
 									<tr class="table-primary">
 										<td class="fw-bold h5 mb-0">
-											Total Biaya
+											Total Diterima dari Pelanggan
 										</td>
 										<td class="text-end fw-bold h4 mb-0 text-primary">
 											Rp <?= number_format($shipment['total_amount']) ?>
@@ -290,7 +290,7 @@ $can_print = !in_array(
 
 									<tr>
 										<td class="text-muted">
-											Nominal Smesco
+											Setoran Ke Mitra / Pusat
 										</td>
 										<td class="text-end text-red">
 											Rp <?= number_format($shipment['nominal_tagihan_smesco']) ?>
