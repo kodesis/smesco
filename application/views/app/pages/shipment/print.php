@@ -191,9 +191,52 @@
 			margin-top: 8px;
 		}
 	</style>
+
+	<?php if (!empty($auto_print)): ?>
+		<style>
+			@page {
+				size: A6 portrait;
+				margin: 0;
+			}
+
+			@media print {
+				.no-print {
+					display: none !important;
+				}
+
+				.label-wrapper:last-child {
+					page-break-after: auto;
+				}
+			}
+		</style>
+	<?php endif; ?>
 </head>
 
 <body>
+
+	<?php if (!empty($auto_print)): ?>
+		<div class="no-print" id="print-bar" style="padding:10px;text-align:center">
+			<button id="btn-print" onclick="cetakLabel()" style="padding:10px 20px;font-size:14px">Cetak Label</button>
+		</div>
+		<script>
+			async function cetakLabel() {
+				if (window.SmescoPrint && typeof SmescoPrint.page === 'function') {
+					const bar = document.getElementById('print-bar');
+					bar.style.display = 'none'; // supaya tombol tidak ikut tercetak
+					try {
+						await SmescoPrint.page();
+					} catch (e) {
+						alert('Gagal cetak: ' + (e.message || e));
+					} finally {
+						bar.style.display = '';
+					}
+				} else {
+					window.print();
+				}
+			}
+			window.addEventListener('load', () => setTimeout(cetakLabel, 300));
+		</script>
+	<?php endif; ?>
 
 	<?php foreach ($labels as $key => $l): ?>
 		<div class="label-wrapper">
@@ -214,7 +257,7 @@
 				<div class="main-info">
 					<div class="info-box">
 						<div style="font-size: 9px; margin-bottom: 2px;">TUJUAN:</div>
-						<div class="destinasi uppercase"><?= $resi['destination'] ?></div>
+						<div class="destinasi uppercase"><?= html_escape($resi['destination']) ?></div>
 					</div>
 					<div class="info-box berat">
 						<div style="font-size: 9px; margin-bottom: 2px;">BERAT:</div>
@@ -225,7 +268,7 @@
 				<table class="detail-table">
 					<tr>
 						<td width="30%">Deskripsi Barang</td>
-						<td width="70%" class="text-bold">: <?= $resi['commodity_detail'] ?></td>
+						<td width="70%" class="text-bold">: <?= html_escape($resi['commodity_detail']) ?></td>
 					</tr>
 					<tr>
 						<td>Jumlah Paket</td>
@@ -233,15 +276,15 @@
 					</tr>
 					<tr>
 						<td>Layanan</td>
-						<td class="text-bold">: <?= $resi['service_name'] ?? 'REGULAR AIR FREIGHT' ?></td>
+						<td class="text-bold">: <?= html_escape($resi['service_name'] ?? 'REGULAR AIR FREIGHT') ?></td>
 					</tr>
 				</table>
 
 				<div class="address-container">
 					<div class="address-box">
 						<span class="addr-title">PENGIRIM</span>
-						<div class="text-bold"><?= $resi['sender_name'] ?> (<?= $resi['sender_phone'] ?>)</div>
-						<div style="font-size: 9px;"><?= $resi['sender_address'] ?></div>
+						<div class="text-bold"><?= html_escape($resi['sender_name']) ?> (<?= html_escape($resi['sender_phone']) ?>)</div>
+						<div style="font-size: 9px;"><?= html_escape($resi['sender_address']) ?></div>
 					</div>
 					<div class="address-box">
 						<span class="addr-title">PENERIMA</span>
@@ -264,7 +307,7 @@
 							<tr>
 								<td width="70%" style="vertical-align: top;">
 									No. Resi: <b style="font-size: 11px;"><?= $resi['no_resi'] ?></b><br>
-									Tujuan: <?= $resi['destination'] ?><br>
+									Tujuan: <?= html_escape($resi['destination']) ?><br>
 									Total Biaya: <b>Rp <?= number_format($resi['total_amount']) ?></b><br>
 									<i style="font-size: 8px;">*Simpan resi ini untuk bukti komplain</i>
 								</td>
@@ -283,11 +326,6 @@
 			</div>
 		</div>
 	<?php endforeach; ?>
-	<script>
-		window.onload = function() {
-			window.print();
-		};
-	</script>
 </body>
 
 </html>

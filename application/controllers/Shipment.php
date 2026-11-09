@@ -1851,14 +1851,14 @@ class Shipment extends Authenticated_Controller
 			return;
 		}
 
-		// if (!empty($resi['agent_origin'])) {
-		// 	redirect('agentkecamatan/print/' . $resi['id']);
-		// }
-
 		$no_print_statuses = ['BOOKED', 'CANCELLED'];
 		if (in_array($resi['status'], $no_print_statuses)) {
 			$this->session->set_flashdata('error', 'Shipment dengan status ' . $resi['status'] . ' tidak bisa dicetak.');
 			redirect('shipment/detail/' . $resi['id']); // ← sesuaikan dengan route detail kamu
+		}
+
+		if (!empty($resi['agent_origin'])) {
+			redirect('agentkecamatan/print_label/' . $resi['id']);
 		}
 
 		$this->load->library('ciqrcode');
@@ -1871,7 +1871,7 @@ class Shipment extends Authenticated_Controller
 		$logoBase64 = (file_exists($logoPath)) ? 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath)) : '';
 
 		// 2. QR Tracking (Sama untuk semua koli karena merujuk ke halaman tracking yang sama)
-		$linkTracking = base_url("home/tracking?awb=$no_resi");
+		$linkTracking = base_url('home/tracking?awb=' . urlencode($no_resi));
 		$fileTracking = 'qr_trc_' . $no_resi . '.png';
 		$pathTracking = $tempDir . DIRECTORY_SEPARATOR . $fileTracking;
 		$this->ciqrcode->generate([
