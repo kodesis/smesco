@@ -21,7 +21,7 @@ class Shipment extends Authenticated_Controller
 	// Hanya dipakai kalau $duitku_mode = 'api' — paymentMethod wajib diisi kode valid, gak bisa kosong
 	private $duitku_default_payment_method = 'VC';
 
-	private $is_payment_gateway = false;
+	private $is_payment_gateway = true;
 
 	public function __construct()
 	{
@@ -1851,6 +1851,10 @@ class Shipment extends Authenticated_Controller
 			return;
 		}
 
+		// if (!empty($resi['agent_origin'])) {
+		// 	redirect('agentkecamatan/print/' . $resi['id']);
+		// }
+
 		$no_print_statuses = ['BOOKED', 'CANCELLED'];
 		if (in_array($resi['status'], $no_print_statuses)) {
 			$this->session->set_flashdata('error', 'Shipment dengan status ' . $resi['status'] . ' tidak bisa dicetak.');
@@ -1921,15 +1925,14 @@ class Shipment extends Authenticated_Controller
 			'logo_base64' => $logoBase64
 		];
 
-		// $this->load->view('app/pages/shipment/print', $data);
-
-
-		if (!empty($shipment['agent_origin'])) {
-			redirect('agentkecamatan/print/' . $shipment['id']);
+		if ($this->input->get('format') === 'pdf') {
+			$html = $this->load->view('app/pages/shipment/print', $data, true);
+			$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+			return;
 		}
-		$html = $this->load->view('app/pages/shipment/print', $data, true);
 
-		$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+		$data['auto_print'] = true;
+		$this->load->view('app/pages/shipment/print', $data);
 	}
 
 	public function pickup_scan()

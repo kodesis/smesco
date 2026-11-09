@@ -367,7 +367,10 @@
 										<?= tabler_icon('truck-delivery', 'me-1') ?> Kirim
 									</button>
 								<?php endif; ?>
-								<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('printer') ?></a>
+								<?php if (!in_array($s->status, ['BOOKED', 'CANCELLED'], true)): ?>
+									<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('printer', 'me-1') ?> Cetak</a>
+									<a href="<?= site_url('shipment/print_label/' . $s->no_resi) ?>?format=pdf" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><?= tabler_icon('file-type-pdf', 'me-1') ?> PDF</a>
+								<?php endif; ?>
 								<?php if ($role_slug !== 'staff-mitra'): ?>
 									<button type="button" class="btn btn-sm btn-icon btn-outline-danger btn-cancel-shipment"
 										data-id="<?= $s->id ?>" data-resi="<?= html_escape($s->no_resi) ?>" title="Batalkan">

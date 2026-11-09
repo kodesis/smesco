@@ -237,7 +237,9 @@ if (! function_exists('tabler_icon')) {
 
 			'building-airport' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3.59 7h8.82a1 1 0 0 1 .902 1.433l-1.44 3a1 1 0 0 1 -.901 .567h-5.942a1 1 0 0 1 -.901 -.567l-1.44 -3a1 1 0 0 1 .901 -1.433" /><path d="M6 7l-.78 -2.342a.5 .5 0 0 1 .473 -.658h4.612a.5 .5 0 0 1 .475 .658l-.78 2.342" /><path d="M8 2v2" /><path d="M6 12v9h4v-9" /><path d="M3 21h18" /><path d="M22 5h-6l-1 -1" /><path d="M18 3l2 2l-2 2" /><path d="M10 17h7a2 2 0 0 1 2 2v2" />',
 
-			'scale' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 20l10 0" /><path d="M6 6l6 -1l6 1" /><path d="M12 3l0 17" /><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0" /><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0" />'
+			'scale' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 20l10 0" /><path d="M6 6l6 -1l6 1" /><path d="M12 3l0 17" /><path d="M9 12l-3 -6l-3 6a3 3 0 0 0 6 0" /><path d="M21 12l-3 -6l-3 6a3 3 0 0 0 6 0" />',
+
+			'file-type-pdf' => '<path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 12v-7a2 2 0 0 1 2 -2h7l5 5v4" /><path d="M5 18h1.5a1.5 1.5 0 0 0 0 -3h-1.5v6" /><path d="M17 18h2" /><path d="M20 15h-3v6" /><path d="M11 15v6h1a2 2 0 0 0 2 -2v-2a2 2 0 0 0 -2 -2h-1" />'
 		];
 
 		// Fallback kalau icon tidak ditemukan
