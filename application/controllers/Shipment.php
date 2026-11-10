@@ -1858,7 +1858,7 @@ class Shipment extends Authenticated_Controller
 		}
 
 		if (!empty($resi['agent_origin'])) {
-			redirect('agentkecamatan/print_label/' . $resi['id']);
+			redirect('agentkecamatan/print_label/' . $no_resi);
 		}
 
 		$this->load->library('ciqrcode');

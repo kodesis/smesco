@@ -207,9 +207,77 @@ $asal_label  = strtoupper((string) $agent_origin_name);
 			margin-top: 8px;
 		}
 	</style>
+	<?php if (!empty($auto_print)): ?>
+		<style>
+			@page {
+				size: A6 portrait;
+				margin: 0;
+			}
+
+			@media print {
+				.no-print {
+					display: none !important;
+				}
+
+				.label-wrapper:last-child {
+					page-break-after: auto;
+				}
+			}
+		</style>
+	<?php endif; ?>
 </head>
 
 <body>
+	<?php if (!empty($auto_print)): ?>
+		<div class="no-print" id="print-bar" style="padding:10px;text-align:center">
+			<button id="btn-print" onclick="cetakLabel()" style="padding:10px 20px;font-size:14px">Cetak Label</button>
+			<div id="print-status" style="margin-top:6px;font-size:12px;color:#555"></div>
+		</div>
+		<script>
+			function setStatus(t) {
+				document.getElementById('print-status').textContent = t;
+			}
+
+			function diAplikasi() {
+				return /SmescoApp/.test(navigator.userAgent);
+			}
+
+			async function cetakLabel() {
+				if (window.SmescoPrint) {
+					const bar = document.getElementById('print-bar');
+					bar.style.display = 'none'; // tombol tidak ikut tercetak
+					try {
+						await SmescoPrint.page();
+						setStatus('Terkirim ke printer.');
+					} catch (e) {
+						setStatus('Gagal cetak: ' + (e.message || e));
+					} finally {
+						bar.style.display = '';
+					}
+				} else if (diAplikasi()) {
+					setStatus('Versi aplikasi belum mendukung print. Update APK Smesco terlebih dahulu.');
+				} else {
+					window.print(); // browser biasa (PC / Chrome)
+				}
+			}
+
+			// Cetak otomatis: tunggu jembatan aplikasi siap, jangan pakai timer tetap
+			(function autoPrint() {
+				let done = false;
+				const go = () => {
+					if (!done) {
+						done = true;
+						cetakLabel();
+					}
+				};
+				if (window.SmescoPrint) return window.addEventListener('load', go);
+				window.addEventListener('smescoprintready', go);
+				// Bukan di aplikasi / aplikasi lama: tetap coba setelah halaman selesai
+				window.addEventListener('load', () => setTimeout(go, 1500));
+			})();
+		</script>
+	<?php endif; ?>
+
 
 	<?php /* ===================== RESI 1 : KECAMATAN -> JAKARTA ===================== */ ?>
 	<?php foreach ($labels as $key => $l): $page_no++; ?>

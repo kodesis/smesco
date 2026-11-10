@@ -377,9 +377,9 @@ class AgentKecamatan extends Agent_Controller
 	 * Tidak membuat ulang template A6.
 	 * Kita validasi ownership dulu, lalu gunakan print_label existing.
 	 */
-	public function print_label($id = NULL)
+	public function print_label($no_resi = NULL)
 	{
-		if ($id === NULL || !ctype_digit((string) $id)) {
+		if ($no_resi === NULL) {
 			show_404();
 			return;
 		}
@@ -387,7 +387,8 @@ class AgentKecamatan extends Agent_Controller
 		$this->load->model('M_AgentKecamatan');
 
 		// Scoped di SQL: shipment agen lain tidak akan pernah ketemu.
-		$resi = $this->M_AgentKecamatan->get_by_id((int) $id, (int) $this->agent_id);
+		// $resi = $this->M_AgentKecamatan->get_by_id((int) $id, (int) $this->agent_id);
+		$resi = $this->M_Shipment->getResi($no_resi);
 
 		if (!$resi || strtoupper((string) $resi['category']) !== 'INTERNATIONAL') {
 			show_404();
@@ -483,8 +484,7 @@ class AgentKecamatan extends Agent_Controller
 		// 	'hub_name'          => 'Jakarta',
 		// 	'hub_address'       => 'Pondok Labu',
 		// ]);
-
-		$html = $this->load->view('app/pages/agent_kecamatan/print', [
+		$data = [
 			'resi'              => $resi,
 			'labels'            => $labels,
 			'total_koli'        => $total_koli,
@@ -494,9 +494,16 @@ class AgentKecamatan extends Agent_Controller
 			'agent_origin_name' => $agent_origin_name !== '' ? $agent_origin_name : '-',
 			'hub_name'          => 'Jakarta',
 			'hub_address'       => 'Pondok Labu',
-		], TRUE);
+		];
 
-		$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+		if ($this->input->get('format') === 'pdf') {
+			$html = $this->load->view('app/pages/agent_kecamatan/print', $data, TRUE);
+			$this->pdfgenerator->generate($html, 'Resi-' . $no_resi, 'A6', 'portrait');
+			return;
+		}
+
+		$data['auto_print'] = true;
+		$this->load->view('app/pages/agent_kecamatan/print', $data);
 	}
 
 

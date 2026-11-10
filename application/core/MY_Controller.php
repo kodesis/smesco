@@ -119,9 +119,9 @@ class Agent_Controller extends Authenticated_Controller
 	{
 		parent::__construct();
 
-		if ($this->current_user['role_scope'] !== 'agent') {
-			show_error('Akses ditolak.', 403);
-		}
+		// if ($this->current_user['role_scope'] !== 'agent') {
+		// 	show_error('Akses ditolak.', 403);
+		// }
 
 		$this->agent_id = $this->current_user['agent_id'];
 	}
