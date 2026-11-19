@@ -391,6 +391,10 @@ class AgentKecamatan extends Agent_Controller
 		// $resi = $this->M_AgentKecamatan->get_by_id((int) $id, (int) $this->agent_id);
 		$resi = $this->M_Shipment->getResiById($no_resi);
 
+		if (!$resi) {
+			$resi = $this->M_Shipment->getResi($no_resi);
+		}
+
 		if (!$resi || strtoupper((string) $resi['category']) !== 'INTERNATIONAL') {
 			show_404();
 			return;
