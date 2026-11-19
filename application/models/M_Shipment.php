@@ -220,6 +220,16 @@ class M_Shipment extends CI_Model
 			->row_array();
 	}
 
+	public function getResiById($id)
+	{
+		return $this->db->select('shipments.*, service_types.name as service_name, service_types.code as service_code')
+			->from('shipments')
+			->join('service_types', 'service_types.id = shipments.service_type_id', 'left')
+			->where('shipments.id', $id)
+			->get()
+			->row_array();
+	}
+
 	public function update_status($id, $new_status, $note = '', $location = '')
 	{
 		// Ambil ID user dari session buat pencatatan log

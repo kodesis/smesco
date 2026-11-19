@@ -379,16 +379,17 @@ class AgentKecamatan extends Agent_Controller
 	 */
 	public function print_label($no_resi = NULL)
 	{
-		if ($no_resi === NULL) {
-			show_404();
-			return;
-		}
+		// print_r($no_resi);exit;
+		// if ($no_resi === NULL) {
+		// 	show_404();
+		// 	return;
+		// }
 
 		$this->load->model('M_AgentKecamatan');
 
 		// Scoped di SQL: shipment agen lain tidak akan pernah ketemu.
 		// $resi = $this->M_AgentKecamatan->get_by_id((int) $id, (int) $this->agent_id);
-		$resi = $this->M_Shipment->getResi($no_resi);
+		$resi = $this->M_Shipment->getResiById($no_resi);
 
 		if (!$resi || strtoupper((string) $resi['category']) !== 'INTERNATIONAL') {
 			show_404();
